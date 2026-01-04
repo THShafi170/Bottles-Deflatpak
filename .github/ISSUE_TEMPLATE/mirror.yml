@@ -14,7 +14,7 @@ body:
       label: Prerequisites
       options:
         - label: |
-            I am sure that this problem has NEVER been discussed in [other issues](https://github.com/bottlesdevs/Bottles/issues).
+            I am sure that this problem has NEVER been discussed in [other issues](https://github.com/tenshou170/Bottles-Deflatpak/issues).
           required: true
 
   - type: textarea

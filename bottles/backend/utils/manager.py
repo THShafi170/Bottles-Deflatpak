@@ -15,9 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-import shlex
 import shutil
 from datetime import datetime
+from bottles.backend.utils.portal import PortalUtils
 from gettext import gettext as _
 from glob import glob
 from typing import Optional
@@ -235,10 +235,6 @@ class ManagerUtils:
         cmd_cli = "bottles-cli"
         icon = "com.usebottles.bottles-program"
 
-        if "FLATPAK_ID" in os.environ:
-            cmd_legacy = "flatpak run com.usebottles.bottles"
-            cmd_cli = "flatpak run --command=bottles-cli com.usebottles.bottles"
-
         if not skip_icon and not custom_icon:
             icon = ManagerUtils.extract_icon(
                 config, program.get("name"), program.get("path")
@@ -283,40 +279,13 @@ class ManagerUtils:
                 f.write(f"Exec={cmd_legacy} -b \"{config.get('Name')}\"\n")
 
             return True
-        '''
-        WIP: the following code is not working yet, it raises an error:
-             GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod
-        import uuid
-        from gi.repository import Gio, Xdp
+        if PortalUtils.is_available():
+            # WIP: Dynamic launcher support via portals
+            portal = PortalUtils.get_portal()
+            if portal:
+                # ... (rest of the WIP logic can be added here)
+                pass
 
-        portal = Xdp.Portal()
-        if icon == "com.usebottles.bottles-program":
-            _icon = Gio.BytesIcon.new(icon.encode("utf-8"))
-        else:
-            _icon = Gio.FileIcon.new(Gio.File.new_for_path(icon))
-        icon_v = _icon.serialize()
-        token = portal.dynamic_launcher_request_install_token(program.get("name"), icon_v)
-        portal.dynamic_launcher_install(
-            token,
-            f"com.usebottles.bottles.{config.get('Name')}.{program.get('name')}.{str(uuid.uuid4())}.desktop",
-            """
-            [Desktop Entry]
-            Exec={}
-            Type=Application
-            Terminal=false
-            Categories=Application;
-            Comment=Launch {} using Bottles.
-            Actions=Configure;
-            [Desktop Action Configure]
-            Name=Configure in Bottles
-            Exec={}
-            """.format(
-                f"{cmd_cli} run -p {shlex.quote(program.get('name'))} -b '{config.get('Path')}'",
-                program.get("name"),
-                f"{cmd_legacy} -b '{config.get('Name')}'"
-            ).encode("utf-8")
-        )
-        '''
         return False
 
     @staticmethod

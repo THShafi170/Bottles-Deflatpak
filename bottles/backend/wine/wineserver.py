@@ -23,8 +23,8 @@ class WineServer(WineProgram):
             return False
 
         # Perform native check before wasting time using wine
-        res = subprocess.Popen(["pgrep", "wineserver"], stdout=subprocess.PIPE)
-        if res.stdout.read() == b"":
+        res = subprocess.run(["pgrep", "wineserver"], capture_output=True)
+        if not res.stdout:
             return False
 
         # Check using wine
@@ -72,14 +72,13 @@ class WineServer(WineProgram):
         env["WINEPREFIX"] = bottle
         env["PATH"] = f"{runner}/bin:{env['PATH']}"
 
-        subprocess.Popen(
+        subprocess.run(
             "wineserver -w",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
             shell=True,
             cwd=bottle,
             env=env,
-        ).wait()
+            capture_output=True,
+        )
 
     def kill(self, signal: int = -1):
         args = "-k"

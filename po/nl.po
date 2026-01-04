@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine-configuratie bijgewerkt!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Als Flatpak uitvoeren, gebruikersmap in een zandbak verwerken…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Als Native uitvoeren, gebruikersmap in een zandbak verwerken…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2430,8 +2430,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Deze functie is niet beschikbaar op uw systeem."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Om deze functie toe te voegen voert u ‘flatpak install’ uit"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Om deze functie toe te voegen voert u ‘native install’ uit"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2841,12 +2841,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak-migratie"
+msgid "Native migration"
+msgstr "Native-migratie"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Schakel het Flatpak-migratiedialoogvenster in."
+msgid "Toggle the Native migration dialog."
+msgstr "Schakel het Native-migratiedialoogvenster in."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3965,8 +3965,8 @@ msgstr "en nog veeeel meer!"
 #~ "Uitgebreide core-afhankelijkheidscontrole, pakketbeheerders worden "
 #~ "verzocht hun pakketten dubbel te controleren"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Nieuw standaardrecht voor het Flatpak-pakket: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Nieuw standaardrecht voor het Native-pakket: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr ""
@@ -4151,11 +4151,11 @@ msgstr "en nog veeeel meer!"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Kan geen app-icoon maken vanwege ontbrekende rechten.\n"
 #~ "Bekijk <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">onze "
-#~ "video</a> over het oplossen van dit probleem in Flatpak."
+#~ "video</a> over het oplossen van dit probleem in Native."
 
 #~ msgid "Type a short comment:"
 #~ msgstr "Typ een korte opmerking:"
@@ -4331,12 +4331,12 @@ msgstr "en nog veeeel meer!"
 #~ msgstr "bijv. 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Je gebruikt Bottles Flatpak, vergeet niet om het rechten te geven via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "Je gebruikt Bottles Native, vergeet niet om het rechten te geven via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> als het scriptpad buiten de sandbox ligt."
 
 #~ msgid "Type the new name:"
@@ -4423,11 +4423,11 @@ msgstr "en nog veeeel meer!"
 #~ msgstr "Klaar"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Waarschuwing: zorg ervoor dat je de Flatpak toestemming geeft voor "
+#~ "Waarschuwing: zorg ervoor dat je de Native toestemming geeft voor "
 #~ "toegang tot het nieuwe pad.\n"
 #~ "Dit zal de zandbak breken!"
 
@@ -4526,8 +4526,8 @@ msgstr "en nog veeeel meer!"
 #~ msgid "Import & export"
 #~ msgstr "Importeren & exporteren"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak hulp"
+#~ msgid "Native help"
+#~ msgstr "Native hulp"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Ik kan mijn oude flessen niet zien na de upgrade."

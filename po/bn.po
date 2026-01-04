@@ -67,7 +67,7 @@ msgid "Wine config updated!"
 msgstr "ওয়াইন কনফিগ আপডেট করা হয়েছে!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr "ফ্লেটপ্যাক চলছে, userdir স্যান্ডবক্স হচ্ছে…"
 
 #: bottles/backend/managers/manager.py:1209
@@ -2363,7 +2363,7 @@ msgid "This feature is unavailable on your system."
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2770,12 +2770,12 @@ msgid "wine;windows;"
 msgstr "ওয়াইন;উইন্ডোজ;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak মাইগ্রেশন"
+msgid "Native migration"
+msgstr "Native মাইগ্রেশন"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak মাইগ্রেশন ডায়ালগ টগল করুন।"
+msgid "Toggle the Native migration dialog."
+msgstr "Native মাইগ্রেশন ডায়ালগ টগল করুন।"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

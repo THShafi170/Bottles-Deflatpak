@@ -70,8 +70,8 @@ msgid "Wine config updated!"
 msgstr "Wine कॉन्फिग अपडेट हो गया!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Flatpak के रूप में चल रहा है, सैंडबॉक्सिंग userdir…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Native के रूप में चल रहा है, सैंडबॉक्सिंग userdir…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2354,7 +2354,7 @@ msgid "This feature is unavailable on your system."
 msgstr "Gamemode या तो आपके सिस्टम पर उपलब्ध नहीं है या नहीं चल रहा है"
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2763,11 +2763,11 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr "फ्लैटपैक प्रवास"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
 msgstr "फ़्लैटपैक माइग्रेशन डायलॉग टॉगल करें।"
 
 #: data/com.usebottles.bottles.gschema.xml:11

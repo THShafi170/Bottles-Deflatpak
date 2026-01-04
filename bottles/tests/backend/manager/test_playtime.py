@@ -81,7 +81,9 @@ def test_recovery_finalizes_running_sessions():
 
         conn = sqlite3.connect(tracker2.db_path)
         cur = conn.cursor()
-        cur.execute("SELECT status, ended_at, last_seen FROM sessions WHERE id=?", (sid,))
+        cur.execute(
+            "SELECT status, ended_at, last_seen FROM sessions WHERE id=?", (sid,)
+        )
         status, ended_at, last_seen = cur.fetchone()
         assert status == "forced"
         assert ended_at == last_seen
@@ -218,7 +220,9 @@ def test_program_id_consistency():
         conn = sqlite3.connect(tracker.db_path)
         cur = conn.cursor()
         # Should have aggregated into one total
-        cur.execute("SELECT sessions_count FROM playtime_totals WHERE bottle_id=?", ("b1",))
+        cur.execute(
+            "SELECT sessions_count FROM playtime_totals WHERE bottle_id=?", ("b1",)
+        )
         assert cur.fetchone()[0] == 2
         tracker.shutdown()
 
@@ -269,7 +273,17 @@ def test_unique_constraint():
                     bottle_id, bottle_name, bottle_path, program_id, program_name, program_path,
                     started_at, last_seen, status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                ("b1", "Bottle", "/bottle", program_id, "Game", "C:/Game/game.exe", started_at, started_at, "running")
+                (
+                    "b1",
+                    "Bottle",
+                    "/bottle",
+                    program_id,
+                    "Game",
+                    "C:/Game/game.exe",
+                    started_at,
+                    started_at,
+                    "running",
+                ),
             )
             conn.commit()
             assert False, "Expected UNIQUE constraint violation"
@@ -425,33 +439,50 @@ def test_get_all_program_totals_returns_empty_when_disabled():
 def test_normalize_path_to_windows():
     """Test path normalization converts Unix paths to Windows format."""
     from bottles.backend.managers.playtime import _normalize_path_to_windows
-    
+
     # Already Windows format - should remain unchanged
-    assert _normalize_path_to_windows("/bottle", "C:\\Program Files\\game.exe") == "C:\\Program Files\\game.exe"
-    assert _normalize_path_to_windows("/bottle", "D:\\Games\\game.exe") == "D:\\Games\\game.exe"
-    
+    assert (
+        _normalize_path_to_windows("/bottle", "C:\\Program Files\\game.exe")
+        == "C:\\Program Files\\game.exe"
+    )
+    assert (
+        _normalize_path_to_windows("/bottle", "D:\\Games\\game.exe")
+        == "D:\\Games\\game.exe"
+    )
+
     # Unix path with drive_c - bottle_path must match the path prefix
     bottle_path = "/var/home/user/.local/share/bottles/MyBottle"
-    unix_path = "/var/home/user/.local/share/bottles/MyBottle/drive_c/Program Files/game.exe"
-    assert _normalize_path_to_windows(bottle_path, unix_path) == "C:\\Program Files\\game.exe"
-    
+    unix_path = (
+        "/var/home/user/.local/share/bottles/MyBottle/drive_c/Program Files/game.exe"
+    )
+    assert (
+        _normalize_path_to_windows(bottle_path, unix_path)
+        == "C:\\Program Files\\game.exe"
+    )
+
     # Unix path with drive_d - should convert to D:\
     unix_path_d = "/path/to/bottle/drive_d/Games/game.exe"
-    assert _normalize_path_to_windows("/path/to/bottle", unix_path_d) == "D:\\Games\\game.exe"
-    
+    assert (
+        _normalize_path_to_windows("/path/to/bottle", unix_path_d)
+        == "D:\\Games\\game.exe"
+    )
+
     # Test with different drive letters
-    assert _normalize_path_to_windows("/bottle", "/bottle/drive_z/test.exe") == "Z:\\test.exe"
+    assert (
+        _normalize_path_to_windows("/bottle", "/bottle/drive_z/test.exe")
+        == "Z:\\test.exe"
+    )
 
 
 def test_database_stores_normalized_paths():
     """Test that program_path is stored in normalized Windows format in the database."""
     with tempfile.TemporaryDirectory() as tmp:
         tracker = _new_tracker(tmp)
-        
+
         bottle_id = "test-bottle"
         bottle_name = "Test Bottle"
         bottle_path = "/home/user/.local/share/bottles/TestBottle"
-        
+
         # Start session with Unix-format path
         unix_path = f"{bottle_path}/drive_c/Program Files/TestGame/game.exe"
         session_id = tracker.start_session(
@@ -461,7 +492,7 @@ def test_database_stores_normalized_paths():
             program_name="TestGame",
             program_path=unix_path,
         )
-        
+
         # Check sessions table has normalized path
         conn = sqlite3.connect(tracker.db_path)
         cur = conn.cursor()
@@ -472,18 +503,18 @@ def test_database_stores_normalized_paths():
         # Should be Windows format, not Unix format
         assert stored_path == "C:\\Program Files\\TestGame\\game.exe"
         assert not stored_path.startswith("/home/")
-        
+
         # Exit session to trigger totals update
         tracker.mark_exit(session_id, status="success")
-        
+
         # Check playtime_totals table also has normalized path
-        cur.execute("SELECT program_path FROM playtime_totals WHERE bottle_id=?", (bottle_id,))
+        cur.execute(
+            "SELECT program_path FROM playtime_totals WHERE bottle_id=?", (bottle_id,)
+        )
         row = cur.fetchone()
         assert row is not None
         totals_path = row[0]
         assert totals_path == "C:\\Program Files\\TestGame\\game.exe"
         assert not totals_path.startswith("/home/")
-        
+
         tracker.shutdown()
-
-

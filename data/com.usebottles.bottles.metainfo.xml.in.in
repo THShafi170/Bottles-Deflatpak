@@ -7,7 +7,7 @@
   <name>Bottles</name>
   <summary>Run Windows software</summary>
   <developer id="@DEVELOPER_ID@">
-    <name translate="no">The Bottles Contributors</name>
+    <name translate="no">The Bottles Developers</name>
   </developer>
   <categories>
     <category>Utility</category>
@@ -69,13 +69,12 @@
   </screenshots>
   <translation type="gettext">@APP_ID@</translation>
   <content_rating type="oars-1.1"/>
-  <url type="homepage">https://usebottles.com</url>
-  <url type="bugtracker">https://github.com/bottlesdevs/Bottles/issues</url>
+  <url type="homepage">https://github.com/tenshou170/Bottles-Deflatpak</url>
+  <url type="bugtracker">https://github.com/tenshou170/Bottles-Deflatpak/issues</url>
   <url type="help">https://docs.usebottles.com</url>
   <url type="donation">https://usebottles.com/funding</url>
   <url type="translate">https://hosted.weblate.org/engage/bottles</url>
-  <url type="vcs-browser">https://github.com/bottlesdevs/Bottles</url>
-  <url type="contribute">https://github.com/bottlesdevs/Bottles/blob/main/CONTRIBUTING.md</url>
+  <url type="vcs-browser">https://github.com/tenshou170/Bottles-Deflatpak</url>
   <recommends>
     <control>pointing</control>
     <control>keyboard</control>
@@ -104,7 +103,7 @@
         </ul>
       </description>
     </release>
-    <release version="60" date="2025-11-22">
+    <release version="60.1" date="2025-11-22">
       <description translate="no">
         <ul>
           <li>New bottle details UI</li>
@@ -119,7 +118,7 @@
           <li>Make updating runners, DXVK and other components easier</li>
           <li>Change repositories URLs via UI</li>
           <li>Registry Rules system for reusable prefix policies</li>
-          <li>Suggest installation of missing Flatpak extensions</li>
+          <li>Suggest installation of missing system extensions</li>
           <li>Ability to only inherit selected system environment variables</li>
           <li>Native Wayland support in bottle settings</li>
           <li>Fixed Steam Deck controls not working in Gaming Mode</li>
@@ -184,7 +183,7 @@
       <description translate="no">
         <ul>
           <li>Add donation dialog</li>
-          <li>Re-add the NVIDIA Flatpak Workaround</li>
+          <li>Re-add the NVIDIA Native Workaround</li>
         </ul>
       </description>
     </release>
@@ -199,7 +198,7 @@
       <description translate="no">
         <ul>
           <li>Added donation dialog</li>
-          <li>Re-added the NVIDIA Flatpak Workaround</li>
+          <li>Re-added the NVIDIA Native Workaround</li>
         </ul>
       </description>
     </release>
@@ -218,7 +217,7 @@
         <p>Version 51.19</p>
         <ul>
           <li>Re-introduce runtime</li>
-          <li>Remove NVIDIA Flatpak workaround</li>
+          <li>Remove NVIDIA Native workaround</li>
           <li>Update screenshots</li>
           <li>Add brand colors</li>
           <li>Update developer name</li>
@@ -231,7 +230,7 @@
       <description translate="no">
         <ul>
           <li>Re-introduce runtime</li>
-          <li>Remove NVIDIA Flatpak workaround</li>
+          <li>Remove NVIDIA Native workaround</li>
           <li>Update screenshots</li>
           <li>Add brand colors</li>
           <li>Update developer name</li>
@@ -267,8 +266,8 @@
         <p>Added an option to alphabetize the programs list</p>
         <p>Fixed an issue where deleting a bottle created on a different drive did not delete cache directories</p>
         <p>Added a functional minimal MangoHud settings window</p>
-        <p>Improved Flatpak manifest and added checks for Flatpak environments</p>
-        <p>Added an error dialog when running outside of sandboxed formats</p>
+        <p>Improved package manifest and added checks for native environments</p>
+        <p>Added support for native execution and distro-agnostic packaging</p>
         <p>Reworked data files and allowed custom app IDs</p>
         <p>Bumped Meson requirement and ported the "devel" option to combo options</p>
         <p>Improved formatting and functionality in Blueprint and UI files</p>
@@ -330,7 +329,7 @@
       <description translate="no">
         <p>Clean FSR settings</p>
         <p>Improve bad connections handling</p>
-        <p>Update Flatpak runtime</p>
+        <p>Update system libraries</p>
         <p>Update translations</p>
         <p>Various bug fixes</p>
       </description>
@@ -349,7 +348,7 @@
     <release version="51.6" date="2023-05-03">
       <description translate="no">
         <p>Support for the double-DLL VKD3D</p>
-        <p>Updated Flatpak runtime</p>
+        <p>Updated system libraries</p>
         <p>Minor improvement and fixes to the library</p>
         <p>Fix the Steam link not being correct</p>
         <p>Download stable component by default</p>

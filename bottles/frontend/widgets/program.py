@@ -62,7 +62,14 @@ class ProgramEntry(Adw.ActionRow):
     # endregion
 
     def __init__(
-        self, window, config, program, is_steam=False, check_boot=True, **kwargs
+        self,
+        window,
+        config,
+        program,
+        is_steam=False,
+        check_boot=True,
+        is_running=None,
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -124,8 +131,13 @@ class ProgramEntry(Adw.ActionRow):
         self.btn_add_steam.connect("clicked", self.add_to_steam)
         self.btn_remove.connect("clicked", self.remove_program)
 
-        if not program.get("removed") and not is_steam and check_boot:
-            self.__is_alive()
+        if not program.get("removed") and not is_steam:
+            if is_running is True:
+                self.__start_watcher(True)
+            elif is_running is False:
+                pass
+            elif check_boot:
+                self.__is_alive()
 
         # Update subtitle with playtime info
         if not is_steam:
@@ -165,7 +177,6 @@ class ProgramEntry(Adw.ActionRow):
             import logging
 
             logging.debug(f"Failed to update playtime subtitle: {e}")
-            pass
 
     def show_launch_options_view(self, _widget=False):
         def update(_widget, config):
@@ -214,22 +225,33 @@ class ProgramEntry(Adw.ActionRow):
         self.btn_run.set_sensitive(status)
         self.btn_stop.set_sensitive(not status)
 
+    def __start_watcher(self, _result=False, _error=False):
+        """
+        Start watching the process if it is running.
+        This method is called if is_running=True is passed or if internal check returns positive.
+        """
+        if isinstance(_result, Result) and not _result.status:
+            return
+        elif isinstance(_result, bool) and not _result:
+            return
+
+        winedbg = WineDbg(self.config)
+        self.__reset_buttons()
+
+        RunAsync(
+            winedbg.wait_for_process,
+            callback=self.__reset_buttons,
+            name=self.executable,
+            timeout=5,
+        )
+
     def __is_alive(self):
         winedbg = WineDbg(self.config)
-
-        @GtkUtils.run_in_main_loop
-        def set_watcher(_result=False, _error=False):
-            nonlocal winedbg
-            self.__reset_buttons()
-
-            RunAsync(
-                winedbg.wait_for_process,
-                callback=self.__reset_buttons,
-                name=self.executable,
-                timeout=5,
-            )
-
-        RunAsync(winedbg.is_process_alive, callback=set_watcher, name=self.executable)
+        RunAsync(
+            winedbg.is_process_alive,
+            callback=self.__start_watcher,
+            name=self.executable,
+        )
 
     def run_executable(self, _widget, with_terminal=False):
         self.pop_actions.popdown()  # workaround #1640
@@ -351,7 +373,7 @@ class ProgramEntry(Adw.ActionRow):
         @GtkUtils.run_in_main_loop
         def update(result, _error=False):
             if not result:
-                webbrowser.open("https://docs.usebottles.com/bottles/programs#flatpak")
+                webbrowser.open("https://docs.usebottles.com/bottles/programs")
                 return
 
             self.window.show_toast(

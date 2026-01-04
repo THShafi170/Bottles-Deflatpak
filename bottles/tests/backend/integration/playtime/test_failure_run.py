@@ -2,7 +2,7 @@
 
 import sqlite3
 import time
-from freezegun import freeze_time
+from freezegun import freeze_time  # type: ignore
 
 
 def test_failure_run_marks_unknown_and_updates_totals(manager):
@@ -10,7 +10,7 @@ def test_failure_run_marks_unknown_and_updates_totals(manager):
     assert tracker is not None
 
     with freeze_time("2025-01-01 02:00:00"):
-        base = int(time.time())
+        int(time.time())
         sid = tracker.start_session(
             bottle_id="b1",
             bottle_name="Bottle",
@@ -97,5 +97,3 @@ def test_multiple_failures_same_bottle_different_programs(manager):
     cur = con.cursor()
     cur.execute("SELECT COUNT(*) FROM playtime_totals WHERE bottle_id=?", ("b1",))
     assert cur.fetchone()[0] == 2
-
-

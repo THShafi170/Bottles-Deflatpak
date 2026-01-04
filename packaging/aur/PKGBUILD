@@ -1,0 +1,78 @@
+# Maintainer: The Bottles Developers
+# Contributor/Modifications: Tenshou170 <https://github.com/tenshou170/Bottles-Deflatpak>
+
+pkgname=bottles
+_pkgname=Bottles
+pkgver=60.1
+pkgrel=1
+epoch=2
+pkgdesc='Easily manage wine and proton prefix (Native Deflatpak version)'
+arch=(any)
+url="https://github.com/tenshou170/Bottles-Deflatpak"
+license=(GPL-3.0-only)
+depends=(
+  cabextract
+  dconf
+  gamemode
+  gtk4
+  gtksourceview5
+  hicolor-icon-theme
+  icoextract
+  imagemagick
+  libadwaita
+  libportal-gtk4
+  p7zip
+  patool
+  python
+  python-chardet
+  python-fvs
+  python-gobject
+  python-markdown
+  python-orjson
+  python-pathvalidate
+  python-pycurl
+  python-requests
+  python-yaml
+  webkit2gtk
+  xorg-xdpyinfo
+  vkbasalt-cli
+  bubblewrap
+)
+optdepends=(
+  gvfs
+  lib32-gamemode
+  lib32-gnutls
+  lib32-vkd3d
+  lib32-vulkan-icd-loader
+  vkd3d
+  vulkan-icd-loader
+  wine
+)
+makedepends=(
+  blueprint-compiler
+  meson
+  ninja
+)
+source=(
+  "bottles-${pkgver}.tar.gz::https://github.com/tenshou170/Bottles-Deflatpak/archive/refs/tags/v${pkgver}.tar.gz"
+)
+sha256sums=(
+  'SKIP'
+)
+
+prepare() {
+  :
+}
+
+build() {
+  cd "${srcdir}/${_pkgname}-${pkgver}"
+  meson setup --prefix='/usr' build
+  ninja -C build
+}
+
+package() {
+  cd "${srcdir}/${_pkgname}-${pkgver}"
+  DESTDIR="${pkgdir}" ninja -C build install
+}
+
+# vim: set ft=sh ts=2 sw=2 et:

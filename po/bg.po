@@ -67,9 +67,9 @@ msgid "Wine config updated!"
 msgstr "Конфигурацията на „Wine“ е обновена!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr ""
-"Изпълнява се като „Flatpak“, вкарване на потребителската директория в "
+"Изпълнява се като „Native“, вкарване на потребителската директория в "
 "пясъчника…"
 
 #: bottles/backend/managers/manager.py:1209
@@ -2413,8 +2413,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Тази функция не е налична за Вашата система."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} За да добавите тази функция, моля изпълнете „flatpak install“"
+msgid "{} To add this feature, please run native install"
+msgstr "{} За да добавите тази функция, моля изпълнете „native install“"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2826,12 +2826,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Миграция от „Flatpak“"
+msgid "Native migration"
+msgstr "Миграция от „Native“"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Превключва диалога за миграция от „Flatpak“."
+msgid "Toggle the Native migration dialog."
+msgstr "Превключва диалога за миграция от „Native“."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3937,8 +3937,8 @@ msgstr "и много, много, много други!"
 #~ "Проверката за основните зависимости е разширена, подканваме отговорните "
 #~ "лица да проверят своите пакети"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Ново разрешение по подразбиране за пакета „Flatpak“: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Ново разрешение по подразбиране за пакета „Native“: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr ""

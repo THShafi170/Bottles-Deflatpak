@@ -242,12 +242,7 @@ class WineExecutor:
             return True
 
         if not os.path.isfile(exec_path):
-            _msg = f"Executable file path does not exist: {exec_path}"
-            if "FLATPAK_ID" in os.environ:
-                _msg = f"Executable file path does not exist or is not accessible by the Flatpak: {exec_path}"
-            logging.error(
-                _msg,
-            )
+            logging.error(f"Executable file path does not exist: {exec_path}")
             return False
 
     def __move_file(self, exec_path, move_upd_fn):

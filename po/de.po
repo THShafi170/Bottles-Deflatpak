@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine-Konfiguration aktualisiert!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Ausführung als Flatpak, isoliere Benutzer-Ordner…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Ausführung als Native, isoliere Benutzer-Ordner…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2431,8 +2431,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Diese Funktion ist auf deinem System nicht verfügbar."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Um diese Funktion hinzuzufügen, führe bitte „flatpak install“ aus"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Um diese Funktion hinzuzufügen, führe bitte „native install“ aus"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2848,12 +2848,12 @@ msgid "wine;windows;"
 msgstr "Wine;Windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak-Migration"
+msgid "Native migration"
+msgstr "Native-Migration"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "De(-aktiviere) dan Flatpak-Migrationsdialog."
+msgid "Toggle the Native migration dialog."
+msgstr "De(-aktiviere) dan Native-Migrationsdialog."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3910,8 +3910,8 @@ msgstr "und viele, viele, viele mehr!"
 #~ "Erweiterte Core-Abhängigkeitsprüfung, Paketierer werden aufgefordert, "
 #~ "ihre Pakete noch einmal zu überprüfen"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Neue Standardberechtigung für das Flatpak-Paket: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Neue Standardberechtigung für das Native-Paket: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr ""
@@ -4097,12 +4097,12 @@ msgstr "und viele, viele, viele mehr!"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Konnte den Desktop Eintrag nicht erstellen aufgrund von fehlenden "
 #~ "Berechtigungen.\n"
 #~ "Schau <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">unser "
-#~ "Video</a> um zu sehen, wie man die Berechtigung für Flatpak erteilt."
+#~ "Video</a> um zu sehen, wie man die Berechtigung für Native erteilt."
 
 #~ msgid "Type a short comment:"
 #~ msgstr "Gib einen kurzen Kommentar ein:"
@@ -4297,14 +4297,14 @@ msgstr "und viele, viele, viele mehr!"
 #~ msgstr "z. B. 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Wenn die Flatpak Version von Bottles verwendet wird und der Pfad des "
+#~ "Wenn die Native Version von Bottles verwendet wird und der Pfad des "
 #~ "Skriptes außerhalb der Sandbox liegt, dann vergiss nicht, die "
 #~ "Bereichtigungen mithilfe von <a href=\"https://docs.usebottles.com/"
-#~ "flatpak/expose-directories\"> Flatseal </a> richtig einzustellen."
+#~ "native/expose-directories\"> Flatseal </a> richtig einzustellen."
 
 #~ msgid "Type the new name:"
 #~ msgstr "Einen neuen Namen eingeben:"
@@ -4390,11 +4390,11 @@ msgstr "und viele, viele, viele mehr!"
 #~ msgstr "Fertig"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Warnung: Vergiss nicht, dem Flatpak die Berechtigung zu geben, auf den "
+#~ "Warnung: Vergiss nicht, dem Native die Berechtigung zu geben, auf den "
 #~ "neuen Pfad zugreifen zu können.\n"
 #~ "Dies würde sonst die Sandbox unbrauchbar machen!"
 
@@ -4539,8 +4539,8 @@ msgstr "und viele, viele, viele mehr!"
 #~ msgid "Library mode"
 #~ msgstr "Bibliotheksmodus"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak-Hilfe"
+#~ msgid "Native help"
+#~ msgstr "Native-Hilfe"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Ich finde meine alten \"bottles\" nach einem Upgrade nicht mehr."
@@ -4648,7 +4648,7 @@ msgstr "und viele, viele, viele mehr!"
 
 #, fuzzy
 #~ msgid "Creating sandboxed folders…"
-#~ msgstr "Ausführung als Flatpak, isolierte Ordner werden erstellt …"
+#~ msgstr "Ausführung als Native, isolierte Ordner werden erstellt …"
 
 #~ msgid "These are the wine/wineserver processes running on your PC."
 #~ msgstr ""
@@ -4776,9 +4776,9 @@ msgstr "und viele, viele, viele mehr!"
 
 #~ msgid ""
 #~ "The lutris-lol runner is now hidden when Bottles is running under "
-#~ "flatpak, as it is not compatible with it"
+#~ "native, as it is not compatible with it"
 #~ msgstr ""
-#~ "Der lutris-lol Runner wird ab jetzt ausgeblendet, wenn Bottles in Flatpak "
+#~ "Der lutris-lol Runner wird ab jetzt ausgeblendet, wenn Bottles in Native "
 #~ "ausgeführt wird, da er nicht kompatibel damit ist"
 
 #~ msgid ""
@@ -4946,8 +4946,8 @@ msgstr "und viele, viele, viele mehr!"
 #~ msgid "Reduced the amount of logs"
 #~ msgstr "Reduziert die Menge der Protokolle"
 
-#~ msgid "Flatpak now uses the app directories"
-#~ msgstr "Flatpak verwendet jetzt die App-Verzeichnisse"
+#~ msgid "Native now uses the app directories"
+#~ msgstr "Native verwendet jetzt die App-Verzeichnisse"
 
 #~ msgid ""
 #~ "If there are bottles in the old dir and the app dir is empty then a "

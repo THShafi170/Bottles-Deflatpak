@@ -57,8 +57,8 @@ class SteamUtils:
         if not os.path.isfile(toolmanifest):
             return False
 
-        f = open(toolmanifest, "r", errors="replace")
-        data = SteamUtils.parse_vdf(f.read())
+        with open(toolmanifest, "r", errors="replace") as f:
+            data = SteamUtils.parse_vdf(f.read())
         compat_layer_name = data.get("manifest", {}).get("compatmanager_layer_name", {})
 
         commandline = data.get("manifest", {}).get("commandline", {})
@@ -76,8 +76,8 @@ class SteamUtils:
             return None
 
         runtime = "scout"
-        f = open(toolmanifest, "r", errors="replace")
-        data = SteamUtils.parse_vdf(f.read())
+        with open(toolmanifest, "r", errors="replace") as f:
+            data = SteamUtils.parse_vdf(f.read())
         tool_appid = data.get("manifest", {}).get("require_tool_appid", {})
 
         if "1628350" in tool_appid:

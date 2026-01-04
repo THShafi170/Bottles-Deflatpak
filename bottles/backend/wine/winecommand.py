@@ -1,7 +1,6 @@
 import os
 import re
 import shlex
-import shutil
 import stat
 import subprocess
 import tempfile
@@ -26,6 +25,7 @@ from bottles.backend.utils.gpu import GPUUtils
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.terminal import TerminalUtils
+from bottles.backend.utils.wine import WineUtils
 
 logging = Logger()
 
@@ -38,7 +38,9 @@ class WineEnv:
     __env: dict = {}
     __result: dict = {"envs": {}, "overrides": []}
 
-    def __init__(self, clean: bool = False, allowed_keys: Optional[Iterable[str]] = None):
+    def __init__(
+        self, clean: bool = False, allowed_keys: Optional[Iterable[str]] = None
+    ):
         self.__env = {}
         if clean:
             return
@@ -355,7 +357,9 @@ class WineCommand:
                     if os.path.exists(os.path.join(runner_path, lib)):
                         gst_env_path.append(os.path.join(runner_path, lib))
                 if len(gst_env_path) > 0:
-                    env.add("GST_PLUGIN_SYSTEM_PATH", ":".join(gst_env_path), override=True)
+                    env.add(
+                        "GST_PLUGIN_SYSTEM_PATH", ":".join(gst_env_path), override=True
+                    )
 
         # DXVK environment variables
         if params.dxvk and not return_steam_env:
@@ -537,7 +541,9 @@ class WineCommand:
             If the runner type is system, set the runner binary
             path to the system command. Else set it to the full path.
             """
-            runner = shutil.which("wine")
+            runner = WineUtils.find_system_wine()
+            if runner is None:
+                return "", ""
 
         else:
             runner = f"{runner}/bin/wine"

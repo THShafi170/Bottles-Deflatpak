@@ -15,6 +15,7 @@ _gi_repository = types.SimpleNamespace(GLib=_glib_stub)
 sys.modules.setdefault("gi", types.SimpleNamespace(repository=_gi_repository))
 sys.modules.setdefault("gi.repository", _gi_repository)
 
+
 class _FVSRepoStub:
     def __init__(self, *args, **kwargs):
         self.active_state_id = 0
@@ -39,12 +40,14 @@ _fvs_exceptions = types.SimpleNamespace(
     FVSStateZeroNotDeletable=_FVSError,
 )
 _fvs_repo = types.SimpleNamespace(FVSRepo=_FVSRepoStub)
-sys.modules.setdefault("fvs", types.SimpleNamespace(repo=_fvs_repo, exceptions=_fvs_exceptions))
+sys.modules.setdefault(
+    "fvs", types.SimpleNamespace(repo=_fvs_repo, exceptions=_fvs_exceptions)
+)
 sys.modules.setdefault("fvs.repo", _fvs_repo)
 sys.modules.setdefault("fvs.exceptions", _fvs_exceptions)
 
-from bottles.backend.managers.manager import Manager
-from bottles.backend.managers.playtime import ProcessSessionTracker
+from bottles.backend.managers.manager import Manager  # noqa: E402
+from bottles.backend.managers.playtime import ProcessSessionTracker  # noqa: E402
 
 
 @pytest.fixture()
@@ -82,5 +85,3 @@ def manager(temp_xdg_home, test_settings_stub):
 
 def open_db(m: Manager) -> sqlite3.Connection:
     return sqlite3.connect(m.playtime_tracker.db_path)
-
-

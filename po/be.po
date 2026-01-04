@@ -69,8 +69,8 @@ msgid "Wine config updated!"
 msgstr "Канфігурацыя Wine абноўлена!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Запуск ад Flatpak, эмуляцыя userdir…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Запуск ад Native, эмуляцыя userdir…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2275,7 +2275,7 @@ msgid "This feature is unavailable on your system."
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2667,11 +2667,11 @@ msgid "wine;windows;"
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:11

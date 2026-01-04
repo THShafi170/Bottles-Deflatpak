@@ -86,11 +86,6 @@
       <summary>Wine audio driver</summary>
       <description>Select which Wine audio driver should be enforced for all bottles. Use "default" to leave the driver unchanged.</description>
     </key>
-    <key type="b" name="show-sandbox-warning">
-      <default>true</default>
-      <summary>Show sandbox warning</summary>
-      <description>Toggle sandbox warning.</description>
-    </key>
     <key type="b" name="playtime-enabled">
       <default>true</default>
       <summary>Enable playtime tracking</summary>

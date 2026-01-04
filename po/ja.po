@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "WINE 設定を更新しました!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Flatpak として実行中、ユーザーディレクトリをサンドボックス化しています…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Native として実行中、ユーザーディレクトリをサンドボックス化しています…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2332,8 +2332,8 @@ msgid "This feature is unavailable on your system."
 msgstr "この機能はお使いのシステムでは利用できません。"
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} この機能を追加するには、以下を実行してください。flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} この機能を追加するには、以下を実行してください。native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2732,12 +2732,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak 版への移行"
+msgid "Native migration"
+msgstr "Native 版への移行"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak 版への移行ダイアログを表示／非表示にします。"
+msgid "Toggle the Native migration dialog."
+msgstr "Native 版への移行ダイアログを表示／非表示にします。"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3959,12 +3959,12 @@ msgstr ""
 #~ msgstr "例: 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Flatpak版のBottlesを使用しています。スクリプトのパスがサンドボックス外にあ"
-#~ "る場合は、<a href=\"https://docs.usebottles.com/flatpak/expose-"
+#~ "Native版のBottlesを使用しています。スクリプトのパスがサンドボックス外にあ"
+#~ "る場合は、<a href=\"https://docs.usebottles.com/native/expose-"
 #~ "directories\">Flatseal</a>を使用してパーミッションを付与するようにしてくだ"
 #~ "さい。"
 
@@ -4039,11 +4039,11 @@ msgstr ""
 #~ msgstr "終了"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "警告: Flatpakが新しいパスにアクセスできるようにパーミッションを付与するよ"
+#~ "警告: Nativeが新しいパスにアクセスできるようにパーミッションを付与するよ"
 #~ "うにしてください。\n"
 #~ "この操作によってサンボドックスが破損します！"
 
@@ -4172,11 +4172,11 @@ msgstr ""
 #~ msgid "Library mode"
 #~ msgstr "ライブラリモード"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak版に関するヘルプ"
+#~ msgid "Native help"
+#~ msgstr "Native版に関するヘルプ"
 
 #~ msgid "I can't see my old bottles after upgrade."
-#~ msgstr "Flatpak版への移行前にはあったボトルが見当たりません。"
+#~ msgstr "Native版への移行前にはあったボトルが見当たりません。"
 
 #~ msgid "I don't see some directories."
 #~ msgstr "表示されないディレクトリがあります。"
@@ -4495,8 +4495,8 @@ msgstr ""
 #~ msgid "Fixed a bug on processes listing"
 #~ msgstr "プロセスリストのバグを修正しました"
 
-#~ msgid "Fix crash log path on Flatpak"
-#~ msgstr "Flatpakのクラッシュログパスを修正しました"
+#~ msgid "Fix crash log path on Native"
+#~ msgstr "Nativeのクラッシュログパスを修正しました"
 
 #~ msgid ""
 #~ "Fixed an issue causing Bottles to detect downloaded dxvk even when it "

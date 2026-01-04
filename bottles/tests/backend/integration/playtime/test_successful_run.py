@@ -2,7 +2,7 @@
 
 import sqlite3
 import time
-from freezegun import freeze_time
+from freezegun import freeze_time  # type: ignore
 
 
 def test_successful_run_finalizes_and_updates_totals(manager):
@@ -109,5 +109,3 @@ def test_success_multiple_apps_two_same_bottle_one_other(manager):
     )
     tsec, scount = cur.fetchone()
     assert scount == 1 and tsec >= 60
-
-

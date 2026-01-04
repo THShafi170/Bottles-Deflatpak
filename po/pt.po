@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Configuração do Wine atualizada!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Executando como Flatpak, isolando o diretório do usuário (sandbox)…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Executando como Native, isolando o diretório do usuário (sandbox)…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2439,8 +2439,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Este recurso está indisponível no seu sistema."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Para adicionar este recurso, execute flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Para adicionar este recurso, execute native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2848,12 +2848,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migração Flatpak"
+msgid "Native migration"
+msgstr "Migração Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Accione diálogo de Migração Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Accione diálogo de Migração Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -4411,8 +4411,8 @@ msgstr "e muito, muito, muito mais!"
 #~ "Agora o utilizador só pode instalar uma dependência por vez para evitar "
 #~ "conflitos"
 
-#~ msgid "Reduced the Flatpak permissions"
-#~ msgstr "Reduzida as permissões Flatpak"
+#~ msgid "Reduced the Native permissions"
+#~ msgstr "Reduzida as permissões Native"
 
 #, fuzzy
 #~ msgid "You can now choose a custom working directory for each bottle"

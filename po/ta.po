@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "ஒயின் கட்டமைப்பு புதுப்பிக்கப்பட்டது!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Flatpak ஆக இயங்குகிறது, சாண்ட்பாக்சிங் பயனர்டிர்…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Native ஆக இயங்குகிறது, சாண்ட்பாக்சிங் பயனர்டிர்…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2386,7 +2386,7 @@ msgid "This feature is unavailable on your system."
 msgstr "இந்த அம்சம் உங்கள் கணினியில் இல்லை."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr "{} இந்த அம்சத்தைச் சேர்க்க, தயவுசெய்து பிளாட்பேக் நிறுவலை இயக்கவும்"
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2794,11 +2794,11 @@ msgid "wine;windows;"
 msgstr "ஒயின்;விண்டோஸ்;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr "பிளாட்பாக் இடம்பெயர்வு"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
 msgstr "பிளாட்பாக் இடம்பெயர்வு உரையாடலை நிலைமாற்று."
 
 #: data/com.usebottles.bottles.gschema.xml:11
@@ -3882,8 +3882,8 @@ msgstr "மற்றும் பல, பல, பல!"
 #~ "விரிவாக்கப்பட்ட கோர் சார்புநிலை சரிபார்ப்பு, பேக்கேஜர்கள் தங்கள் தொகுப்புகளை இருமுறை "
 #~ "சரிபார்க்க அழைக்கப்படுகிறார்கள்"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Flatpak தொகுப்பிற்கான புதிய இயல்புநிலை அனுமதி: xdg-பதிவிறக்கம்"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Native தொகுப்பிற்கான புதிய இயல்புநிலை அனுமதி: xdg-பதிவிறக்கம்"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr "கிரெடிட்ஸ் பிரிவில் மூன்றாம் தரப்பு நூலகங்களுக்கான கிரெடிட்கள் சேர்க்கப்பட்டன"

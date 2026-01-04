@@ -69,8 +69,8 @@ msgid "Wine config updated!"
 msgstr "Wine konfiguracija je aktualizirana!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Pokretanje kao Flatpak, postavljanje testne korisničke mape …"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Pokretanje kao Native, postavljanje testne korisničke mape …"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2400,8 +2400,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Ova funkcija nije dostupna na tvom sustavu."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Za dodavanje ove funkcije pokreni flatpak instalaciju"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Za dodavanje ove funkcije pokreni native instalaciju"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2810,12 +2810,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak migracija"
+msgid "Native migration"
+msgstr "Native migracija"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Uključi/isključi dijalog za Flatpak migraciju."
+msgid "Toggle the Native migration dialog."
+msgstr "Uključi/isključi dijalog za Native migraciju."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3888,8 +3888,8 @@ msgstr "i još puno, puno više!"
 #~ "Proširena provjera osnovnih ovisnosti, pakirače se poziva da još jednom "
 #~ "provjere svoje pakete"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Nova zadana dozvola za Flatpak paket: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Nova zadana dozvola za Native paket: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr "Dodane su zasluge za stane biblioteke u odjeljku zasluga"
@@ -4073,12 +4073,12 @@ msgstr "i još puno, puno više!"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Nije moguće stvoriti ikonu programa na radnoj površini jer nedostaju "
 #~ "korisnička prava.\n"
 #~ "Pogledaj <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">naš "
-#~ "video</a> o tome kako to popraviti u Flatpaku."
+#~ "video</a> o tome kako to popraviti u Nativeu."
 
 #~ msgid "Type a short comment:"
 #~ msgstr "Upiši kratki komentar:"
@@ -4253,12 +4253,12 @@ msgstr "i još puno, puno više!"
 #~ msgstr "npr. 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Koristiš Flatpak verziju programa Butelje. Omogući programu dozvole putem "
-#~ "<a href=\"https://docs.usebottles.com/flatpak/expose-"
+#~ "Koristiš Native verziju programa Butelje. Omogući programu dozvole putem "
+#~ "<a href=\"https://docs.usebottles.com/native/expose-"
 #~ "directories\">Flatseal</a>, ako je staza skripta izvan okruženja za "
 #~ "testiranje."
 
@@ -4331,11 +4331,11 @@ msgstr "i još puno, puno više!"
 #~ msgstr "Završi"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Upozorenje: Obavezno dozvoli Flatpak-u pristup novoj stazi.\n"
+#~ "Upozorenje: Obavezno dozvoli Native-u pristup novoj stazi.\n"
 #~ "Ovo će zaustaviti rad okruženja za testiranje!"
 
 #~ msgid "Whether the above list should display unstable versions."
@@ -4409,8 +4409,8 @@ msgstr "i još puno, puno više!"
 #~ msgid "Import & export"
 #~ msgstr "Uvezi i izvezi"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak pomoć"
+#~ msgid "Native help"
+#~ msgstr "Native pomoć"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Nakon nadogradnje ne mogu vidjeti svoje stare butelje."
@@ -4666,8 +4666,8 @@ msgstr "i još puno, puno više!"
 #~ "Sada je moguće duplicirati butelju s novim imenom, što se može koristiti "
 #~ "i za stvaranje predložaka za butelje"
 
-#~ msgid "Reduced the Flatpak permissions"
-#~ msgstr "Smanjene su dozvole za Flatpak"
+#~ msgid "Reduced the Native permissions"
+#~ msgstr "Smanjene su dozvole za Native"
 
 #~ msgid "You can now choose a custom working directory for each bottle"
 #~ msgstr "Sada možeš odabrati prilagođenu radnu mapu za svaku butelju"
@@ -4699,8 +4699,8 @@ msgstr "i još puno, puno više!"
 #~ "Isto kao prethodna točka, ali se odnosi na preuzimanja čija se veličina "
 #~ "razlikuje od izvora"
 
-#~ msgid "Fixed the File Manager integration in Flatpak"
-#~ msgstr "Ispravljena je integracija upravljača datoteka u Flatpaku"
+#~ msgid "Fixed the File Manager integration in Native"
+#~ msgstr "Ispravljena je integracija upravljača datoteka u Nativeu"
 
 #~ msgid "Fixed a bug in temp directory clean up"
 #~ msgstr "Ispravljena je greška u pražnjenju mape privremenih datoteka"

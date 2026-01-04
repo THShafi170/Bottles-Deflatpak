@@ -67,7 +67,7 @@ msgid "Wine config updated!"
 msgstr "Οι ρυθμίσεις του Wine ενημερώθηκαν!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr "Εκτέλεση ως Flatpack, διαχωρισμός του καταλόγου χρήστη…"
 
 #: bottles/backend/managers/manager.py:1209
@@ -2413,7 +2413,7 @@ msgid "This feature is unavailable on your system."
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2820,12 +2820,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Μετανάστευση Flatpak"
+msgid "Native migration"
+msgstr "Μετανάστευση Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Ενεργοποίηση/Απενεργοποίηση στο μήνυμα μετανάστευσης Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Ενεργοποίηση/Απενεργοποίηση στο μήνυμα μετανάστευσης Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

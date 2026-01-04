@@ -35,18 +35,22 @@ def test_format_last_played():
     # These now return translated strings, but we can still test the logic
     result_none = PlaytimeService.format_last_played(None)
     assert "never" in result_none.lower() or result_none == "Never"
-    
+
     result_today = PlaytimeService.format_last_played(now)
     assert "today" in result_today.lower() or result_today == "Today"
-    
+
     result_yesterday = PlaytimeService.format_last_played(now - timedelta(days=1))
     assert "yesterday" in result_yesterday.lower() or result_yesterday == "Yesterday"
-    
+
     result_2days = PlaytimeService.format_last_played(now - timedelta(days=2))
-    assert "2" in result_2days and ("day" in result_2days.lower() or result_2days == "2 days ago")
-    
+    assert "2" in result_2days and (
+        "day" in result_2days.lower() or result_2days == "2 days ago"
+    )
+
     result_6days = PlaytimeService.format_last_played(now - timedelta(days=6))
-    assert "6" in result_6days and ("day" in result_6days.lower() or result_6days == "6 days ago")
+    assert "6" in result_6days and (
+        "day" in result_6days.lower() or result_6days == "6 days ago"
+    )
 
     # Old dates now use locale-aware format (%x)
     old_date = now - timedelta(days=10)

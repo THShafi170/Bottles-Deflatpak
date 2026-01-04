@@ -74,8 +74,8 @@ msgid "Wine config updated!"
 msgstr "Wine config updated!"
 
 #: bottles/backend/managers/manager.py:1265
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Running as Native, sandboxing userdir…"
 
 #: bottles/backend/managers/manager.py:1267
 msgid "Sandboxing userdir…"
@@ -2425,8 +2425,8 @@ msgid "This feature is unavailable on your system."
 msgstr "This feature is unavailable on your system."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} To add this feature, please run native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2854,12 +2854,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak migration"
+msgid "Native migration"
+msgstr "Native migration"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
+msgstr "Toggle the Native migration dialog."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3058,8 +3058,8 @@ msgid "Support for the double-DLL VKD3D"
 msgstr "Support for the double-DLL VKD3D"
 
 #: data/com.usebottles.bottles.metainfo.xml.in:81
-msgid "Updated Flatpak runtime"
-msgstr "Updated Flatpak runtime"
+msgid "Updated Native runtime"
+msgstr "Updated Native runtime"
 
 #: data/com.usebottles.bottles.metainfo.xml.in:82
 msgid "Minor improvement and fixes to the library"

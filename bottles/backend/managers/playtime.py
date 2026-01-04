@@ -12,7 +12,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
@@ -689,13 +689,13 @@ class ProcessSessionTracker:
                 # Then add offset*7 to shift to the target week
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         CAST(strftime('%w', started_at, 'unixepoch', 'localtime') AS INTEGER) as day_of_week,
                         SUM(duration_seconds) as total_seconds
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') >= date('now', 'weekday 0', '-7 days', ? || ' days') AND
                         date(started_at, 'unixepoch', 'localtime') < date('now', 'weekday 0', '-7 days', ? || ' days')
@@ -765,13 +765,13 @@ class ProcessSessionTracker:
                 # We need to split sessions that span multiple hours
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         started_at,
                         ended_at
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') = ?
                 """,
@@ -867,13 +867,13 @@ class ProcessSessionTracker:
                 # strftime('%m', ...) returns month as 01-12
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         CAST(strftime('%m', started_at, 'unixepoch', 'localtime') AS INTEGER) as month,
                         SUM(duration_seconds) as total_seconds
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         strftime('%Y', started_at, 'unixepoch', 'localtime') = ?
                     GROUP BY month
@@ -928,9 +928,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') >= date('now', 'weekday 0', '-7 days', ? || ' days') AND
                         date(started_at, 'unixepoch', 'localtime') < date('now', 'weekday 0', '-7 days', ? || ' days')
@@ -972,9 +972,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') = ?
                 """,
@@ -1010,9 +1010,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         strftime('%Y', started_at, 'unixepoch', 'localtime') = ?
                 """,

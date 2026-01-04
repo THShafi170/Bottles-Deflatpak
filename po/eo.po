@@ -71,7 +71,7 @@ msgid "Wine config updated!"
 msgstr "Reagordiĝis Wine!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr ""
 
 #: bottles/backend/managers/manager.py:1209
@@ -2480,7 +2480,7 @@ msgid "This feature is unavailable on your system."
 msgstr "Gamemode estas aŭ ne havebla aŭ ne ruliĝanta en via sistemo."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2902,13 +2902,13 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migrado al Flatpak"
+msgid "Native migration"
+msgstr "Migrado al Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
 #, fuzzy
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Migrado al Flatpak"
+msgid "Toggle the Native migration dialog."
+msgstr "Migrado al Native"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -2933,7 +2933,7 @@ msgstr ""
 #: data/com.usebottles.bottles.gschema.xml:22
 #, fuzzy
 msgid "Toggle steam apps listing."
-msgstr "Migrado al Flatpak"
+msgstr "Migrado al Native"
 
 #: data/com.usebottles.bottles.gschema.xml:26
 msgid "Epic Games listing"
@@ -2950,7 +2950,7 @@ msgstr ""
 #: data/com.usebottles.bottles.gschema.xml:32
 #, fuzzy
 msgid "Toggle ubisoft connect listing."
-msgstr "Migrado al Flatpak"
+msgstr "Migrado al Native"
 
 #: data/com.usebottles.bottles.gschema.xml:36
 msgid "Window width"
@@ -3041,7 +3041,7 @@ msgstr ""
 #: data/com.usebottles.bottles.gschema.xml:87
 #, fuzzy
 msgid "Toggle sandbox warning."
-msgstr "Migrado al Flatpak"
+msgstr "Migrado al Native"
 
 #: data/com.usebottles.bottles.metainfo.xml.in:11
 #, fuzzy

@@ -45,9 +45,7 @@ class RegistryRuleManager:
         if name in rules:
             del rules[name]
             serialised = [item.to_dict() for item in rules.values()]
-            manager.update_config(
-                config=config, key="Registry_Rules", value=serialised
-            )
+            manager.update_config(config=config, key="Registry_Rules", value=serialised)
 
     @classmethod
     def apply_rules(
@@ -67,7 +65,9 @@ class RegistryRuleManager:
             selected = {
                 name: rule
                 for name, rule in selected.items()
-                if not rule.triggers or trigger in rule.triggers or "all" in rule.triggers
+                if not rule.triggers
+                or trigger in rule.triggers
+                or "all" in rule.triggers
             }
 
         reg = Reg(config)

@@ -68,8 +68,8 @@ msgid "Wine config updated!"
 msgstr "תצורת Wine עודכנה!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "מורץ בתור Flatpak, מבודד את ספריית המשתמש…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "מורץ בתור Native, מבודד את ספריית המשתמש…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2374,8 +2374,8 @@ msgid "This feature is unavailable on your system."
 msgstr "תכונה זו אינה זמינה במערכת שלך."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} כדי להוסיף תכונה זו, נא להריץ flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} כדי להוסיף תכונה זו, נא להריץ native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2776,12 +2776,12 @@ msgid "wine;windows;"
 msgstr "‪wine;windows;‬"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "הגירת Flatpak"
+msgid "Native migration"
+msgstr "הגירת Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "החלפת מצב הנראות של תיבת דו־השיח להגירת Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "החלפת מצב הנראות של תיבת דו־השיח להגירת Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

@@ -18,11 +18,11 @@
 import contextlib
 import os
 import webbrowser
-from datetime import datetime, timedelta
+from datetime import datetime
 from gettext import gettext as _
 from typing import Optional
 
-from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
 
 from bottles.backend.globals import Paths
 from bottles.backend.health import HealthChecker
@@ -114,35 +114,6 @@ class BottlesWindow(Adw.ApplicationWindow):
         if self.settings.get_boolean("dark-theme"):
             manager = Adw.StyleManager.get_default()
             manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
-
-        # Be VERY explicit that non-sandboxed environments are unsupported
-        if not Xdp.Portal.running_under_sandbox():
-
-            def response(dialog, response, *args):
-                if response == "close":
-                    quit(1)
-
-            body = _(
-                "Bottles is only supported within a sandboxed environment. Official sources of Bottles are available at"
-            )
-            download_url = "usebottles.com/download"
-
-            error_dialog = Adw.AlertDialog.new(
-                _("Unsupported Environment"),
-                f"{body} <a href='https://{download_url}' title='https://{download_url}'>{download_url}.</a>",
-            )
-
-            error_dialog.add_response("close", _("Close"))
-            error_dialog.set_body_use_markup(True)
-            error_dialog.connect("response", response)
-            error_dialog.present(self)
-            logging.error(
-                _(
-                    "Bottles is only supported within a sandboxed format. Official sources of Bottles are available at:"
-                )
-            )
-            logging.error("https://usebottles.com/download/")
-            return
 
         # Loading view
         self.page_loading = LoadingView()
@@ -302,9 +273,14 @@ class BottlesWindow(Adw.ApplicationWindow):
         def set_manager(result: Manager, error=None):
             self.manager = result
 
-            tmp_runners = [
-                x for x in self.manager.runners_available if not x.startswith("sys-")
-            ]
+            try:
+                tmp_runners = [
+                    x
+                    for x in self.manager.runners_available
+                    if not x.startswith("sys-")
+                ]
+            except AttributeError:
+                tmp_runners = []
             if len(tmp_runners) == 0:
                 self._showing_onboard = True
                 self.show_onboard_view()

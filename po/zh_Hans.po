@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "WINE 配置已更新！"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "运行为 Flatpak，沙箱化用户目录…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "运行为 Native，沙箱化用户目录…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2314,8 +2314,8 @@ msgid "This feature is unavailable on your system."
 msgstr "该功能在你的系统上不可用。"
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} 要添加此功能，请运行 flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} 要添加此功能，请运行 native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2714,12 +2714,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak 迁移"
+msgid "Native migration"
+msgstr "Native 迁移"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "开关 Flatpak 迁移对话框。"
+msgid "Toggle the Native migration dialog."
+msgstr "开关 Native 迁移对话框。"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3709,8 +3709,8 @@ msgstr "不再赘述其他！"
 #~ "their packages"
 #~ msgstr "扩展了核心依赖项检查，请求打包者仔细检查包"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Flatpak 包的新默认权限：xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Native 包的新默认权限：xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr "在“致谢”部分添加了对第三方库的致谢"
@@ -3880,7 +3880,7 @@ msgstr "不再赘述其他！"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "缺少权限而无法创建桌面条目。\n"
 #~ "查看 <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">我们的视频</"
@@ -4055,12 +4055,12 @@ msgstr "不再赘述其他！"
 #~ msgstr "比如 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "您在使用 Flatpak 版本的 Bottles，如果脚本路径在沙盒外面请记得通过 <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "您在使用 Native 版本的 Bottles，如果脚本路径在沙盒外面请记得通过 <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> 授予权限。"
 
 #~ msgid "Type the new name:"
@@ -4142,11 +4142,11 @@ msgstr "不再赘述其他！"
 #~ msgstr "完成"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "警告：确保授予 Flatpak 访问新路径的权限。\n"
+#~ "警告：确保授予 Native 访问新路径的权限。\n"
 #~ "这将破坏沙盒环境！"
 
 #~ msgid "Whether the above list should display unstable versions."
@@ -4245,8 +4245,8 @@ msgstr "不再赘述其他！"
 #~ msgid "Import & export"
 #~ msgstr "导入和导出"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak 帮助"
+#~ msgid "Native help"
+#~ msgstr "Native 帮助"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "我的旧 bottle 升级后就看不到了。"
@@ -4460,9 +4460,9 @@ msgstr "不再赘述其他！"
 
 #~ msgid ""
 #~ "The lutris-lol runner is now hidden when Bottles is running under "
-#~ "flatpak, as it is not compatible with it"
+#~ "native, as it is not compatible with it"
 #~ msgstr ""
-#~ "当 Bottles 在 flatpak 下运行时，因为兼容性问题，lutris-lol runner 现在被隐"
+#~ "当 Bottles 在 native 下运行时，因为兼容性问题，lutris-lol runner 现在被隐"
 #~ "藏"
 
 #~ msgid ""
@@ -4539,8 +4539,8 @@ msgstr "不再赘述其他！"
 #~ "used for bottles templating"
 #~ msgstr "可以用新名称克隆一个 bottle，这也可用于 bottle 制模"
 
-#~ msgid "Reduced the Flatpak permissions"
-#~ msgstr "降低了 Flatpak 权限"
+#~ msgid "Reduced the Native permissions"
+#~ msgstr "降低了 Native 权限"
 
 #~ msgid "You can now choose a custom working directory for each bottle"
 #~ msgstr "现在可以为每个 boottle 选择一个自定义的工作目录"
@@ -4566,8 +4566,8 @@ msgstr "不再赘述其他！"
 #~ "source"
 #~ msgstr "和上面一样，但这个用来处理与源文件大小不一致的下载"
 
-#~ msgid "Fixed the File Manager integration in Flatpak"
-#~ msgstr "修复了 Flatpak 中的文件管理器集成"
+#~ msgid "Fixed the File Manager integration in Native"
+#~ msgstr "修复了 Native 中的文件管理器集成"
 
 #~ msgid "Fixed a bug in temp directory clean up"
 #~ msgstr "修正了临时目录清理的错误"
@@ -4652,8 +4652,8 @@ msgstr "不再赘述其他！"
 #~ msgid "Fixed a bug on processes listing"
 #~ msgstr "修复了进程列举的一个错误"
 
-#~ msgid "Fix crash log path on Flatpak"
-#~ msgstr "修复 Flatpak 崩溃日志路径"
+#~ msgid "Fix crash log path on Native"
+#~ msgstr "修复 Native 崩溃日志路径"
 
 #~ msgid ""
 #~ "Fixed an issue causing Bottles to detect downloaded dxvk even when it "
@@ -4773,8 +4773,8 @@ msgstr "不再赘述其他！"
 #~ msgid "Reduced the amount of logs"
 #~ msgstr "减少了日志量"
 
-#~ msgid "Flatpak now uses the app directories"
-#~ msgstr "Flatpak现在使用应用程序目录"
+#~ msgid "Native now uses the app directories"
+#~ msgstr "Native现在使用应用程序目录"
 
 #~ msgid ""
 #~ "If there are bottles in the old dir and the app dir is empty then a "

@@ -16,12 +16,12 @@ class ExtJSONEncoder(_json.JSONEncoder):
         return super().default(o)
 
 
-def load(fp: IO[str]) -> Any:
+def load(fp: IO[str]) -> dict | list | Any:
     """Deserialize fp (a .read()-supporting file-like object containing a JSON document) to a Python object."""
     return _json.load(fp)
 
 
-def loads(s: str | bytes) -> Any:
+def loads(s: str | bytes) -> dict | list | Any:
     """Deserialize s (a str, bytes or bytearray instance containing a JSON document) to a Python object."""
     return _json.loads(s)
 

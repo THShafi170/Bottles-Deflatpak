@@ -20,7 +20,7 @@ import os
 import re
 from gettext import gettext as _
 
-from gi.repository import Adw, Gdk, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gtk
 
 from bottles.backend.globals import (
     gamemode_available,
@@ -148,76 +148,30 @@ class PreferencesView(Adw.PreferencesPage):
         self.queue = details.queue
         self.details = details
 
-        if not gamemode_available or not Xdp.Portal.running_under_sandbox():
-            return
-
         _not_available = _("This feature is unavailable on your system.")
-        _flatpak_not_available = _("{} To add this feature, please run").format(
-            _not_available
-        )
-        self._install_commands = {
-            "gamescope": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope",
-            "vkbasalt": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.vkBasalt",
-            "mangohud": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.MangoHud",
-            "obsvkc": "flatpak install flathub com.obsproject.Studio.Plugin.OBSVkCapture",
-        }
-
-        is_flatpak = "FLATPAK_ID" in os.environ
 
         if not gamemode_available:
             self.switch_gamemode.set_tooltip_text(_not_available)
             self.__add_unavailable_indicator(self.row_gamemode, None)
 
         if not gamescope_available:
-            _gamescope_command = self._install_commands.get("gamescope")
-            _gamescope_not_available = (
-                f"{_flatpak_not_available} {_gamescope_command}"
-                if is_flatpak
-                else _not_available
-            )
-            self.switch_gamescope.set_tooltip_text(_gamescope_not_available)
-            self.btn_manage_gamescope.set_tooltip_text(_gamescope_not_available)
-            self.__add_unavailable_indicator(
-                self.row_gamescope, _gamescope_command if is_flatpak else None
-            )
+            self.switch_gamescope.set_tooltip_text(_not_available)
+            self.btn_manage_gamescope.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_gamescope, None)
 
         if not vkbasalt_available:
-            _vkbasalt_command = self._install_commands.get("vkbasalt")
-            _vkbasalt_not_available = (
-                f"{_flatpak_not_available} {_vkbasalt_command}"
-                if is_flatpak
-                else _not_available
-            )
-            self.switch_vkbasalt.set_tooltip_text(_vkbasalt_not_available)
-            self.btn_manage_vkbasalt.set_tooltip_text(_vkbasalt_not_available)
-            self.__add_unavailable_indicator(
-                self.row_vkbasalt, _vkbasalt_command if is_flatpak else None
-            )
+            self.switch_vkbasalt.set_tooltip_text(_not_available)
+            self.btn_manage_vkbasalt.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_vkbasalt, None)
 
         if not mangohud_available:
-            _mangohud_command = self._install_commands.get("mangohud")
-            _mangohud_not_available = (
-                f"{_flatpak_not_available} {_mangohud_command}"
-                if is_flatpak
-                else _not_available
-            )
-            self.switch_mangohud.set_tooltip_text(_mangohud_not_available)
-            self.btn_manage_mangohud.set_tooltip_text(_mangohud_not_available)
-            self.__add_unavailable_indicator(
-                self.row_mangohud, _mangohud_command if is_flatpak else None
-            )
+            self.switch_mangohud.set_tooltip_text(_not_available)
+            self.btn_manage_mangohud.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_mangohud, None)
 
         if not obs_vkc_available:
-            _obsvkc_command = self._install_commands.get("obsvkc")
-            _obsvkc_not_available = (
-                f"{_flatpak_not_available} {_obsvkc_command}"
-                if is_flatpak
-                else _not_available
-            )
-            self.switch_obsvkc.set_tooltip_text(_obsvkc_not_available)
-            self.__add_unavailable_indicator(
-                self.row_obsvkc, _obsvkc_command if is_flatpak else None
-            )
+            self.switch_obsvkc.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_obsvkc, None)
 
         if not vmtouch_available:
             self.switch_vmtouch.set_tooltip_text(_not_available)
