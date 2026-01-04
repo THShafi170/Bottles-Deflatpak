@@ -16,7 +16,6 @@
 #
 
 import filecmp
-import os
 import shutil
 import subprocess
 from glob import glob
@@ -29,11 +28,6 @@ class VulkanUtils:
         "/usr/local/share/vulkan",
         "/usr/local/etc/vulkan",
     ]
-    if "FLATPAK_ID" in os.environ:
-        __vk_icd_dirs += [
-            "/usr/lib/x86_64-linux-gnu/GL/vulkan",
-            "/usr/lib/i386-linux-gnu/GL/vulkan",
-        ]
 
     def __init__(self):
         self.loaders = self.__get_vk_icd_loaders()
@@ -46,7 +40,7 @@ class VulkanUtils:
 
             for file in _files:
                 if "nvidia" in file.lower():
-                    # Workaround for nvidia flatpak bug: https://github.com/flathub/org.freedesktop.Platform.GL.nvidia/issues/112
+                    # Workaround for nvidia bug
                     should_skip = False
                     for nvidia_loader in loaders["nvidia"]:
                         try:

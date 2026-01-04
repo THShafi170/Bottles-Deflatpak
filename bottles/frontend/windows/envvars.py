@@ -284,7 +284,10 @@ class EnvironmentVariablesDialog(Adw.Dialog):
         self.__update_inherited_placeholder()
 
     def __save_inherited_var(self, *_args):
-        if not self.switch_limit_inherited.get_active() or not self.__valid_inherited_name:
+        if (
+            not self.switch_limit_inherited.get_active()
+            or not self.__valid_inherited_name
+        ):
             return
 
         new_name = self.entry_new_inherited.get_text().strip()

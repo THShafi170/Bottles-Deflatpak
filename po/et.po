@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine'i seadistused on uuendatud!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Käivitusime Flatpakina, pruugime kasutaja kausta puhul aedikkäitust…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Käivitusime Nativeina, pruugime kasutaja kausta puhul aedikkäitust…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2420,8 +2420,8 @@ msgid "This feature is unavailable on your system."
 msgstr "See funktsionaalsus pole sinu süsteemis saadaval."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Selle funktsionaalsuse lisamiseks palun käivita „flatpak install“"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Selle funktsionaalsuse lisamiseks palun käivita „native install“"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2836,12 +2836,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;proton;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Üleviimine Flatpakile"
+msgid "Native migration"
+msgstr "Üleviimine Nativeile"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Näita või peida Flatpakile üleviimise vaade."
+msgid "Toggle the Native migration dialog."
+msgstr "Näita või peida Nativeile üleviimise vaade."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

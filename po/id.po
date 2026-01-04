@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Konfigurasi WINE diperbaharui!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Jalankan sebagai Flatpak, membuat berkas pengguna sebagai sandbox…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Jalankan sebagai Native, membuat berkas pengguna sebagai sandbox…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2530,7 +2530,7 @@ msgid "This feature is unavailable on your system."
 msgstr "Fitur ini tidak tersedia di sistem anda."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2951,12 +2951,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migrasi Flatpak"
+msgid "Native migration"
+msgstr "Migrasi Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Beralih dialog migrasi Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Beralih dialog migrasi Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -4010,11 +4010,11 @@ msgstr ""
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Tidak dapat membuat Entri Desktop karena tidak memiliki izin.\n"
 #~ "Periksa <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">video "
-#~ "kami</a> tentang bagaimana cara memperbaikinya dalam Flatpak."
+#~ "kami</a> tentang bagaimana cara memperbaikinya dalam Native."
 
 #, fuzzy
 #~ msgid "Type a short comment:"
@@ -4209,12 +4209,12 @@ msgstr ""
 #~ msgstr "mis: 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Anda menggunakan Bottles Flatpak, jangan lupa untuk memberi izin lewat <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "Anda menggunakan Bottles Native, jangan lupa untuk memberi izin lewat <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> jika skrip jalur berada di luar sandbox."
 
 #~ msgid "Type the new name:"
@@ -4287,11 +4287,11 @@ msgstr ""
 #~ msgstr "Selesai"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Peringatan: Pastikan untuk memberi izin kepada Flatpak untuk mengakses "
+#~ "Peringatan: Pastikan untuk memberi izin kepada Native untuk mengakses "
 #~ "jalur baru.\n"
 #~ "Ini akan menghancurkan sandbox!"
 
@@ -4432,8 +4432,8 @@ msgstr ""
 #~ msgid "Library mode"
 #~ msgstr "Mode perpustakaan"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Bantuan flatpak"
+#~ msgid "Native help"
+#~ msgstr "Bantuan native"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Saya tidak bisa melihat bottle lama saya setelah upgrade."

@@ -98,7 +98,7 @@ class ComponentManager:
                         logging.warning(
                             f"{component[0]} was found but it requires "
                             "glibc >= 2.32 and your system is running an older "
-                            "version. Use the Flatpak instead if you can't "
+                            "version. Use the Native instead if you can't "
                             "upgrade your system. This runner will be ignored, "
                             "please keep in mind that Bottles and all our "
                             "installers are only tested with Soda and Caffe runners."

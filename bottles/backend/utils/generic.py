@@ -85,7 +85,7 @@ def is_glibc_min_available():
         version = gnu_get_libc_version().decode("ascii")
         if version >= "2.32":
             return version
-    except:
+    except (AttributeError, ImportError, Exception):
         pass
     return False
 
@@ -93,9 +93,7 @@ def is_glibc_min_available():
 def sort_by_version(_list: list, extra_check: str = "async"):
     def natural_keys(text):
         result = [int(re.search(extra_check, text) is None)]
-        result.extend(
-            [int(n) for n in re.findall(r"\d+", text)]
-        )
+        result.extend([int(n) for n in re.findall(r"\d+", text)])
         return result
 
     _list.sort(key=natural_keys, reverse=True)

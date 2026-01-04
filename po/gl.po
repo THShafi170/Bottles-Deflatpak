@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Configuración de Wine actualizada!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Executando como Flatpak, illando o directorio de usuario…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Executando como Native, illando o directorio de usuario…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2445,7 +2445,7 @@ msgid "This feature is unavailable on your system."
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2864,12 +2864,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migración desde Flatpak"
+msgid "Native migration"
+msgstr "Migración desde Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Troca o diálogo de migración de Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Troca o diálogo de migración de Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3934,8 +3934,8 @@ msgstr ""
 #~ msgid "This field cannot contain special characters!"
 #~ msgstr "Este campo non pode conter caracteres especiais!"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Axuda de Flatpak"
+#~ msgid "Native help"
+#~ msgstr "Axuda de Native"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "No pode ver botellas antigas despois da actualización."

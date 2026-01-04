@@ -1,0 +1,7 @@
+bottles (60.1) unstable; urgency=medium
+
+  * Initial release as a native package.
+  * Updated dependencies for v60.1.
+  * Removed Flatpak checks.
+
+ -- Bottles Developers <hello@usebottles.com>  Sat, 20 Dec 2024 13:20:00 +0000

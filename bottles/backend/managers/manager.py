@@ -76,6 +76,7 @@ from bottles.backend.wine.uninstaller import Uninstaller
 from bottles.backend.wine.wineboot import WineBoot
 from bottles.backend.wine.winepath import WinePath
 from bottles.backend.wine.wineserver import WineServer
+from bottles.backend.utils.wine import WineUtils
 
 logging = Logger()
 
@@ -112,7 +113,7 @@ class Manager(metaclass=Singleton):
 
     def __init__(
         self,
-        g_settings: Any = None,
+        g_settings: Optional[Any] = None,
         check_connection: bool = True,
         is_cli: bool = False,
         **kwargs,
@@ -170,7 +171,7 @@ class Manager(metaclass=Singleton):
                 self.settings.connect(
                     "changed::playtime-enabled", self._on_playtime_enabled_changed
                 )
-            except Exception:
+            except (AttributeError, TypeError, Exception):
                 pass
 
         # Subscribe to playtime signals (connect once per process)
@@ -318,7 +319,7 @@ class Manager(metaclass=Singleton):
         try:
             if hasattr(self, "playtime_tracker") and self.playtime_tracker:
                 self.playtime_tracker.shutdown()
-        except Exception:
+        except (AttributeError, RuntimeError, Exception):
             pass
 
     def _initialize_playtime_tracker(self) -> None:
@@ -415,8 +416,8 @@ class Manager(metaclass=Singleton):
             config = self._get_payload_config(payload)
             if config:
                 RegistryRuleManager.apply_rules(config, trigger="start_program")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug(f"Failed to handle program started signal: {e}")
 
     def _on_program_finished(self, data: Optional[Result] = None) -> None:
         try:
@@ -435,8 +436,8 @@ class Manager(metaclass=Singleton):
             config = self._get_payload_config(payload)
             if config:
                 RegistryRuleManager.apply_rules(config, trigger="stop_program")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug(f"Failed to handle program finished signal: {e}")
 
     def _get_payload_config(self, payload) -> Optional[BottleConfig]:
         config = self.local_bottles.get(payload.bottle_name)
@@ -445,7 +446,7 @@ class Manager(metaclass=Singleton):
 
         try:
             config_path = os.path.join(payload.bottle_path, "bottle.yml")
-        except Exception:
+        except (TypeError, ValueError):
             return None
 
         loaded = BottleConfig.load(config_path)
@@ -693,13 +694,15 @@ class Manager(metaclass=Singleton):
                         os.rename(winemenubuilder, f"{winemenubuilder}.lock")
 
         # check system wine
-        if shutil.which("wine") is not None:
+        if (wine_path := WineUtils.find_system_wine()) is not None:
             """
             If the Wine command is available, get the runner version
             and add it to the runners_available list.
             """
             version = (
-                subprocess.Popen("wine --version", stdout=subprocess.PIPE, shell=True)
+                subprocess.Popen(
+                    f"{wine_path} --version", stdout=subprocess.PIPE, shell=True
+                )
                 .communicate()[0]
                 .decode("utf-8")
             )
@@ -765,9 +768,6 @@ class Manager(metaclass=Singleton):
 
     def check_runtimes(self, install_latest: bool = True) -> bool:
         self.runtimes_available = []
-        if "FLATPAK_ID" in os.environ:
-            self.runtimes_available = ["flatpak-managed"]
-            return True
 
         runtimes = os.listdir(Paths.runtimes)
 
@@ -829,15 +829,16 @@ class Manager(metaclass=Singleton):
         missing_installation = len(winebridge) == 0 or not installed_identifier
         needs_latest = False
         if latest_supported:
-            needs_latest = (
-                missing_installation
-                or _is_newer(latest_supported, installed_identifier)
+            needs_latest = missing_installation or _is_newer(
+                latest_supported, installed_identifier
             )
 
         return latest_supported, installed_identifier, needs_latest
 
     def winebridge_update_status(self) -> dict:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
         return {
             "latest_supported": latest_supported,
             "installed_identifier": installed_identifier,
@@ -848,7 +849,9 @@ class Manager(metaclass=Singleton):
     def check_winebridge(
         self, install_latest: bool = True, update: bool = False
     ) -> bool:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
 
         can_install = install_latest or update
         if can_install and needs_latest and latest_supported:
@@ -1124,7 +1127,7 @@ class Manager(metaclass=Singleton):
                     if fnmatch.fnmatch(executable_name.lower(), pattern):
                         stop = True
                         break
-                except:  # safe to ignore
+                except (TypeError, ValueError, Exception):  # safe to ignore
                     pass
             if stop:
                 continue
@@ -1182,7 +1185,11 @@ class Manager(metaclass=Singleton):
         Check for local bottles and update the local_bottles list.
         Will also mark the broken ones if the configuration file is missing
         """
-        bottles = os.listdir(Paths.bottles)
+        try:
+            bottles = os.listdir(Paths.bottles)
+        except FileNotFoundError:
+            self.check_app_dirs()
+            bottles = []
 
         # Empty local bottles
         self.local_bottles = {}
@@ -1362,8 +1369,17 @@ class Manager(metaclass=Singleton):
             Sync type change requires wineserver restart or wine will fail
             to execute any command.
             """
-            wineboot.kill()
-            wineserver.wait()
+            # Only kill if the value is actually changing
+            current_val = None
+            if scope and hasattr(config, scope):
+                obj = getattr(config, scope)
+                current_val = getattr(obj, key, None)
+            else:
+                current_val = getattr(config, key, None)
+
+            if current_val != value:
+                wineboot.kill()
+                wineserver.wait()
 
         if scope:
             if remove:
@@ -1685,14 +1701,15 @@ class Manager(metaclass=Singleton):
 
         # create the bottle directory
         try:
-            os.makedirs(bottle_complete_path)
+            os.makedirs(bottle_complete_path, exist_ok=True)
             # Pre-create drive_c directory and set the case-fold flag
             bottle_drive_c = os.path.join(bottle_complete_path, "drive_c")
-            os.makedirs(bottle_drive_c)
+            os.makedirs(bottle_drive_c, exist_ok=True)
             FileUtils.chattr_f(bottle_drive_c)
-        except:
+        except OSError as e:
             logging.error(
-                f"Failed to create bottle directory: {bottle_complete_path}", jn=True
+                f"Failed to create bottle directory: {bottle_complete_path}. Error: {e}",
+                jn=True,
             )
             log_update(_("Failed to create bottle directory."))
             return Result(False)
@@ -1704,13 +1721,13 @@ class Manager(metaclass=Singleton):
         if bottle_custom_path:
             placeholder_dir = os.path.join(Paths.bottles, bottle_name_path)
             try:
-                os.makedirs(placeholder_dir)
+                os.makedirs(placeholder_dir, exist_ok=True)
                 with open(os.path.join(placeholder_dir, "placeholder.yml"), "w") as f:
                     placeholder = {"Path": bottle_complete_path}
                     f.write(yaml.dump(placeholder))
-            except:
+            except OSError as e:
                 logging.error(
-                    f"Failed to create placeholder directory/file at: {placeholder_dir}",
+                    f"Failed to create placeholder directory/file at: {placeholder_dir}. Error: {e}",
                     jn=True,
                 )
                 log_update(_("Failed to create placeholder directory/file."))

@@ -35,8 +35,6 @@ from bottles.frontend.params import (
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("GtkSource", "5")
-gi.require_version("Xdp", "1.0")
-# gi.require_version("XdpGtk4", "1.0")
 
 # ruff: noqa: E402
 from gi.repository import Adw, Gio, GLib, GObject  # type: ignore
@@ -270,7 +268,10 @@ class Bottles(Adw.Application):
         logging.info(
             _("[Quit] request received."),
         )
-        self.win.on_close_request()
+        try:
+            self.win.on_close_request()
+        except AttributeError:
+            pass
         quit()
 
     @staticmethod
@@ -321,25 +322,9 @@ class Bottles(Adw.Application):
         return False
 
     def __show_about_dialog(self, *_args):
-        developers = [
-            "Mirko Brombin https://github.com/mirkobrombin",
-            "hthre7 https://github.com/hthre7",
-            "Kekun https://github.com/Kekun",
-            "Sonny Piers https://github.com/sonnyp",
-            "BrainBlasted https://github.com/BrainBlasted",
-            "Francesco Masala <mail@francescomasala.me>",
-            "Hari Rana (TheEvilSkeleton) https://theevilskeleton.gitlab.io",
-            "axtlos https://axtloss.github.io",
-            "Oro https://github.com/orowith2os",
-            "gregorni https://gitlab.com/gregorni",
-        ]
+        developers = []
 
-        artists = [
-            "Marco Montini https://github.com/marckniack",
-            "Noëlle https://github.com/jannuary",
-            "Alvar Lagerlöf https://github.com/alvarlagerlof",
-            "Ezekiel Smith https://github.com/ZekeSmith",
-        ]
+        artists = []
 
         about_dialog = Adw.AboutDialog.new_from_appdata(
             "/com/usebottles/bottles/appdata",

@@ -69,8 +69,8 @@ msgid "Wine config updated!"
 msgstr "کۆنفیگی واین نوێ کرایەوە!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "کارکردن وەکو Flatpak ،sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "کارکردن وەکو Native ،sandboxing userdir…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2508,7 +2508,7 @@ msgid "This feature is unavailable on your system."
 msgstr "ئەم تایبتەمەندییە لەسەر سیستەمەکەی تۆ بەردەست نییە."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2933,11 +2933,11 @@ msgid "wine;windows;"
 msgstr "واین؛ویندۆز;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr "گواستنەوەی فلاتپاک"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
 msgstr "کردنەوە و داخستنی دایەلۆگی گواستنەوەی فلاتپاک."
 
 #: data/com.usebottles.bottles.gschema.xml:11
@@ -4019,12 +4019,12 @@ msgstr ""
 #~ msgstr "بۆ نموونە ٣٠"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
 #~ "تۆ فلاتپاکی بۆتڵز بەکاردەهێنیت، بیرت بێت کە مۆڵەتی پێ بدەیت بەهۆی <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">فلاتسیڵ</"
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">فلاتسیڵ</"
 #~ "a> ئەگەر شوێنی سکریپتەکە لە دەرەوەی ساندبۆکس بوو."
 
 #~ msgid "Type the new name:"
@@ -4096,7 +4096,7 @@ msgstr ""
 #~ msgstr "تەواو"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
@@ -4175,7 +4175,7 @@ msgstr ""
 #~ msgid "Import & export"
 #~ msgstr "هاوردە & هەناردە"
 
-#~ msgid "Flatpak help"
+#~ msgid "Native help"
 #~ msgstr "یارمەتی فلاتپاک"
 
 #~ msgid "I can't see my old bottles after upgrade."

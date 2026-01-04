@@ -68,8 +68,8 @@ msgid "Wine config updated!"
 msgstr "تم تحديث تكوين واين!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "التشغيل كـ Flatpak، تُحدد آلية الوصول لدليل المستخدم…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "التشغيل كـ Native، تُحدد آلية الوصول لدليل المستخدم…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2335,8 +2335,8 @@ msgid "This feature is unavailable on your system."
 msgstr "لا تتوفر هذه الميزة لنظامك."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} شغِّل flatpak install لإضافة هذه الميزة"
+msgid "{} To add this feature, please run native install"
+msgstr "{} شغِّل native install لإضافة هذه الميزة"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2731,12 +2731,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr "ترحيل فلاتباك"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "بدّل مربع حوار \"الترحيل إلى Flatpak\"."
+msgid "Toggle the Native migration dialog."
+msgstr "بدّل مربع حوار \"الترحيل إلى Native\"."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3726,7 +3726,7 @@ msgstr "والكثير غير ذلك!"
 #~ "packages"
 #~ msgstr "فحص تبعيات موسع، ندعو المسؤوليين عن الحزم للتحقق من حزمهم مرة أخرى"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
 #~ msgstr "إذن افتراضي جديد لحزمة الفلاتباك: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"

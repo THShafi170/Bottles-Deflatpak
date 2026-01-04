@@ -4,7 +4,7 @@ moduledir = join_paths(pkgdatadir, 'bottles')
 python = import('python')
 
 conf = configuration_data()
-conf.set('PYTHON', python.find_installation('python3').full_path())
+conf.set('PYTHON', '/usr/bin/python3')
 conf.set('BASE_ID', BASE_ID)
 conf.set('APP_ID', APP_ID)
 conf.set('APP_NAME', APP_NAME)

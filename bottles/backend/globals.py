@@ -83,13 +83,6 @@ mangohud_available = shutil.which("mangohud") or False
 obs_vkc_available = shutil.which("obs-vkcapture") or False
 vmtouch_available = shutil.which("vmtouch") or False
 base_version = ""
-if os.path.isfile("/app/manifest.json"):
-    with open("/app/manifest.json", mode="r", encoding="utf-8") as file:
-        base_version = (
-            json.load(file)  # type: ignore
-            .get("base-version", "")
-            .removeprefix("stable-")
-        )
 
 # encoding detection correction, following windows defaults
 locale_encodings: Dict[str, str] = {"ja_JP": "cp932", "zh_CN": "gbk"}

@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Winen kokoonpano päivitetty!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Suoritetaan flatpakina, eristetään käyttäjähakemisto…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Suoritetaan nativeina, eristetään käyttäjähakemisto…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2421,8 +2421,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Tämä ominaisuus ei ole käytettävissä järjestelmässäsi."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Lisää tämä ominaisuus suorittamalla flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Lisää tämä ominaisuus suorittamalla native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2831,12 +2831,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak-migraatio"
+msgid "Native migration"
+msgstr "Native-migraatio"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak-siirtymädialogi"
+msgid "Toggle the Native migration dialog."
+msgstr "Native-siirtymädialogi"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -4240,8 +4240,8 @@ msgstr ""
 #~ msgid "Library mode"
 #~ msgstr "Kirjastotila"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak-ohje"
+#~ msgid "Native help"
+#~ msgstr "Native-ohje"
 
 #~ msgid "Destroy this bottle"
 #~ msgstr "Tuhoa tämä pullo"

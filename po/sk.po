@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Konfigurácia Wine bola aktualizovaná!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Spúšťam ako Flatpak, v sandboxe používateľa…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Spúšťam ako Native, v sandboxe používateľa…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2413,8 +2413,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Váš systém nedisponuje touto funkciou."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} pre pridanie tejto funkcie spustite flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} pre pridanie tejto funkcie spustite native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2826,12 +2826,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Prechod na Flatpak"
+msgid "Native migration"
+msgstr "Prechod na Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Zapnúť/vypnúť dialógové okno Prechod na Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Zapnúť/vypnúť dialógové okno Prechod na Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

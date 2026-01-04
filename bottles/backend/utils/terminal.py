@@ -38,7 +38,7 @@ class TerminalUtils:
     }
 
     terminals = [
-        # Part of Flatpak package
+        # Built-in terminal
         ["easyterm.py", '-d -p "%s" -c %s'],
         # Third party
         ["foot", "%s"],
@@ -62,10 +62,6 @@ class TerminalUtils:
         self.terminal = None
 
     def check_support(self):
-        if "FLATPAK_ID" in os.environ:
-            self.terminal = self.terminals[0]
-            return True
-
         for terminal in self.terminals:
             terminal_check = (
                 subprocess.Popen(
@@ -104,11 +100,6 @@ class TerminalUtils:
         terminal = self.terminal
         template = " ".join(terminal)
         term_bin = os.path.basename(terminal[0])
-
-        if "FLATPAK_ID" in os.environ and "easyterm" in term_bin:
-            ld = env.get("LD_LIBRARY_PATH", "")
-            base = "/app/lib:/app/lib64"
-            env["LD_LIBRARY_PATH"] = base + (":" + ld if ld else "")
 
         if "easyterm" in term_bin:
             for k in [

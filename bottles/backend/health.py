@@ -117,7 +117,7 @@ class HealthChecker:
 
     def get_results(self, plain: bool = False):
         results = {
-            "Official Package": "FLATPAK_ID" in os.environ,
+            "Native Package": True,
             "Version": APP_VERSION,
             "DE/WM": self.desktop,
             "Display": {

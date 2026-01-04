@@ -7,7 +7,9 @@ from bottles.backend.wine.executor import WineExecutor
 from bottles.backend.wine.winecommand import WineCommand, WineEnv
 
 
-def _make_config(name: str = "TestBottle", path: str = "TestBottlePath") -> BottleConfig:
+def _make_config(
+    name: str = "TestBottle", path: str = "TestBottlePath"
+) -> BottleConfig:
     return BottleConfig(Name=name, Path=path, Custom_Path="", Environment="Custom")
 
 
@@ -40,7 +42,7 @@ def test_replace_placeholders_handles_unknown_tokens():
 
 
 def test_run_program_substitutes_placeholders(monkeypatch):
-    captured: dict[str, object] = {}
+    _captured: dict[str, object] = {}
 
     def fake_init(
         self,

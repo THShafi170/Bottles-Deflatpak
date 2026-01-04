@@ -16,6 +16,7 @@
 #
 
 
+import glob
 import os
 import shlex
 import subprocess
@@ -48,7 +49,7 @@ class SandboxManager:
         self.share_display = share_display
         self.share_sound = share_sound
         self.share_gpu = share_gpu
-        self.__uid = os.environ.get("UID", "1000")
+        self.__uid = str(os.getuid())
 
     def __get_bwrap(self, cmd: str):
         _cmd = ["bwrap"]
@@ -78,15 +79,21 @@ class SandboxManager:
             ]
 
         if self.share_sound:
-            _cmd.append(
-                f"--ro-bind /run/user/{self.__uid}/pulse /run/user/{self.__uid}/pulse"
-            )
+            pulse_path = f"/run/user/{self.__uid}/pulse"
+            if os.path.exists(pulse_path):
+                _cmd.append(
+                    f"--ro-bind {shlex.quote(pulse_path)} {shlex.quote(pulse_path)}"
+                )
 
         if self.share_gpu:
-            pass  # not implemented yet
+            for device in glob.glob("/dev/dri/*"):
+                _cmd += ["--dev-bind", shlex.quote(device), shlex.quote(device)]
+            for device in glob.glob("/dev/nvidia*"):
+                _cmd += ["--dev-bind", shlex.quote(device), shlex.quote(device)]
 
         if self.share_display:
-            _cmd.append("--dev-bind /dev/video0 /dev/video0")
+            for device in glob.glob("/dev/video*"):
+                _cmd += ["--dev-bind", shlex.quote(device), shlex.quote(device)]
 
         _cmd.append("--share-net" if self.share_net else "--unshare-net")
         _cmd.append("--share-user" if self.share_user else "--unshare-user")
@@ -94,56 +101,8 @@ class SandboxManager:
 
         return _cmd
 
-    def __get_flatpak_spawn(self, cmd: str):
-        _cmd = ["flatpak-spawn", "--sandbox"]
-
-        if self.envs:
-            _cmd += [f"--env={k}={shlex.quote(v)}" for k, v in self.envs.items()]
-
-        if self.clear_env:
-            _cmd.append("--clear-env")
-
-        if self.chdir:
-            quoted_dir = shlex.quote(self.chdir)
-            _cmd.append(f"--directory={quoted_dir}")
-            _cmd.append(f"--sandbox-expose-path={quoted_dir}")
-
-        if self.share_host_ro:
-            _cmd.append("--sandbox-expose-path-ro=/")
-
-        if self.share_paths_ro:
-            _cmd += [
-                f"--sandbox-expose-path-ro={shlex.quote(p)}"
-                for p in self.share_paths_ro
-            ]
-
-        if self.share_paths_rw:
-            _cmd += [
-                f"--sandbox-expose-path={shlex.quote(p)}" for p in self.share_paths_rw
-            ]
-
-        if not self.share_net:
-            _cmd.append("--no-network")
-
-        if self.share_display:
-            _cmd.append("--sandbox-flag=share-display")
-
-        if self.share_sound:
-            _cmd.append("--sandbox-flag=share-sound")
-
-        if self.share_gpu:
-            _cmd.append("--sandbox-flag=share-gpu")
-
-        _cmd.append(cmd)
-
-        return _cmd
-
     def get_cmd(self, cmd: str):
-        if "FLATPAK_ID" in os.environ:
-            _cmd = self.__get_flatpak_spawn(cmd)
-        else:
-            _cmd = self.__get_bwrap(cmd)
-
+        _cmd = self.__get_bwrap(cmd)
         return " ".join(_cmd)
 
     def run(self, cmd: str) -> subprocess.Popen[bytes]:

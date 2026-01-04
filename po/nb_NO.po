@@ -72,8 +72,8 @@ msgstr "Oppsett"
 
 #: bottles/backend/managers/manager.py:1207
 #, fuzzy
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Kjører som Flatpak. Oppretter sandkasse-mapper…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Kjører som Native. Oppretter sandkasse-mapper…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2538,7 +2538,7 @@ msgstr ""
 "Spillmodus er enten ikke tilgjengelig på systemet ditt, eller kjører ikke."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2679,7 +2679,7 @@ msgstr "En flaske ved navn «{0}» ble opprettet"
 msgid "Steam was not found or Bottles does not have enough permissions."
 msgstr ""
 "Steam ble ikke funnet eller så har ikke Flasker nok tillatelser. Besøk "
-"https://docs.usebottles.com/flatpak/cant-enable-steam-proton-manager"
+"https://docs.usebottles.com/native/cant-enable-steam-proton-manager"
 
 #: bottles/frontend/views/preferences.py:176
 #, fuzzy
@@ -2965,13 +2965,13 @@ msgid "wine;windows;"
 msgstr "WINE;Windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak-migrasjon"
+msgid "Native migration"
+msgstr "Native-migrasjon"
 
 #: data/com.usebottles.bottles.gschema.xml:7
 #, fuzzy
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Skru av/på Flatpak-migrasjonsdialogen."
+msgid "Toggle the Native migration dialog."
+msgstr "Skru av/på Native-migrasjonsdialogen."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -4259,8 +4259,8 @@ msgstr ""
 #~ msgid "Import & export"
 #~ msgstr "Importerer"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak-hjelp"
+#~ msgid "Native help"
+#~ msgstr "Native-hjelp"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Jeg ser ikke mine gamle flasker etter oppgradering."
@@ -4373,7 +4373,7 @@ msgstr ""
 
 #, fuzzy
 #~ msgid "Creating sandboxed folders…"
-#~ msgstr "Kjører som Flatpak. Oppretter sandkasse-mapper…"
+#~ msgstr "Kjører som Native. Oppretter sandkasse-mapper…"
 
 #, fuzzy
 #~ msgid "These are the wine/wineserver processes running on your PC."
@@ -4588,8 +4588,8 @@ msgstr ""
 #~ msgid "Spanish by lvaskz"
 #~ msgstr "Spansk oversettelse ved Ivaskz"
 
-#~ msgid "Support for 32 bit applications in Flatpak"
-#~ msgstr "Støtte for 32-biters programmer i Flatpak"
+#~ msgid "Support for 32 bit applications in Native"
+#~ msgstr "Støtte for 32-biters programmer i Native"
 
 #, fuzzy
 #~ msgid "Execute .bat files in your bottles"
@@ -4599,8 +4599,8 @@ msgstr ""
 #~ msgstr "Feilfiks:"
 
 #~ msgid ""
-#~ "Proposed a fix that should resolve the execution of executables on Flatpak"
-#~ msgstr "Forslag om fiks som bør fikse kjøring av kjørbare filer på Flatpak"
+#~ "Proposed a fix that should resolve the execution of executables on Native"
+#~ msgstr "Forslag om fiks som bør fikse kjøring av kjørbare filer på Native"
 
 #~ msgid "The window can now be resized"
 #~ msgstr "Vindusstørrelsen kan nå endres"

@@ -34,8 +34,6 @@ logging = Logger()
 class LibraryEntryInitializationError(Exception):
     """Raised when a library entry cannot be initialized."""
 
-    pass
-
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/library-entry.ui")
 class LibraryEntry(Gtk.Box):

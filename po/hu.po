@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine konfiguráció frissítve!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Futtatás Flatpakként, felhasználói mappa homokozóba helyezése…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Futtatás Nativeként, felhasználói mappa homokozóba helyezése…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2418,8 +2418,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Ez a funkció nem érhető el a rendszerén."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} A funkció hozzáadásához, kérjük, futtassa ezt: flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} A funkció hozzáadásához, kérjük, futtassa ezt: native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2831,12 +2831,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak átköltözés"
+msgid "Native migration"
+msgstr "Native átköltözés"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak átköltözés párbeszédpanel be-/kikapcsolása."
+msgid "Toggle the Native migration dialog."
+msgstr "Native átköltözés párbeszédpanel be-/kikapcsolása."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3973,11 +3973,11 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Nem lehet létrehozni az asztalbejegyzést a hiányzó jogosultságok miatt.\n"
 #~ "Tekintse meg <a href=\"https://www.youtube.com/watch?"
-#~ "v=tPFNg9AU5k4\">videónkat</a> arról, hogyan javíthatja ki ezt a Flatpak "
+#~ "v=tPFNg9AU5k4\">videónkat</a> arról, hogyan javíthatja ki ezt a Native "
 #~ "alkalmazásban."
 
 #~ msgid "Type a short comment:"
@@ -4179,12 +4179,12 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgstr "pl. 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "A Palackok Flatpak verzióját használja, ne felejtsen el engedélyt adni a "
-#~ "<a href=\"https://docs.usebottles.com/flatpak/expose-"
+#~ "A Palackok Native verzióját használja, ne felejtsen el engedélyt adni a "
+#~ "<a href=\"https://docs.usebottles.com/native/expose-"
 #~ "directories\">Flatseal</a> alkalmazással, ha a szkript útvonala a "
 #~ "homokozón kívülre esik."
 
@@ -4269,11 +4269,11 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgstr "Befejez"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Figyelmeztetés: Győződjön meg, hogy ad engedélyt a Flatpaknek, hogy "
+#~ "Figyelmeztetés: Győződjön meg, hogy ad engedélyt a Nativenek, hogy "
 #~ "elérje az új útvonalat.\n"
 #~ "Ez megtöri a homokozót!"
 
@@ -4416,8 +4416,8 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgid "Library mode"
 #~ msgstr "Könyvtár mód"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak súgó"
+#~ msgid "Native help"
+#~ msgstr "Native súgó"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Nem látom az régi palackjaim frissítés után."
@@ -4530,7 +4530,7 @@ msgstr "és sokkal, sokkal, sokkal több!"
 
 #~ msgid "Creating sandboxed folders…"
 #~ msgstr ""
-#~ "Flatpak-ként futtatása, védőfal mögé helyezett mappák létrehozása "
+#~ "Native-ként futtatása, védőfal mögé helyezett mappák létrehozása "
 #~ "folyamatban van…"
 
 #~ msgid "These are the wine/wineserver processes running on your PC."
@@ -4657,9 +4657,9 @@ msgstr "és sokkal, sokkal, sokkal több!"
 
 #~ msgid ""
 #~ "The lutris-lol runner is now hidden when Bottles is running under "
-#~ "flatpak, as it is not compatible with it"
+#~ "native, as it is not compatible with it"
 #~ msgstr ""
-#~ "A lutris-lol futó most el van rejtve, amikor a Tárolók flatpak alatt "
+#~ "A lutris-lol futó most el van rejtve, amikor a Tárolók native alatt "
 #~ "futnak, mivel nem kompatibilis vele"
 
 #~ msgid ""
@@ -4755,8 +4755,8 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ "Mostantól lehetőség van egy ismétlődés tároló másolat új névvel, ezzel is "
 #~ "használható a tárolók sablonozása"
 
-#~ msgid "Reduced the Flatpak permissions"
-#~ msgstr "Csökkentette a Flatpak engedélyeket"
+#~ msgid "Reduced the Native permissions"
+#~ msgstr "Csökkentette a Native engedélyeket"
 
 #~ msgid "You can now choose a custom working directory for each bottle"
 #~ msgstr "Mostantól minden tárolóhoz egyéni munkakönyvtárat választhat"
@@ -4788,8 +4788,8 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ "Ugyanaz, mint a fentiek, de ez a fogantyú rossz méretben töltődik le, "
 #~ "mint a forrás"
 
-#~ msgid "Fixed the File Manager integration in Flatpak"
-#~ msgstr "A Flatpak fájlkezelő beilleszkedése javítva"
+#~ msgid "Fixed the File Manager integration in Native"
+#~ msgstr "A Native fájlkezelő beilleszkedése javítva"
 
 #~ msgid "Fixed a bug in temp directory clean up"
 #~ msgstr "Ideiglenes könyvtár törlése hibajavítása"
@@ -4888,8 +4888,8 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgid "Fixed a bug on processes listing"
 #~ msgstr "Javítva a folyamatlista hibája"
 
-#~ msgid "Fix crash log path on Flatpak"
-#~ msgstr "Javítsa az ütközési napló elérési útját a Flatpakon"
+#~ msgid "Fix crash log path on Native"
+#~ msgstr "Javítsa az ütközési napló elérési útját a Nativeon"
 
 #~ msgid ""
 #~ "Fixed an issue causing Bottles to detect downloaded dxvk even when it "
@@ -5035,8 +5035,8 @@ msgstr "és sokkal, sokkal, sokkal több!"
 #~ msgid "Reduced the amount of logs"
 #~ msgstr "Csökkentette a naplók mennyiségét"
 
-#~ msgid "Flatpak now uses the app directories"
-#~ msgstr "Flatpak most az alkalmazás könyvtárakat használja"
+#~ msgid "Native now uses the app directories"
+#~ msgstr "Native most az alkalmazás könyvtárakat használja"
 
 #~ msgid ""
 #~ "If there are bottles in the old dir and the app dir is empty then a "

@@ -180,13 +180,20 @@ class DetailsView(Adw.Bin):
             if self.view_bottle.get_parent() is None:
                 self.default_view.append(self.view_bottle)
 
-            self.stack_bottle.add_named(self.view_preferences, "preferences")
-            self.stack_bottle.add_named(self.view_dependencies, "dependencies")
-            self.stack_bottle.add_named(self.view_registry_rules, "registry_rules")
-            self.stack_bottle.add_named(self.view_versioning, "versioning")
-            self.stack_bottle.add_named(self.view_installers, "installers")
-            self.stack_bottle.add_named(self.view_taskmanager, "taskmanager")
-            self.stack_bottle.add_named(self.view_eagle, "eagle")
+            if self.view_preferences.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_preferences, "preferences")
+            if self.view_dependencies.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_dependencies, "dependencies")
+            if self.view_registry_rules.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_registry_rules, "registry_rules")
+            if self.view_versioning.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_versioning, "versioning")
+            if self.view_installers.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_installers, "installers")
+            if self.view_taskmanager.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_taskmanager, "taskmanager")
+            if self.view_eagle.get_parent() != self.stack_bottle:
+                self.stack_bottle.add_named(self.view_eagle, "eagle")
 
             if self.view_bottle.actions.get_parent() is None:
                 self.set_actions(self.view_bottle.actions)
@@ -213,12 +220,15 @@ class DetailsView(Adw.Bin):
         self.config = config
 
         # update widgets data with bottle configuration
+        # update widgets data with bottle configuration
         self.view_bottle.set_config(config=config)
-        self.view_preferences.set_config(config=config)
-        self.view_taskmanager.set_config(config=config)
-        self.view_installers.update(config=config)
-        self.view_registry_rules.update(config=config)
-        self.view_versioning.update(config=config)
+
+        # Defer heavy sub-views update to next frames to allow smooth transition
+        GLib.idle_add(self.view_preferences.set_config, config)
+        GLib.idle_add(self.view_taskmanager.set_config, config)
+        GLib.idle_add(self.view_installers.update, config)
+        GLib.idle_add(self.view_registry_rules.update, config)
+        GLib.idle_add(self.view_versioning.update, config)
 
         if rebuild_pages:
             self.build_pages()

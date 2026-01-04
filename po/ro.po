@@ -68,8 +68,8 @@ msgid "Wine config updated!"
 msgstr "Configurația Wine e actualizată!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Se pornește ca Flatpak, se creează dosarul într-un mediu izolat…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Se pornește ca Native, se creează dosarul într-un mediu izolat…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2431,8 +2431,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Această caracteristică nu e disponibilă pentru sistemul tău."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Pentru a adăuga această caracteristică, pornește instalarea flatpak"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Pentru a adăuga această caracteristică, pornește instalarea native"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2842,12 +2842,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migrare la Flatpak"
+msgid "Native migration"
+msgstr "Migrare la Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Act/Dez dialogul de migrare la Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Act/Dez dialogul de migrare la Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

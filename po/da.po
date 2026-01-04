@@ -70,7 +70,7 @@ msgid "Wine config updated!"
 msgstr "Konfiguration"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr ""
 
 #: bottles/backend/managers/manager.py:1209
@@ -2463,7 +2463,7 @@ msgstr ""
 "Spilletilstand er enten ikke tilgængelig på dit system, eller kører ikke."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
+msgid "{} To add this feature, please run native install"
 msgstr ""
 
 #: bottles/frontend/views/bottle_preferences.py:246
@@ -2885,11 +2885,11 @@ msgid "wine;windows;"
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
+msgid "Native migration"
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
+msgid "Toggle the Native migration dialog."
 msgstr ""
 
 #: data/com.usebottles.bottles.gschema.xml:11
@@ -3789,8 +3789,8 @@ msgstr ""
 #~ msgid "Import & export"
 #~ msgstr "Importering"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak-hjælp"
+#~ msgid "Native help"
+#~ msgstr "Native-hjælp"
 
 #, fuzzy
 #~ msgid "Destroy this bottle"

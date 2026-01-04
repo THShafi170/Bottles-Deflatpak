@@ -15,14 +15,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
 import re
 import uuid
 from datetime import datetime
 from gettext import gettext as _
 from typing import Dict, List, Optional, Tuple
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from bottles.backend.managers.backup import BackupManager
 from bottles.backend.models.config import BottleConfig
@@ -95,7 +94,6 @@ class BottleView(Adw.PreferencesPage):
     btn_backup_full = Gtk.Template.Child()
     btn_duplicate = Gtk.Template.Child()
     btn_delete = Gtk.Template.Child()
-    btn_flatpak_doc = Gtk.Template.Child()
     label_name = Gtk.Template.Child()
     dot_versioning = Gtk.Template.Child()
     grid_versioning = Gtk.Template.Child()
@@ -170,16 +168,6 @@ class BottleView(Adw.PreferencesPage):
         self.btn_backup_config.connect("clicked", self.__backup, "config")
         self.btn_backup_full.connect("clicked", self.__backup, "full")
         self.btn_duplicate.connect("clicked", self.__duplicate)
-        self.btn_flatpak_doc.connect(
-            "clicked", open_doc_url, "flatpak/black-screen-or-silent-crash"
-        )
-
-        if "FLATPAK_ID" in os.environ:
-            """
-            If Flatpak, show the btn_flatpak_doc widget to reach
-            the documentation on how to expose directories
-            """
-            self.btn_flatpak_doc.set_visible(True)
 
         self.exec_winebridge.set_active(self.config.Winebridge)
         self.populate_updates()
@@ -268,9 +256,11 @@ class BottleView(Adw.PreferencesPage):
         ):
             self.__alert_missing_runner()
 
-        # update programs list
-        self.update_programs()
-        self.populate_updates()
+        # Update programs list and updates asynchronously to avoid blocking the UI
+        # We empty the list synchronously to avoid ghosting during the transition
+        self.empty_list()
+        GLib.idle_add(self.update_programs)
+        GLib.idle_add(self.populate_updates)
 
     def add(self, widget=False):
         """
@@ -338,7 +328,11 @@ class BottleView(Adw.PreferencesPage):
             GLib.idle_add(self.empty_list)
 
         def new_program(
-            _program, check_boot=None, is_steam=False, wineserver_status=False
+            _program,
+            check_boot=None,
+            is_steam=False,
+            wineserver_status=False,
+            is_running=None,
         ):
             if check_boot is None:
                 check_boot = wineserver_status
@@ -349,6 +343,7 @@ class BottleView(Adw.PreferencesPage):
                 _program,
                 is_steam=is_steam,
                 check_boot=check_boot,
+                is_running=is_running,
             )
 
             # Update playtime subtitle if not Steam program
@@ -364,26 +359,57 @@ class BottleView(Adw.PreferencesPage):
 
         def process_programs():
             wineserver_status = WineServer(self.config).is_alive()
-            programs = self.manager.get_programs(self.config)
-            programs = sorted(programs, key=lambda p: p.get("name", "").lower())
-            handled = 0
 
-            if self.config.Environment == "Steam":
-                GLib.idle_add(new_program, {"name": self.config.Name}, None, True)
-                handled += 1
+            def on_processes_fetched(result, error=None):
+                running_executables = []
+                if result:
+                    try:
+                        # result is the return value of get_processes
+                        running_executables = [p["name"] for p in result]
+                    except Exception:
+                        pass
 
-            for program in programs:
-                if program.get("removed"):
-                    if self.show_hidden:
-                        GLib.idle_add(
-                            new_program, program, None, False, wineserver_status
-                        )
-                        handled += 1
-                    continue
-                GLib.idle_add(new_program, program, None, False, wineserver_status)
-                handled += 1
+                populate_ui(running_executables)
 
-            self.row_no_programs.set_visible(handled == 0)
+            def populate_ui(running_executables):
+                programs = self.manager.get_programs(self.config)
+                programs = sorted(programs, key=lambda p: p.get("name", "").lower())
+                handled = 0
+
+                if self.config.Environment == "Steam":
+                    GLib.idle_add(new_program, {"name": self.config.Name}, None, True)
+                    handled += 1
+
+                for program in programs:
+                    is_running = program.get("executable") in running_executables
+
+                    if program.get("removed"):
+                        if self.show_hidden:
+                            GLib.idle_add(
+                                new_program,
+                                program,
+                                None,
+                                False,
+                                wineserver_status,
+                                is_running,
+                            )
+                            handled += 1
+                        continue
+                    GLib.idle_add(
+                        new_program, program, None, False, wineserver_status, is_running
+                    )
+                    handled += 1
+
+                self.row_no_programs.set_visible(handled == 0)
+
+            # Fix for massive winedbg spawn on bottle load
+            if wineserver_status:
+                # Run get_processes in background to avoid blocking UI (can take seconds)
+                RunAsync(
+                    WineDbg(self.config).get_processes, callback=on_processes_fetched
+                )
+            else:
+                populate_ui([])
 
         process_programs()
 
@@ -786,8 +812,6 @@ class BottleView(Adw.PreferencesPage):
         """
 
         def show_chooser(*_args):
-            self.window.settings.set_boolean("show-sandbox-warning", False)
-
             def execute(_dialog, response):
                 if response != Gtk.ResponseType.ACCEPT:
                     return
@@ -824,22 +848,7 @@ class BottleView(Adw.PreferencesPage):
             dialog.connect("response", execute)
             dialog.show()
 
-        if Xdp.Portal.running_under_sandbox():
-            if self.window.settings.get_boolean("show-sandbox-warning"):
-                dialog = Adw.MessageDialog.new(
-                    self.window,
-                    _("Be Aware of Sandbox"),
-                    _(
-                        "Bottles is running in a sandbox, a restricted permission environment needed to keep you safe. If the program won't run, consider moving inside the bottle (3 dots icon on the top), then launch from there."
-                    ),
-                )
-                dialog.add_response("dismiss", _("_Dismiss"))
-                dialog.connect("response", lambda *args: show_chooser())
-                dialog.present()
-            else:
-                show_chooser()
-        else:
-            show_chooser()
+        show_chooser()
 
     def run_eagle(self, _widget):
         """
@@ -869,6 +878,8 @@ class BottleView(Adw.PreferencesPage):
         )
         dialog.connect("response", set_path)
         dialog.show()
+
+
 
     def __backup(self, widget, backup_type):
         """
@@ -966,6 +977,7 @@ class BottleView(Adw.PreferencesPage):
         dialog.add_response("ok", _("_Delete"))
         dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.connect("response", handle_response)
+        dialog.set_default_size(380, -1)
         dialog.present()
 
     def __alert_missing_runner(self):
@@ -986,7 +998,9 @@ the Bottles preferences or choose a new one to run applications."
             ),
         )
         dialog.add_response("ok", _("_Dismiss"))
+
         dialog.connect("response", handle_response)
+        dialog.set_default_size(380, -1)
         dialog.present()
 
     def __update_by_env(self):
@@ -1063,7 +1077,9 @@ the Bottles preferences or choose a new one to run applications."
             dialog.add_response("cancel", _("_Cancel"))
             dialog.add_response("ok", _("Force _Stop"))
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
+
             dialog.connect("response", handle_response)
+            dialog.set_default_size(380, -1)
             dialog.present()
 
     def __set_steam_rules(self):

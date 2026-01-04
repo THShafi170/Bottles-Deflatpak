@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine yapılandırması güncellendi!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Flatpak olarak çalışıyor, kullanıcı dizini korumalı yapılıyor…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Native olarak çalışıyor, kullanıcı dizini korumalı yapılıyor…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2410,8 +2410,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Bu özellik sisteminizde kullanılabilir değil."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} Bu özelliği eklemek için lütfen flatpak install'ı çalıştırın"
+msgid "{} To add this feature, please run native install"
+msgstr "{} Bu özelliği eklemek için lütfen native install'ı çalıştırın"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2817,12 +2817,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;bottles;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak geçişi"
+msgid "Native migration"
+msgstr "Native geçişi"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak geçişi iletişim kutusunu aç/kapat."
+msgid "Toggle the Native migration dialog."
+msgstr "Native geçişi iletişim kutusunu aç/kapat."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3923,10 +3923,10 @@ msgstr "ve çok, çok, çok daha fazlası!"
 #~ msgid ""
 #~ "Can't create Desktop Entry due to missing privileges.\n"
 #~ "Check out <a href=\"https://www.youtube.com/watch?v=tPFNg9AU5k4\">our "
-#~ "video</a> about how to fix that in Flatpak."
+#~ "video</a> about how to fix that in Native."
 #~ msgstr ""
 #~ "Karşılanamayan izinler nedeniyle Masaüstü Girdisi oluşturulamadı.\n"
-#~ "Bu sorunu Flatpak'te düzeltmek için <a href=\"https://www.youtube.com/"
+#~ "Bu sorunu Native'te düzeltmek için <a href=\"https://www.youtube.com/"
 #~ "watch?v=tPFNg9AU5k4\">videomuza</a> göz atın."
 
 #, fuzzy
@@ -4106,12 +4106,12 @@ msgstr "ve çok, çok, çok daha fazlası!"
 #~ msgstr "Örnek: 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Bottle Flatpak sürümünü kullanıyorsun, eğer komut yolu Sandbox dışındaysa "
-#~ "<a href=\"https://docs.usebottles.com/flatpak/expose-"
+#~ "Bottle Native sürümünü kullanıyorsun, eğer komut yolu Sandbox dışındaysa "
+#~ "<a href=\"https://docs.usebottles.com/native/expose-"
 #~ "directories\">Flatseal</a> ile gerekli izinleri vermeyi unutma."
 
 #~ msgid "Type the new name:"
@@ -4197,11 +4197,11 @@ msgstr "ve çok, çok, çok daha fazlası!"
 #~ msgstr "Bitiş"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Uyarı: Flatpak'ın yeni yola erişim izni olduğundan emin olun.\n"
+#~ "Uyarı: Native'ın yeni yola erişim izni olduğundan emin olun.\n"
 #~ "Sandbox'ı bozacaktır!"
 
 #~ msgid "Whether the above list should display unstable versions."
@@ -4303,8 +4303,8 @@ msgstr "ve çok, çok, çok daha fazlası!"
 #~ msgid "Import & export"
 #~ msgstr "İçe ve dışa aktar"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Flatpak yardımı"
+#~ msgid "Native help"
+#~ msgstr "Native yardımı"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Yükseltmeden sonra eski şişelerimi göremiyorum."
@@ -4566,9 +4566,9 @@ msgstr "ve çok, çok, çok daha fazlası!"
 
 #~ msgid ""
 #~ "The lutris-lol runner is now hidden when Bottles is running under "
-#~ "flatpak, as it is not compatible with it"
+#~ "native, as it is not compatible with it"
 #~ msgstr ""
-#~ "lutris-lol çalıştırıcısı artık Şişeler flatpak altında çalışırken onunla "
+#~ "lutris-lol çalıştırıcısı artık Şişeler native altında çalışırken onunla "
 #~ "uyumlu olmadığı için gizleniyor"
 
 #~ msgid ""

@@ -68,9 +68,9 @@ msgid "Wine config updated!"
 msgstr "Konfiguracja Wine zaktualizowana!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
+msgid "Running as Native, sandboxing userdir…"
 msgstr ""
-"Uruchamiam jako Flatpak, konfiguruję piaskownicę dla katalogu użytkownika…"
+"Uruchamiam jako Native, konfiguruję piaskownicę dla katalogu użytkownika…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2431,8 +2431,8 @@ msgid "This feature is unavailable on your system."
 msgstr "Ta funkcja nie jest dostępna w Twoim systemie."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} By dodać tę funkcję, prosimy uruchomić instalację Flatpak"
+msgid "{} To add this feature, please run native install"
+msgstr "{} By dodać tę funkcję, prosimy uruchomić instalację Native"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2558,7 +2558,7 @@ msgstr "Pomyślnie utworzono „{0}”."
 msgid "Steam was not found or Bottles does not have enough permissions."
 msgstr ""
 "Nie znaleziono instalacji Steama, bądź Bottles nie ma wystarczających "
-"uprawnień. Odwiedź https://docs.usebottles.com/flatpak/cant-enable-steam-"
+"uprawnień. Odwiedź https://docs.usebottles.com/native/cant-enable-steam-"
 "proton-manager."
 
 #: bottles/frontend/views/preferences.py:176
@@ -2852,12 +2852,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Migracja Flatpak"
+msgid "Native migration"
+msgstr "Migracja Native"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Przełącz okno dialogowe migracji Flatpak."
+msgid "Toggle the Native migration dialog."
+msgstr "Przełącz okno dialogowe migracji Native."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"
@@ -3929,8 +3929,8 @@ msgstr "i wiele, wiele, wiele więcej!"
 #~ "Rozszerzona weryfikacja podstawowych zależności, zachęcamy osoby "
 #~ "przygotowujące pakiety do podwójnego sprawdzenia swoich pakietów"
 
-#~ msgid "New default permission for the Flatpak package: xdg-download"
-#~ msgstr "Nowe domyślne uprawnienie dla pakietu Flatpak: xdg-download"
+#~ msgid "New default permission for the Native package: xdg-download"
+#~ msgstr "Nowe domyślne uprawnienie dla pakietu Native: xdg-download"
 
 #~ msgid "Added credits for Third-Party Libraries in the Credits section"
 #~ msgstr ""
@@ -4314,12 +4314,12 @@ msgstr "i wiele, wiele, wiele więcej!"
 #~ msgstr "np. 30"
 
 #~ msgid ""
-#~ "You are using Bottles Flatpak, remember to give it permissions via <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "You are using Bottles Native, remember to give it permissions via <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> if the script path is outside the sandbox."
 #~ msgstr ""
-#~ "Używasz Bottles w wersji Flatpak, pamiętaj aby przyznać uprawnienia w <a "
-#~ "href=\"https://docs.usebottles.com/flatpak/expose-directories\">Flatseal</"
+#~ "Używasz Bottles w wersji Native, pamiętaj aby przyznać uprawnienia w <a "
+#~ "href=\"https://docs.usebottles.com/native/expose-directories\">Flatseal</"
 #~ "a> jeśli ścieżka skryptu jest poza piaskownicą."
 
 #~ msgid "Type the new name:"
@@ -4390,11 +4390,11 @@ msgstr "i wiele, wiele, wiele więcej!"
 #~ msgstr "Zakończ"
 
 #~ msgid ""
-#~ "Warning: Be sure to give permission to the Flatpak to access the new "
+#~ "Warning: Be sure to give permission to the Native to access the new "
 #~ "path.\n"
 #~ "This will break the sandbox!"
 #~ msgstr ""
-#~ "Ostrzeżenie: Upewnij się, że Flatpak ma pozwolenie na dostęp do nowej "
+#~ "Ostrzeżenie: Upewnij się, że Native ma pozwolenie na dostęp do nowej "
 #~ "ścieżki.\n"
 #~ "Spowoduje to przerwę w piaskownicy!"
 
@@ -4533,8 +4533,8 @@ msgstr "i wiele, wiele, wiele więcej!"
 #~ msgid "Library mode"
 #~ msgstr "Tryb biblioteki"
 
-#~ msgid "Flatpak help"
-#~ msgstr "Pomoc Flatpak"
+#~ msgid "Native help"
+#~ msgstr "Pomoc Native"
 
 #~ msgid "I can't see my old bottles after upgrade."
 #~ msgstr "Po aktualizacji nie widzę moich starych butelek."
@@ -4834,8 +4834,8 @@ msgstr "i wiele, wiele, wiele więcej!"
 #~ msgid "Reduced the amount of logs"
 #~ msgstr "Zmniejszona ilość logów"
 
-#~ msgid "Flatpak now uses the app directories"
-#~ msgstr "Flatpak używa teraz katalogów aplikacji"
+#~ msgid "Native now uses the app directories"
+#~ msgstr "Native używa teraz katalogów aplikacji"
 
 #~ msgid ""
 #~ "If there are bottles in the old dir and the app dir is empty then a "

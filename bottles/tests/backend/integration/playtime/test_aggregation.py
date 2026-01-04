@@ -2,7 +2,7 @@
 
 import sqlite3
 import time
-from freezegun import freeze_time
+from freezegun import freeze_time  # type: ignore
 
 
 def test_same_program_aggregates_into_one_row(manager):
@@ -74,4 +74,3 @@ def test_different_programs_separate_rows(manager):
     cur = con.cursor()
     cur.execute("SELECT COUNT(*) FROM playtime_totals WHERE bottle_id=?", ("b1",))
     assert cur.fetchone()[0] == 2
-

@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "Wine 설정 업데이트 완료!"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "Flatpak로 실행, 사용자 디렉터리 샌드박싱 중…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "Native로 실행, 사용자 디렉터리 샌드박싱 중…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2353,8 +2353,8 @@ msgid "This feature is unavailable on your system."
 msgstr "이 기능은 현재 시스템에서 사용할 수 없습니다."
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} 이 기능을 추가하려면 flatpak install을 실행하세요"
+msgid "{} To add this feature, please run native install"
+msgstr "{} 이 기능을 추가하려면 native install을 실행하세요"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2756,12 +2756,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak 이전"
+msgid "Native migration"
+msgstr "Native 이전"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "Flatpak 이전 대화창을 전환합니다."
+msgid "Toggle the Native migration dialog."
+msgstr "Native 이전 대화창을 전환합니다."
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

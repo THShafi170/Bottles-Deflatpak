@@ -20,7 +20,7 @@ from gettext import gettext as _
 from threading import Event
 from typing import Any, Optional
 
-from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, Xdp
+from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
 from pathvalidate import sanitize_filename
 
 from bottles.backend.models.config import BottleConfig
@@ -86,7 +86,7 @@ class BottlesNewBottleDialog(Adw.Dialog):
         super().__init__(**kwargs)
         # common variables and references
         self.window = GtkUtils.get_parent_window()
-        if not self.window or not Xdp.Portal.running_under_sandbox():
+        if not self.window:
             return
 
         self.app = self.window.get_application()

@@ -67,8 +67,8 @@ msgid "Wine config updated!"
 msgstr "WINE 設定檔已更新！"
 
 #: bottles/backend/managers/manager.py:1207
-msgid "Running as Flatpak, sandboxing userdir…"
-msgstr "在 Flatpak 環境執行，正將使用者目錄進行沙盒隔離…"
+msgid "Running as Native, sandboxing userdir…"
+msgstr "在 Native 環境執行，正將使用者目錄進行沙盒隔離…"
 
 #: bottles/backend/managers/manager.py:1209
 msgid "Sandboxing userdir…"
@@ -2314,8 +2314,8 @@ msgid "This feature is unavailable on your system."
 msgstr "您的系統無法使用這個功能。"
 
 #: bottles/frontend/views/bottle_preferences.py:196
-msgid "{} To add this feature, please run flatpak install"
-msgstr "{} 欲新增此功能，請執行flatpak install"
+msgid "{} To add this feature, please run native install"
+msgstr "{} 欲新增此功能，請執行native install"
 
 #: bottles/frontend/views/bottle_preferences.py:246
 msgid "This bottle name is already in use."
@@ -2715,12 +2715,12 @@ msgid "wine;windows;"
 msgstr "wine;windows;"
 
 #: data/com.usebottles.bottles.gschema.xml:6
-msgid "Flatpak migration"
-msgstr "Flatpak 遷移"
+msgid "Native migration"
+msgstr "Native 遷移"
 
 #: data/com.usebottles.bottles.gschema.xml:7
-msgid "Toggle the Flatpak migration dialog."
-msgstr "觸發 Flatpak 遷移對話框。"
+msgid "Toggle the Native migration dialog."
+msgstr "觸發 Native 遷移對話框。"
 
 #: data/com.usebottles.bottles.gschema.xml:11
 msgid "Dark theme"

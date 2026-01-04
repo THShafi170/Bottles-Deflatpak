@@ -24,7 +24,8 @@ bottles_sources = [
   'connection.py',
   'gsettings_stub.py',
   'json.py',
-  'singleton.py'
+  'singleton.py',
+  'portal.py'
 ]
 
 install_data(bottles_sources, install_dir: utilsdir)
