@@ -28,7 +28,7 @@ if APP_MINOR_VERSION == "@APP_MINOR_VERSION@":
 APP_ICON = APP_ID
 PROFILE = "@PROFILE@"
 if PROFILE == "@PROFILE@":
-    PROFILE = "development"
+    PROFILE = "default"
 
 # Internal settings not user editable
 ANIM_DURATION = 120
