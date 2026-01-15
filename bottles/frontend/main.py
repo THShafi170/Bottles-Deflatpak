@@ -193,13 +193,11 @@ class Bottles(Adw.Application):
                     )
 
         uri = commands.lookup_value(GLib.OPTION_REMAINING)
-        logging.info(
-            _("Launching with URI: {0}").format(uri),
-        )
         if uri:
-            return self.__process_uri(uri)
+            self.__process_uri(uri)
+            return 0
 
-        self.do_activate()
+        self.activate()
         return 0
 
     def __process_uri(self, uri):

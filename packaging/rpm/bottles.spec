@@ -84,6 +84,7 @@ Recommends:     mangohud
 Suggests:       obs-studio-plugin-vkcapture
 Recommends:     vkBasalt
 Recommends:     vmtouch
+Recommends:     libportal
 Recommends:     bubblewrap
 
 
