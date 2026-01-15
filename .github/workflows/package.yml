@@ -93,7 +93,7 @@ jobs:
 
   deb:
     name: "Build DEB (Debian/Ubuntu)"
-    needs: [tarball]
+    needs: [validate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +138,7 @@ jobs:
 
   rpm:
     name: "Build RPM (Fedora)"
-    needs: [deb]
+    needs: [validate]
     runs-on: ubuntu-latest
     container: fedora:latest
     steps:
@@ -184,7 +184,7 @@ jobs:
   release:
     name: "Create/Update Release"
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: [validate, rpm]
+    needs: [validate, tarball, deb, rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
