@@ -59,10 +59,10 @@ class DictCompatMixIn:
 class BottleSandboxParams(DictCompatMixIn):
     share_net: bool = False
     share_sound: bool = False
-    # share_host_ro: bool = True  # TODO: implement, requires the Bottles runtime (next) for a minimal sandbox
-    # share_gpu: bool = True  # TODO: implement
-    # share_paths_ro: List[str] = field(default_factory=lambda: [])  # TODO: implement
-    # share_paths_rw: List[str] = field(default_factory=lambda: [])  # TODO: implement
+    share_host_ro: bool = True
+    share_gpu: bool = True
+    share_paths_ro: List[str] = field(default_factory=lambda: [])
+    share_paths_rw: List[str] = field(default_factory=lambda: [])
 
 
 @dataclass

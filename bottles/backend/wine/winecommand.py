@@ -760,13 +760,21 @@ class WineCommand:
         )
 
     def _get_sandbox_manager(self) -> SandboxManager:
+        share_paths_rw = [ManagerUtils.get_bottle_path(self.config)]
+        share_paths_rw.extend(self.config.Sandbox.share_paths_rw)
+
+        share_paths_ro = [p for p in [Paths.runners, Paths.temp] if p]
+        share_paths_ro.extend(self.config.Sandbox.share_paths_ro)
+
         return SandboxManager(
             envs=self.env,
             chdir=self.cwd,
-            share_paths_rw=[ManagerUtils.get_bottle_path(self.config)],
-            share_paths_ro=[p for p in [Paths.runners, Paths.temp] if p],
+            share_paths_rw=share_paths_rw,
+            share_paths_ro=share_paths_ro,
             share_net=self.config.Sandbox.share_net,
             share_sound=self.config.Sandbox.share_sound,
+            share_host_ro=self.config.Sandbox.share_host_ro,
+            share_gpu=self.config.Sandbox.share_gpu,
         )
 
     def run(self) -> Result[Optional[str]]:

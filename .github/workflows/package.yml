@@ -8,18 +8,47 @@ on:
     paths-ignore:
       - "**.md"
       - ".gitignore"
+      - ".gitattributes"
       - "LICENSE"
+      - "COPYING.md"
+      - "SECURITY.md"
+      - "VERSION"
+      - "docs/**"
       - "po/**"
+      - ".pre-commit-config.yaml"
+      - "mypy.ini"
+      - "pyrightconfig.json"
   pull_request:
     branches: [main]
     paths-ignore:
       - "**.md"
       - ".gitignore"
+      - ".gitattributes"
       - "LICENSE"
+      - "COPYING.md"
+      - "SECURITY.md"
+      - "VERSION"
+      - "docs/**"
       - "po/**"
+      - ".pre-commit-config.yaml"
+      - "mypy.ini"
+      - "pyrightconfig.json"
   workflow_dispatch:
 
 jobs:
+  get-version:
+    name: "Get Version"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -oP "version: '\K[^']+" meson.build | head -1)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
   lint:
     name: "Lint & Quality Check"
     runs-on: ubuntu-latest
@@ -159,9 +188,9 @@ jobs:
           path: rpmbuild/RPMS/noarch/*.rpm
 
   release:
-    name: "Create Release"
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [tarball, deb, rpm]
+    name: "Create/Update Release"
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [get-version, tarball, deb, rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -181,13 +210,15 @@ jobs:
         with:
           name: rpm-package
 
-      - name: Create Release
+      - name: Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.get-version.outputs.version }}
           files: |
             *.tar.gz
             *.deb
             *.rpm
-          draft: true
+          draft: false
           prerelease: false
           generate_release_notes: true
+          make_latest: true
