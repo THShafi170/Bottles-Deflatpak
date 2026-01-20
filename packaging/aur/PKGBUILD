@@ -1,5 +1,5 @@
 # Maintainer: The Bottles Developers
-# Contributor/Modifications: Tenshou170 <https://github.com/tenshou170/Bottles-Deflatpak>
+# Contributor/Modifications: THShafi170 <https://github.com/THShafi170/Bottles-Deflatpak>
 
 pkgname=bottles
 _pkgname=Bottles
@@ -8,7 +8,7 @@ pkgrel=1
 epoch=2
 pkgdesc='Easily manage wine and proton prefix (Native Deflatpak version)'
 arch=(any)
-url="https://github.com/tenshou170/Bottles-Deflatpak"
+url="https://github.com/THShafi170/Bottles-Deflatpak"
 license=(GPL-3.0-only)
 depends=(
   cabextract
@@ -54,7 +54,7 @@ makedepends=(
   ninja
 )
 source=(
-  "bottles-${pkgver}.tar.gz::https://github.com/tenshou170/Bottles-Deflatpak/archive/refs/tags/v${pkgver}.tar.gz"
+  "bottles-${pkgver}.tar.gz::https://github.com/THShafi170/Bottles-Deflatpak/archive/refs/tags/v${pkgver}.tar.gz"
 )
 sha256sums=(
   'SKIP'

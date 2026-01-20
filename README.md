@@ -7,10 +7,10 @@
 <br/>
 
 <div align="center">
-  <a href="https://github.com/tenshou170/Bottles-Deflatpak/releases">
-    <img alt="GitHub Releases" src="https://img.shields.io/github/v/release/tenshou170/Bottles-Deflatpak" />
+  <a href="https://github.com/THShafi170/Bottles-Deflatpak/releases">
+    <img alt="GitHub Releases" src="https://img.shields.io/github/v/release/THShafi170/Bottles-Deflatpak" />
   </a>
-  <a href="https://github.com/tenshou170/Bottles-Deflatpak/blob/main/LICENSE">
+  <a href="https://github.com/THShafi170/Bottles-Deflatpak/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg">
   </a>
 </div>

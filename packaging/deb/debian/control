@@ -1,7 +1,7 @@
 Source: bottles
 Section: utils
 Priority: optional
-Maintainer: Bottles-Deflatpak User <no-reply@localhost>
+Maintainer: Tawsif Hossain Shafi <thshafi170@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                meson,
                ninja-build,
@@ -20,7 +20,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-dev,
                python3-gi
 Standards-Version: 4.6.2
-Homepage: https://github.com/tenshou170/Bottles-Deflatpak
+Homepage: https://github.com/THShafi170/Bottles-Deflatpak
 
 Package: bottles
 Architecture: all

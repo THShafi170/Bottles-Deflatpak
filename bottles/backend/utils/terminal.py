@@ -47,6 +47,7 @@ class TerminalUtils:
         ["st", "-e %s"],
         ["wezterm", "-e -- %s"],
         # Desktop environments
+        ["cosmic-term", "-e sh -c %s"],
         ["xfce4-terminal", "-e %s"],
         ["konsole", "--noclose -e %s"],
         ["gnome-terminal", "-- %s"],
@@ -129,7 +130,21 @@ class TerminalUtils:
             except Exception:
                 full_cmd = f"{template} {cmd_for_shell}"
 
-        elif term_bin in ["kitty", "foot", "konsole", "gnome-terminal", "wezterm"]:
+        elif term_bin == "cosmic-term":
+            # cosmic-term requires separated args, so we use the template directly
+            # with the already quoted command (without wrapping it in another sh -c)
+            try:
+                full_cmd = template % command
+            except Exception:
+                full_cmd = f"{template} {command}"
+
+        elif term_bin in [
+            "kitty",
+            "foot",
+            "konsole",
+            "gnome-terminal",
+            "wezterm",
+        ]:
             cmd_for_shell = shlex.quote(f"sh -c {command}")
             try:
                 full_cmd = template % cmd_for_shell

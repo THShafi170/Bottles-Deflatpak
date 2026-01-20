@@ -4,7 +4,7 @@ Version:    60.1
 Release:    %autorelease
 Summary:    Run Windows in a Bottle (Native Deflatpak version)
 
-%global forgeurl https://github.com/tenshou170/Bottles-Deflatpak
+%global forgeurl https://github.com/THShafi170/Bottles-Deflatpak
 %global tag v%{version}
 %forgemeta
 
