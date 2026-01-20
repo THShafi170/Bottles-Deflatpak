@@ -1,3 +1,0 @@
-# bottles
-
-The bottles package

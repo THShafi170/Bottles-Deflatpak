@@ -81,6 +81,7 @@ gamescope_available = shutil.which("gamescope") or False
 vkbasalt_available = Paths.is_vkbasalt_available()
 mangohud_available = shutil.which("mangohud") or False
 obs_vkc_available = shutil.which("obs-vkcapture") or False
+sandbox_available = shutil.which("bwrap") or False
 vmtouch_available = shutil.which("vmtouch") or False
 base_version = ""
 

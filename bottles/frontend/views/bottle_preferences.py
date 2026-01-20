@@ -27,6 +27,7 @@ from bottles.backend.globals import (
     gamescope_available,
     mangohud_available,
     obs_vkc_available,
+    sandbox_available,
     vkbasalt_available,
     vmtouch_available,
 )
@@ -177,6 +178,11 @@ class PreferencesView(Adw.PreferencesPage):
             self.switch_vmtouch.set_tooltip_text(_not_available)
             self.__add_unavailable_indicator(self.row_vmtouch, None)
 
+        if not sandbox_available:
+            self.switch_sandbox.set_tooltip_text(_not_available)
+            self.btn_manage_sandbox.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_sandbox, None)
+
         # region signals
         self.row_manage_display.connect("activated", self.__show_display_settings)
         self.row_overrides.connect(
@@ -267,6 +273,8 @@ class PreferencesView(Adw.PreferencesPage):
         self.btn_manage_mangohud.set_sensitive(mangohud_available)
         self.switch_obsvkc.set_sensitive(obs_vkc_available)
         self.switch_vmtouch.set_sensitive(vmtouch_available)
+        self.switch_sandbox.set_sensitive(sandbox_available)
+        self.btn_manage_sandbox.set_sensitive(sandbox_available)
 
         is_wayland_session = DisplayUtils.display_server_type() == "wayland"
         self.switch_wayland.set_sensitive(is_wayland_session)

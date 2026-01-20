@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: bottles
-Source: https://github.com/tenshou170/Bottles-Deflatpak
+Source: https://github.com/THShafi170/Bottles-Deflatpak
 
 Files: *
 Copyright: 2025 mirkobrombin <brombin94@gmail.com>
