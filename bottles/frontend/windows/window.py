@@ -18,7 +18,6 @@
 import contextlib
 import os
 import webbrowser
-from datetime import datetime
 from gettext import gettext as _
 from typing import Optional
 
@@ -49,7 +48,7 @@ from bottles.frontend.windows.crash import CrashReportDialog
 from bottles.frontend.windows.depscheck import DependenciesCheckDialog
 from bottles.frontend.windows.onboard import OnboardDialog
 from bottles.frontend.windows.winebridgeupdate import WineBridgeUpdateDialog
-from bottles.frontend.windows.funding import FundingDialog
+
 
 logging = Logger()
 
@@ -86,13 +85,6 @@ class BottlesWindow(Adw.ApplicationWindow):
 
         self.data_mgr = DataManager()
         self.data_mgr = DataManager()
-        self._show_funding = False
-        if not self.data_mgr.get(UserDataKeys.FundingDismissed, False):
-            last_prompt = self.data_mgr.get(UserDataKeys.LastFundingPrompt, "")
-            today = datetime.now().strftime("%Y-%m-%d")
-            
-            if last_prompt != today:
-                self._show_funding = True
 
         self.utils_conn = ConnectionUtils(
             force_offline=self.settings.get_boolean("force-offline")
@@ -153,7 +145,6 @@ class BottlesWindow(Adw.ApplicationWindow):
         logging.info(
             "Bottles Started!",
         )
-        GLib.idle_add(self.__maybe_show_funding_dialog)
 
     def __schedule_donate_icon_swap(self):
         GLib.timeout_add_seconds(5, self.__on_donate_icon_timeout)
@@ -426,26 +417,6 @@ class BottlesWindow(Adw.ApplicationWindow):
 
             if crash_log:
                 CrashReportDialog(self, crash_log).present()
-
-    def __maybe_show_funding_dialog(self):
-        if not self._show_funding:
-            return
-
-        count = self.data_mgr.get(UserDataKeys.FundingPromptCount) or 0
-        self.data_mgr.set(UserDataKeys.FundingPromptCount, count + 1)
-        
-        today = datetime.now().strftime("%Y-%m-%d")
-        self.data_mgr.set(UserDataKeys.LastFundingPrompt, today)
-
-        dialog = FundingDialog(self, show_dont_show=count >= 7)
-        dialog.connect("response", self.__funding_response)
-        dialog.present()
-
-    def __funding_response(self, dialog, response):
-        if response == "dismiss":
-            self.data_mgr.set(UserDataKeys.FundingDismissed, True)
-
-        dialog.destroy()
 
     def toggle_selection_mode(self, status: bool = True):
         context = self.headerbar.get_style_context()
