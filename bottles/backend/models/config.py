@@ -61,6 +61,8 @@ class BottleSandboxParams(DictCompatMixIn):
     share_sound: bool = False
     share_host_ro: bool = True
     share_gpu: bool = True
+    share_display: bool = True
+    share_user: bool = False
     share_paths_ro: List[str] = field(default_factory=lambda: [])
     share_paths_rw: List[str] = field(default_factory=lambda: [])
 

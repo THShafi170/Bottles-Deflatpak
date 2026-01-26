@@ -879,8 +879,6 @@ class BottleView(Adw.PreferencesPage):
         dialog.connect("response", set_path)
         dialog.show()
 
-
-
     def __backup(self, widget, backup_type):
         """
         This function pop up the file chooser where the user

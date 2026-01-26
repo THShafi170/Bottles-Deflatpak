@@ -1,6 +1,6 @@
 Name:       bottles
 Epoch:      2
-Version:    60.1
+Version:    61.1
 Release:    %autorelease
 Summary:    Run Windows in a Bottle (Native Deflatpak version)
 
@@ -58,6 +58,8 @@ Requires:       python3dist(urllib3)
 Requires:       python3dist(certifi)
 Requires:       python3dist(pefile)
 Requires:       python3dist(vkbasalt-cli)
+Requires:       python3dist(yara-python)
+Requires:       yara
 
 # Optional dependencies which may be required for running 32-bit bottles.
 # We recommend those in order to allow users to opt out.

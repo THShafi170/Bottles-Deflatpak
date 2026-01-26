@@ -18,7 +18,6 @@
 import contextlib
 import os
 import webbrowser
-from datetime import datetime
 from gettext import gettext as _
 from typing import Optional
 
@@ -49,7 +48,7 @@ from bottles.frontend.windows.crash import CrashReportDialog
 from bottles.frontend.windows.depscheck import DependenciesCheckDialog
 from bottles.frontend.windows.onboard import OnboardDialog
 from bottles.frontend.windows.winebridgeupdate import WineBridgeUpdateDialog
-from bottles.frontend.windows.funding import FundingDialog
+
 
 logging = Logger()
 
@@ -78,7 +77,7 @@ class BottlesWindow(Adw.ApplicationWindow):
     argument_executed = False
     _winebridge_dialog_shown = False
 
-    def __init__(self, arg_bottle, **kwargs):
+    def __init__(self, arg_bottle, arg_program=None, **kwargs):
         width = self.settings.get_int("window-width")
         height = self.settings.get_int("window-height")
 
@@ -86,19 +85,13 @@ class BottlesWindow(Adw.ApplicationWindow):
 
         self.data_mgr = DataManager()
         self.data_mgr = DataManager()
-        self._show_funding = False
-        if not self.data_mgr.get(UserDataKeys.FundingDismissed, False):
-            last_prompt = self.data_mgr.get(UserDataKeys.LastFundingPrompt, "")
-            today = datetime.now().strftime("%Y-%m-%d")
-            
-            if last_prompt != today:
-                self._show_funding = True
 
         self.utils_conn = ConnectionUtils(
             force_offline=self.settings.get_boolean("force-offline")
         )
         self.manager = None
         self.arg_bottle = arg_bottle
+        self.arg_program = arg_program
         self._showing_onboard = False
         self._winebridge_prompt_attempts = 0
         self.app = kwargs.get("application")
@@ -153,7 +146,6 @@ class BottlesWindow(Adw.ApplicationWindow):
         logging.info(
             "Bottles Started!",
         )
-        GLib.idle_add(self.__maybe_show_funding_dialog)
 
     def __schedule_donate_icon_swap(self):
         GLib.timeout_add_seconds(5, self.__on_donate_icon_timeout)
@@ -193,6 +185,28 @@ class BottlesWindow(Adw.ApplicationWindow):
     def on_close_request(self, *args):
         self.settings.set_int("window-width", self.get_width())
         self.settings.set_int("window-height", self.get_height())
+
+        from bottles.backend.utils.proc import ProcUtils
+
+        if ProcUtils.any_wine_running():
+            logging.info(
+                "Wine processes are still running. Hiding window and waiting for them to finish."
+            )
+            self.set_visible(False)
+            GLib.timeout_add_seconds(2, self.__check_stay_alive)
+            return True
+
+        return False
+
+    def __check_stay_alive(self):
+        from bottles.backend.utils.proc import ProcUtils
+
+        if not ProcUtils.any_wine_running():
+            logging.info("All Wine processes have finished. Exiting.")
+            self.app.quit()
+            return False
+
+        return True
 
     # region Backend signal handlers
     def network_changed_handler(self, res: Result):
@@ -427,26 +441,6 @@ class BottlesWindow(Adw.ApplicationWindow):
             if crash_log:
                 CrashReportDialog(self, crash_log).present()
 
-    def __maybe_show_funding_dialog(self):
-        if not self._show_funding:
-            return
-
-        count = self.data_mgr.get(UserDataKeys.FundingPromptCount) or 0
-        self.data_mgr.set(UserDataKeys.FundingPromptCount, count + 1)
-        
-        today = datetime.now().strftime("%Y-%m-%d")
-        self.data_mgr.set(UserDataKeys.LastFundingPrompt, today)
-
-        dialog = FundingDialog(self, show_dont_show=count >= 7)
-        dialog.connect("response", self.__funding_response)
-        dialog.present()
-
-    def __funding_response(self, dialog, response):
-        if response == "dismiss":
-            self.data_mgr.set(UserDataKeys.FundingDismissed, True)
-
-        dialog.destroy()
-
     def toggle_selection_mode(self, status: bool = True):
         context = self.headerbar.get_style_context()
         if status:
@@ -492,6 +486,37 @@ class BottlesWindow(Adw.ApplicationWindow):
     def __on_page_changed(self, stack, *args):
         is_bottles_list = stack.get_visible_child_name() == "page_list"
         self.btn_search.set_visible(is_bottles_list)
+
+    def run_program_by_name(self, bottle_name: str, program_name: str):
+        """
+        Run a program by name within a specific bottle.
+        """
+        if not self.manager:
+            GLib.timeout_add(500, self.run_program_by_name, bottle_name, program_name)
+            return False
+
+        def __run():
+            bottle = self.manager.get_bottle_by_name(bottle_name)
+            if not bottle:
+                logging.error(f"Bottle {bottle_name} not found.")
+                return
+
+            program = None
+            for p in bottle.programs:
+                if p.name == program_name:
+                    program = p
+                    break
+
+            if not program:
+                logging.error(f"Program {program_name} not found in {bottle_name}.")
+                return
+
+            logging.info(f"Launching program {program_name} from URI/CLI")
+            # Navigate to the bottle and run the program
+            self.page_list.show_details(bottle_name)
+            self.page_details.run_program(program)
+
+        GLib.idle_add(__run)
 
     @staticmethod
     def proper_close():

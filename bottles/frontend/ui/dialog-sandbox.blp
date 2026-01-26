@@ -39,6 +39,42 @@ template $SandboxDialog: Adw.Window {
           }
         }
 
+        Adw.ActionRow {
+          title: _("Share GPU");
+          activatable-widget: switch_gpu;
+
+          Switch switch_gpu {
+            valign: center;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Share Display");
+          activatable-widget: switch_display;
+
+          Switch switch_display {
+            valign: center;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Share Host (Read-only)");
+          activatable-widget: switch_host_ro;
+
+          Switch switch_host_ro {
+            valign: center;
+          }
+        }
+
+        Adw.ActionRow {
+          title: _("Share User");
+          activatable-widget: switch_user;
+
+          Switch switch_user {
+            valign: center;
+          }
+        }
+
       }
 
     }

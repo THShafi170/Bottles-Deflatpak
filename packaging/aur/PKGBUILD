@@ -3,7 +3,7 @@
 
 pkgname=bottles
 _pkgname=Bottles
-pkgver=60.1
+pkgver=61.1
 pkgrel=1
 epoch=2
 pkgdesc='Easily manage wine and proton prefix (Native Deflatpak version)'
@@ -37,6 +37,8 @@ depends=(
   xorg-xdpyinfo
   vkbasalt-cli
   bubblewrap
+  python-yara
+  yara
 )
 optdepends=(
   gvfs

@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="bottles">
-	<schema id="@APP_ID@" path="/com/usebottles/bottles/">
-    <key type="b" name="flatpak-migration">
-      <default>true</default>
-      <summary>Flatpak migration</summary>
-      <description>Toggle the Flatpak migration dialog.</description>
-    </key>
+  <schema id="@APP_ID@" path="/com/usebottles/bottles/">
     <key type="b" name="dark-theme">
       <default>false</default>
       <summary>Dark theme</summary>
@@ -69,7 +64,8 @@
     <key type="b" name="experiments">
       <default>false</default>
       <summary>Experiments</summary>
-      <description>Toggle experimental features such as versioning and installers. Release candidate for runners.</description>
+      <description>Toggle experimental features such as versioning and installers. Release candidate
+        for runners.</description>
     </key>
     <key type="b" name="steam-proton-support">
       <default>false</default>
@@ -84,22 +80,26 @@
     <key type="s" name="audio-driver">
       <default>'default'</default>
       <summary>Wine audio driver</summary>
-      <description>Select which Wine audio driver should be enforced for all bottles. Use "default" to leave the driver unchanged.</description>
+      <description>Select which Wine audio driver should be enforced for all bottles. Use "default"
+        to leave the driver unchanged.</description>
     </key>
     <key type="b" name="playtime-enabled">
       <default>true</default>
       <summary>Enable playtime tracking</summary>
-      <description>When true, Bottles records playtime telemetry to a local SQLite database. Disable to stop tracking.</description>
+      <description>When true, Bottles records playtime telemetry to a local SQLite database. Disable
+        to stop tracking.</description>
     </key>
     <key type="i" name="playtime-heartbeat-interval">
       <default>60</default>
       <summary>Playtime heartbeat interval (seconds)</summary>
-      <description>How often to update session heartbeat. Defines max timestamp error for abrupt exits.</description>
+      <description>How often to update session heartbeat. Defines max timestamp error for abrupt
+        exits.</description>
     </key>
     <key type="i" name="eagle-scan-limit">
       <default>50</default>
       <summary>Eagle deep scan limit</summary>
-      <description>Maximum number of binaries to scan when analysing installers. Higher values provide more thorough analysis but take longer.</description>
+      <description>Maximum number of binaries to scan when analysing installers. Higher values
+        provide more thorough analysis but take longer.</description>
     </key>
-	</schema>
+  </schema>
 </schemalist>

@@ -59,6 +59,10 @@ class SandboxManager:
 
         if self.share_host_ro:
             _cmd.append("--ro-bind / /")
+            # Ensure standard system configs are available even if / is re-mounted
+            for p in ["/etc/resolv.conf", "/etc/hosts", "/etc/passwd"]:
+                if os.path.exists(p):
+                    _cmd += ["--ro-bind", p, p]
 
         if self.chdir:
             _cmd.append(f"--chdir {shlex.quote(self.chdir)}")
@@ -66,6 +70,15 @@ class SandboxManager:
 
         if self.clear_env:
             _cmd.append("--clearenv")
+
+        # Standard mounts for native apps
+        _cmd += ["--dev", "/dev"]
+        _cmd += ["--proc", "/proc"]
+        _cmd += ["--tmpfs", "/tmp"]
+        _cmd += ["--tmpfs", "/run"]
+
+        if os.path.exists("/dev/shm"):
+            _cmd += ["--bind", "/dev/shm", "/dev/shm"]
 
         if self.share_paths_ro:
             _cmd += [
@@ -79,11 +92,16 @@ class SandboxManager:
             ]
 
         if self.share_sound:
+            # PulseAudio/PipeWire socket discovery
             pulse_path = f"/run/user/{self.__uid}/pulse"
             if os.path.exists(pulse_path):
                 _cmd.append(
-                    f"--ro-bind {shlex.quote(pulse_path)} {shlex.quote(pulse_path)}"
+                    f"--bind {shlex.quote(pulse_path)} {shlex.quote(pulse_path)}"
                 )
+
+            # Alsa fallback
+            if os.path.exists("/dev/snd"):
+                _cmd += ["--dev-bind", "/dev/snd", "/dev/snd"]
 
         if self.share_gpu:
             for device in glob.glob("/dev/dri/*"):
@@ -92,6 +110,19 @@ class SandboxManager:
                 _cmd += ["--dev-bind", shlex.quote(device), shlex.quote(device)]
 
         if self.share_display:
+            # X11/Wayland support
+            x11_path = (
+                f"/tmp/.X11-unix/X{os.environ.get('DISPLAY', ':0').split(':')[-1]}"
+            )
+            if os.path.exists(x11_path):
+                _cmd += ["--bind", x11_path, x11_path]
+
+            wayland_display = os.environ.get("WAYLAND_DISPLAY")
+            if wayland_display:
+                wayland_path = f"/run/user/{self.__uid}/{wayland_display}"
+                if os.path.exists(wayland_path):
+                    _cmd += ["--bind", wayland_path, wayland_path]
+
             for device in glob.glob("/dev/video*"):
                 _cmd += ["--dev-bind", shlex.quote(device), shlex.quote(device)]
 

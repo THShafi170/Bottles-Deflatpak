@@ -775,6 +775,8 @@ class WineCommand:
             share_sound=self.config.Sandbox.share_sound,
             share_host_ro=self.config.Sandbox.share_host_ro,
             share_gpu=self.config.Sandbox.share_gpu,
+            share_display=self.config.Sandbox.share_display,
+            share_user=self.config.Sandbox.share_user,
         )
 
     def run(self) -> Result[Optional[str]]:

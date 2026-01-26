@@ -242,7 +242,8 @@ class ManagerUtils:
         elif custom_icon:
             icon = custom_icon
 
-        if not use_xdp:
+        # Native desktop entry creation (preferred over Portal)
+        if not use_xdp or not PortalUtils.is_available():
             file_name_template = "%s/%s--%s--%s.desktop"
             existing_files = glob(
                 file_name_template
@@ -259,7 +260,10 @@ class ManagerUtils:
                 for file in existing_files:
                     os.remove(file)
 
-            # [Bug-]issue #4247 (single- to double-quotes in Desktop Entry spec -> "The Exec key"):
+            # Use native command names
+            cmd_cli = "bottles-cli"
+            cmd_legacy = "bottles"
+
             with open(desktop_file, "w") as f:
                 f.write("[Desktop Entry]\n")
                 f.write(f"Name={program.get('name')}\n")

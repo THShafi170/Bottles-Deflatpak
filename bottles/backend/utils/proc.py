@@ -82,3 +82,20 @@ class ProcUtils:
     @staticmethod
     def get_by_pid(pid):
         return Proc(pid)
+
+    @staticmethod
+    def any_wine_running():
+        """
+        Check if any Wine-related processes are running.
+        """
+        for pid in os.listdir("/proc"):
+            if not pid.isdigit():
+                continue
+            proc = Proc(pid)
+            name = proc.get_name()
+            if "wine" in name.lower():
+                return True
+            cmdline = proc.get_cmdline().lower()
+            if "wine" in cmdline or "wineserver" in cmdline:
+                return True
+        return False

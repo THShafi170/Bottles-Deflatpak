@@ -1,3 +1,12 @@
+bottles (61.1) unstable; urgency=medium
+
+  * Updated version to 61.1.
+  * Improved native Steam path prioritization.
+  * Robust Bubblewrap sandbox with Wayland/X11 and Audio support.
+  * Expanded Sandbox UI with more settings.
+
+ -- Tawsif Hossain Shafi <thshafi170@gmail.com>  Mon, 02 Feb 2026 19:24:00 +0600
+
 bottles (60.1) unstable; urgency=medium
 
   * Initial release as a native package.
