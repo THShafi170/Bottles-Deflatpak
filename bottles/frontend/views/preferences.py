@@ -45,7 +45,6 @@ class PreferencesWindow(Adw.PreferencesWindow):
     row_theme = Gtk.Template.Child()
     switch_theme = Gtk.Template.Child()
     switch_notifications = Gtk.Template.Child()
-    switch_show_funding = Gtk.Template.Child()
     switch_force_offline = Gtk.Template.Child()
     switch_temp = Gtk.Template.Child()
     switch_release_candidate = Gtk.Template.Child()
@@ -130,12 +129,6 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.settings.bind(
             "notifications",
             self.switch_notifications,
-            "active",
-            Gio.SettingsBindFlags.DEFAULT,
-        )
-        self.settings.bind(
-            "show-funding",
-            self.switch_show_funding,
             "active",
             Gio.SettingsBindFlags.DEFAULT,
         )
@@ -281,9 +274,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.settings.set_int("eagle-scan-limit", int(spin_row.get_value()))
 
     def __open_steam_proton_doc(self, widget):
-        webbrowser.open(
-            "https://docs.usebottles.com/flatpak/cant-enable-steam-proton-manager"
-        )
+        webbrowser.open("https://docs.usebottles.com/bottles/steam-proton-manager")
 
     def __choose_bottles_path(self, widget):
         def set_path(_dialog, response):

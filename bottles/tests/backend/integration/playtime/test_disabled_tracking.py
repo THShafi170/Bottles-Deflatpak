@@ -18,7 +18,9 @@ def test_disabled_tracking_smoke(temp_xdg_home):
     base_dir = os.path.join(temp_xdg_home, "bottles")
     os.makedirs(base_dir, exist_ok=True)
     db_path = os.path.join(base_dir, "process_metrics.sqlite")
-    tracker = ProcessSessionTracker(db_path=db_path, heartbeat_interval=5, enabled=False)
+    tracker = ProcessSessionTracker(
+        db_path=db_path, heartbeat_interval=5, enabled=False
+    )
     assert tracker is not None
     assert tracker.enabled is False
 
@@ -39,5 +41,3 @@ def test_disabled_tracking_smoke(temp_xdg_home):
     assert cur.fetchone()[0] == 0
     cur.execute("SELECT COUNT(*) FROM playtime_totals")
     assert cur.fetchone()[0] == 0
-
-

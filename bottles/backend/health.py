@@ -17,6 +17,7 @@
 
 import contextlib
 import os
+import shutil
 
 from bottles.backend.logger import Logger
 from bottles.backend.params import APP_VERSION
@@ -60,7 +61,40 @@ class HealthChecker:
         self.gpus = GPUUtils().get_gpu()
         self.glibc_min = is_glibc_min_available()
         self.bottles_envs = self.get_bottles_envs()
+        self.check_tools()
         self.check_system_info()
+
+    def check_tools(self):
+        tools = [
+            "cabextract",
+            "p7zip",
+            "patool",
+            "icoextract",
+            "pefile",
+            "orjson",
+            "markdown",
+            "xdpyinfo",
+            "convert",  # ImageMagick
+            "fvs",  # FVS
+        ]
+
+        for tool in tools:
+            key = tool
+            if tool == "convert":
+                key = "ImageMagick"
+            elif tool == "fvs":
+                key = "FVS"
+
+            # Check for python modules or binaries
+            if tool in ["icoextract", "pefile", "orjson", "markdown", "patool"]:
+                try:
+                    __import__(tool)
+                    setattr(self, tool, True)
+                except ImportError:
+                    setattr(self, tool, False)
+            else:
+                # Check for binaries
+                setattr(self, key, bool(shutil.which(tool)))
         self.disk = self.get_disk_data()
         self.ram = {"MemTotal": "n/a", "MemAvailable": "n/a"}
         self.get_ram_data()
@@ -117,7 +151,7 @@ class HealthChecker:
 
     def get_results(self, plain: bool = False):
         results = {
-            "Official Package": "FLATPAK_ID" in os.environ,
+            "Official Package": False,
             "Version": APP_VERSION,
             "DE/WM": self.desktop,
             "Display": {
@@ -130,6 +164,18 @@ class HealthChecker:
             "Disk": self.disk,
             "RAM": self.ram,
             "Bottles_envs": self.bottles_envs,
+            "Tools": {
+                "cabextract": self.cabextract,
+                "p7zip": self.p7zip,
+                "patool": self.patool,
+                "icoextract": self.icoextract,
+                "pefile": self.pefile,
+                "orjson": self.orjson,
+                "markdown": self.markdown,
+                "xdpyinfo": self.xdpyinfo,
+                "ImageMagick": self.ImageMagick,
+                "FVS": self.FVS,
+            },
         }
 
         if plain:

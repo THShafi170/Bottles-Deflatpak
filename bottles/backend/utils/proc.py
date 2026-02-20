@@ -42,9 +42,9 @@ class Proc:
     def get_name(self):
         return self.__get_data("stat")
 
-    def kill(self):
+    def kill(self, signal=15):
         subprocess.Popen(
-            ["kill", str(self.pid)],
+            ["kill", f"-{signal}", str(self.pid)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

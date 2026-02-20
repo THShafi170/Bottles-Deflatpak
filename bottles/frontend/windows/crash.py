@@ -141,7 +141,7 @@ class CrashReportDialog(Adw.Window):
         if there are no similar reports.
         """
         similar_issues = []
-        api_url = "https://api.github.com/repos/bottlesdevs/Bottles/issues?filter=all&state=all"
+        api_url = "https://api.github.com/repos/THShafi170/Bottles-Deflatpak/issues?filter=all&state=all"
         with contextlib.suppress(
             urllib.error.HTTPError,
             urllib.error.URLError,
@@ -166,4 +166,6 @@ class CrashReportDialog(Adw.Window):
         This function opens the page for creating a new issue on github,
         with the form filled in with the report details and log.
         """
-        webbrowser.open("https://github.com/bottlesdevs/Bottles/issues/new/choose")
+        webbrowser.open(
+            "https://github.com/THShafi170/Bottles-Deflatpak/issues/new/choose"
+        )

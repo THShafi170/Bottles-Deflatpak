@@ -1,0 +1,23 @@
+--- a/bottles/backend/managers/sandbox.py	2026-02-20 23:04:31.957089178 +0600
++++ b/bottles/backend/managers/sandbox.py	2026-03-07 16:50:35.364006645 +0600
+@@ -67,7 +67,7 @@
+         args.extend(["--dir", "/run"])
+
+         # Essential system paths
+-        for p in ["/usr", "/lib", "/lib64", "/bin", "/sbin"]:
++        for p in ["/usr", "/lib", "/lib64", "/bin", "/sbin", "/nix/store", "/run/current-system"]:
+             if os.path.exists(p):
+                 args.extend(["--ro-bind", p, p])
+
+@@ -164,6 +164,11 @@
+             if os.path.exists("/dev/dri"):
+                 args.extend(["--dev-bind", "/dev/dri", "/dev/dri"])
+
++            # NixOS specific opengl driver paths
++            for p in ["/run/opengl-driver", "/run/opengl-driver-32"]:
++                if os.path.exists(p):
++                    args.extend(["--ro-bind", p, p])
++
+             # NVIDIA support
+             for i in range(16):
+                 dev = f"/dev/nvidia{i}"

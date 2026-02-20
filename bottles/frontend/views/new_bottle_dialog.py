@@ -20,7 +20,13 @@ from gettext import gettext as _
 from threading import Event
 from typing import Any, Optional
 
-from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, Xdp
+from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
+
+try:
+    from gi.repository import Xdp
+except (ImportError, ValueError):
+    Xdp = None
+
 from pathvalidate import sanitize_filename
 
 from bottles.backend.models.config import BottleConfig
@@ -86,7 +92,7 @@ class BottlesNewBottleDialog(Adw.Dialog):
         super().__init__(**kwargs)
         # common variables and references
         self.window = GtkUtils.get_parent_window()
-        if not self.window or not Xdp.Portal.running_under_sandbox():
+        if not self.window:
             return
 
         self.app = self.window.get_application()
@@ -127,7 +133,13 @@ class BottlesNewBottleDialog(Adw.Dialog):
         # Populate widgets
         self.label_choose_env.set_label(self.default_string)
         self.label_choose_path.set_label(self.default_string)
-        self.str_list_runner.splice(0, 0, self.manager.runners_available)
+        runners = []
+        for runner in self.manager.runners_available:
+            _runner = runner
+            if runner.startswith("/"):
+                _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
+            runners.append(_runner)
+        self.str_list_runner.splice(0, 0, runners)
         self.str_list_arch.splice(0, 0, list(self.arch.values()))
 
         self.selected_environment = (
