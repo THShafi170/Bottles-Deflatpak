@@ -12,7 +12,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
@@ -65,6 +65,9 @@ def _normalize_path_to_windows(bottle_path: str, program_path: str) -> str:
         Windows-format path (e.g., C:\\Program Files\\game.exe)
     """
 
+    if not program_path:
+        return ""
+
     # Already Windows format? (copied from WinePath.is_windows)
     if ":" in program_path or "\\" in program_path:
         return program_path
@@ -104,7 +107,9 @@ def _compute_program_id(bottle_id: str, bottle_path: str, program_path: str) -> 
     Normalizes paths to Windows format for portability across machines.
     """
     normalized_path = _normalize_path_to_windows(bottle_path, program_path)
-    combined = f"{bottle_id}:{normalized_path}".encode("utf-8")
+    # Ensure we have something stable to hash
+    id_source = f"{bottle_id or 'unknown'}:{normalized_path}"
+    combined = id_source.encode("utf-8")
     program_id = hashlib.sha1(combined).hexdigest()
 
     # Debug logging to track normalization
@@ -436,8 +441,14 @@ class ProcessSessionTracker:
 
         with self._lock:
             for sid, started_at, last_seen, bottle_id, program_id in rows:
-                end_ts = int(last_seen)
-                duration = max(0, end_ts - int(started_at))
+                if sid is None:
+                    continue
+                end_ts = (
+                    int(last_seen)
+                    if last_seen is not None
+                    else int(started_at or _utc_now_seconds())
+                )
+                duration = max(0, end_ts - int(started_at or end_ts))
                 cur.execute(
                     """
                     UPDATE sessions
@@ -447,9 +458,10 @@ class ProcessSessionTracker:
                     (end_ts, duration, sid),
                 )
                 self._tracked.pop(int(sid), None)
-                self._update_totals(
-                    bottle_id=str(bottle_id), program_id=str(program_id), cur=cur
-                )
+                if bottle_id and program_id:
+                    self._update_totals(
+                        bottle_id=str(bottle_id), program_id=str(program_id), cur=cur
+                    )
         self._conn.commit()
         logging.info(f"Recovered {len(rows)} running sessions -> forced at last_seen")
 
@@ -458,7 +470,7 @@ class ProcessSessionTracker:
             try:
                 self._flush_heartbeats()
             except Exception as e:
-                logging.exception(e)
+                logging.exception(f"Playtime heartbeat error: {e}")
 
     def _flush_heartbeats(self) -> None:
         with self._lock:
@@ -689,13 +701,13 @@ class ProcessSessionTracker:
                 # Then add offset*7 to shift to the target week
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         CAST(strftime('%w', started_at, 'unixepoch', 'localtime') AS INTEGER) as day_of_week,
                         SUM(duration_seconds) as total_seconds
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') >= date('now', 'weekday 0', '-7 days', ? || ' days') AND
                         date(started_at, 'unixepoch', 'localtime') < date('now', 'weekday 0', '-7 days', ? || ' days')
@@ -765,13 +777,13 @@ class ProcessSessionTracker:
                 # We need to split sessions that span multiple hours
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         started_at,
                         ended_at
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') = ?
                 """,
@@ -867,13 +879,13 @@ class ProcessSessionTracker:
                 # strftime('%m', ...) returns month as 01-12
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         CAST(strftime('%m', started_at, 'unixepoch', 'localtime') AS INTEGER) as month,
                         SUM(duration_seconds) as total_seconds
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         strftime('%Y', started_at, 'unixepoch', 'localtime') = ?
                     GROUP BY month
@@ -928,9 +940,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') >= date('now', 'weekday 0', '-7 days', ? || ' days') AND
                         date(started_at, 'unixepoch', 'localtime') < date('now', 'weekday 0', '-7 days', ? || ' days')
@@ -972,9 +984,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         date(started_at, 'unixepoch', 'localtime') = ?
                 """,
@@ -1010,9 +1022,9 @@ class ProcessSessionTracker:
                     """
                     SELECT COUNT(*)
                     FROM sessions
-                    WHERE 
-                        bottle_id = ? AND 
-                        program_id = ? AND 
+                    WHERE
+                        bottle_id = ? AND
+                        program_id = ? AND
                         status != 'running' AND
                         strftime('%Y', started_at, 'unixepoch', 'localtime') = ?
                 """,

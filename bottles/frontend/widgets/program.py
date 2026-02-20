@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import webbrowser
 from gettext import gettext as _
 
 from gi.repository import Adw, Gtk
@@ -36,6 +35,7 @@ from bottles.frontend.windows.playtimegraph import PlaytimeGraphDialog
 from bottles.frontend.windows.rename import RenameDialog
 
 from typing import Optional
+
 
 # noinspection PyUnusedLocal
 @Gtk.Template(resource_path="/com/usebottles/bottles/program-entry.ui")
@@ -167,7 +167,6 @@ class ProgramEntry(Adw.ActionRow):
             import logging
 
             logging.debug(f"Failed to update playtime subtitle: {e}")
-            pass
 
     def show_launch_options_view(self, _widget=False):
         def update(_widget, config):
@@ -356,13 +355,14 @@ class ProgramEntry(Adw.ActionRow):
                 "name": self.program["name"],
                 "executable": self.program["executable"],
                 "path": self.program["path"],
-            }
+            },
         )
 
         def _on_desktop_entry_created(data: Optional[Result] = None) -> None:
             self.window.show_toast(
                 _('Desktop Entry created for "{0}"').format(self.program["name"])
             )
+
         SignalManager.connect(Signals.DesktopEntryCreated, _on_desktop_entry_created)
 
     def add_to_library(self, _widget):

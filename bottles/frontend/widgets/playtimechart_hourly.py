@@ -28,8 +28,6 @@ Features:
 - Automatic scaling based on data
 """
 
-import math
-from gettext import gettext as _
 from typing import List, Optional, Dict, Any
 
 from gi.repository import Gtk, Adw

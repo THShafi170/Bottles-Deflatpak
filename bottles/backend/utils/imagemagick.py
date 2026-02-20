@@ -17,6 +17,9 @@
 
 import os
 import subprocess
+from bottles.backend.logger import Logger
+
+logging = Logger()
 
 
 class ImageMagickUtils:
@@ -36,7 +39,8 @@ class ImageMagickUtils:
 
         try:
             res = subprocess.check_output(["bash", "-c", cmd])
-        except:
+        except Exception as e:
+            logging.error(f"Could not list assets for {self.path}: {e}")
             return []
 
         assets = []

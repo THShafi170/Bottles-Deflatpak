@@ -16,6 +16,7 @@
 #
 
 
+import os
 from gettext import gettext as _
 from typing import Optional
 
@@ -256,4 +257,7 @@ class DetailsView(Adw.Bin):
         self.btn_back.set_tooltip_text(_("Return to your bottles."))
 
     def update_runner_label(self, runner: str):
-        self.view_bottle.label_runner.set_text(runner)
+        _runner = runner
+        if runner.startswith("/"):
+            _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
+        self.view_bottle.label_runner.set_text(_runner)

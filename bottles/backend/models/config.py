@@ -59,10 +59,12 @@ class DictCompatMixIn:
 class BottleSandboxParams(DictCompatMixIn):
     share_net: bool = False
     share_sound: bool = False
-    # share_host_ro: bool = True  # TODO: implement, requires the Bottles runtime (next) for a minimal sandbox
-    # share_gpu: bool = True  # TODO: implement
-    # share_paths_ro: List[str] = field(default_factory=lambda: [])  # TODO: implement
-    # share_paths_rw: List[str] = field(default_factory=lambda: [])  # TODO: implement
+    share_display: bool = True
+    share_user: bool = False
+    share_host_ro: bool = True
+    share_gpu: bool = True
+    share_paths_ro: List[str] = field(default_factory=lambda: [])
+    share_paths_rw: List[str] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -113,6 +115,9 @@ class BottleParams(DictCompatMixIn):
     versioning_exclusion_patterns: bool = False
     vmtouch: bool = False
     vmtouch_cache_cwd: bool = False
+    use_umu: bool = False
+    use_proton_scripts: bool = False
+    proton_log: bool = False
 
 
 @dataclass
@@ -238,11 +243,7 @@ class BottleConfig(DictCompatMixIn):
             data["Sandbox"] = {}
 
         # migrate old fsr_level key to fsr_sharpening_strength
-        # TODO: remove after some time
         if "fsr_level" in data["Parameters"]:
-            logging.warning(
-                "Migrating config key 'fsr_level' to 'fsr_sharpening_strength'"
-            )
             data["Parameters"]["fsr_sharpening_strength"] = data["Parameters"].pop(
                 "fsr_level"
             )

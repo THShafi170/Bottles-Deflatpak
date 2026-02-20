@@ -1,24 +1,26 @@
-# Contributing to Bottles
-First off, thanks for taking the time to contribute :heart:!
+# Contributing to Bottles-Deflatpak
+
+Thanks for taking the time to contribute :heart:!
 
 ## Found a Problem?
-Before reporting a problem, be it a bug, design or others, we assume you have made sure that:
-1. the [Bottles wiki](https://github.com/bottlesdevs/Bottles/wiki) does not cover your problem
-1. the problem has not been reported in the [issue tracker](https://github.com/bottlesdevs/Bottles/issues)
-1. the problem is reproducible with [Bottles from Flathub](https://flathub.org/apps/details/com.usebottles.bottles)
 
-If all apply, then please consider opening a [new issue](https://github.com/bottlesdevs/Bottles/issues/new/choose).
+Before reporting a problem, please make sure that:
+
+1. The [upstream Bottles documentation](https://docs.usebottles.com) does not cover your problem
+2. The problem has not already been reported in the [issue tracker](https://github.com/THShafi170/Bottles-Deflatpak/issues)
+3. The problem is reproducible with a native (non-Flatpak) build of Bottles-Deflatpak
+
+If all apply, then please [open a new issue](https://github.com/THShafi170/Bottles-Deflatpak/issues/new).
+
+> **Note:** If your issue also affects the upstream Flatpak version of Bottles, please report it to [bottlesdevs/Bottles](https://github.com/bottlesdevs/Bottles/issues) instead.
 
 ## Want to Submit Code?
-You can submit code by [forking](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) this project, editing the desired code and finally submitting a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
-To build Bottles, refer to the [Building](README.md#Building) instructions.
-
-### Having Trouble Understanding the Source Code?
-If you want to inquire to understand the code base, you can contact us via [Discord](https://discord.com/invite/wF4JAdYrTR). We'd love to help you out!
+1. [Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) this repository
+2. Make your changes (see [Building](README.md#building) and [Coding Guide](CODING_GUIDE.md))
+3. Run the pre-commit checks: `./venv/bin/python -m pre_commit run --all-files`
+4. Submit a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)
 
 ## Want to Translate Bottles?
-You can help Bottles speak your language by translating on [Weblate](https://hosted.weblate.org/projects/bottles).
 
-## Want to Donate or Sponsor Bottles?
-You can financially support Bottles through [donations and sponsorships](https://usebottles.com/funding).
+Translations are managed upstream. You can help via [Weblate](https://hosted.weblate.org/projects/bottles).

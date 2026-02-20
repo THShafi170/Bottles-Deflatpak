@@ -28,9 +28,7 @@ logging = Logger()
 
 class UserDataKeys:
     CustomBottlesPath = "custom_bottles_path"
-    FundingDismissed = "funding_dialog_dismissed_next"
-    LastFundingPrompt = "last_funding_prompt_date"
-    FundingPromptCount = "funding_prompt_count"
+
     PersonalRepositories = "personal_repositories"
 
 

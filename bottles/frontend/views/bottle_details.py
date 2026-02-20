@@ -22,7 +22,12 @@ from datetime import datetime
 from gettext import gettext as _
 from typing import Dict, List, Optional, Tuple
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+try:
+    from gi.repository import Xdp
+except (ImportError, ValueError):
+    Xdp = None
 
 from bottles.backend.managers.backup import BackupManager
 from bottles.backend.models.config import BottleConfig
@@ -95,7 +100,7 @@ class BottleView(Adw.PreferencesPage):
     btn_backup_full = Gtk.Template.Child()
     btn_duplicate = Gtk.Template.Child()
     btn_delete = Gtk.Template.Child()
-    btn_flatpak_doc = Gtk.Template.Child()
+    btn_troubleshoot_doc = Gtk.Template.Child()
     label_name = Gtk.Template.Child()
     dot_versioning = Gtk.Template.Child()
     grid_versioning = Gtk.Template.Child()
@@ -179,16 +184,6 @@ class BottleView(Adw.PreferencesPage):
         self.btn_backup_config.connect("clicked", self.__backup, "config")
         self.btn_backup_full.connect("clicked", self.__backup, "full")
         self.btn_duplicate.connect("clicked", self.__duplicate)
-        self.btn_flatpak_doc.connect(
-            "clicked", open_doc_url, "flatpak/black-screen-or-silent-crash"
-        )
-
-        if "FLATPAK_ID" in os.environ:
-            """
-            If Flatpak, show the btn_flatpak_doc widget to reach
-            the documentation on how to expose directories
-            """
-            self.btn_flatpak_doc.set_visible(True)
 
         self.exec_winebridge.set_active(self.config.Winebridge)
         self.populate_updates()
@@ -255,7 +250,11 @@ class BottleView(Adw.PreferencesPage):
 
         # set name and runner
         self.label_name.set_text(self.config.Name)
-        self.label_runner.set_text(self.config.Runner)
+
+        _runner = self.config.Runner
+        if _runner.startswith("/"):
+            _runner = f"{os.path.basename(_runner.strip('/'))} (Steam)"
+        self.label_runner.set_text(_runner)
 
         # set environment
         self.label_environment.set_text(_(self.config.Environment))
@@ -847,8 +846,6 @@ class BottleView(Adw.PreferencesPage):
         """
 
         def show_chooser(*_args):
-            self.window.settings.set_boolean("show-sandbox-warning", False)
-
             def execute(_dialog, response):
                 if response != Gtk.ResponseType.ACCEPT:
                     return
@@ -885,22 +882,7 @@ class BottleView(Adw.PreferencesPage):
             dialog.connect("response", execute)
             dialog.show()
 
-        if Xdp.Portal.running_under_sandbox():
-            if self.window.settings.get_boolean("show-sandbox-warning"):
-                dialog = Adw.MessageDialog.new(
-                    self.window,
-                    _("Be Aware of Sandbox"),
-                    _(
-                        "Bottles is running in a sandbox, a restricted permission environment needed to keep you safe. If the program won't run, consider moving inside the bottle (3 dots icon on the top), then launch from there."
-                    ),
-                )
-                dialog.add_response("dismiss", _("_Dismiss"))
-                dialog.connect("response", lambda *args: show_chooser())
-                dialog.present()
-            else:
-                show_chooser()
-        else:
-            show_chooser()
+        show_chooser()
 
     def run_eagle(self, _widget):
         """
@@ -1126,6 +1108,8 @@ the Bottles preferences or choose a new one to run applications."
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.connect("response", handle_response)
             dialog.present()
+        else:
+            RunAsync(wineboot.send_status, callback=reset, status=status)
 
     def __set_steam_rules(self):
         status = False if self.config.Environment == "Steam" else True

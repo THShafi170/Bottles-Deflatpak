@@ -20,15 +20,22 @@ import os
 import re
 from gettext import gettext as _
 
-from gi.repository import Adw, Gdk, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gtk
+
+try:
+    from gi.repository import Xdp
+except (ImportError, ValueError):
+    Xdp = None
 
 from bottles.backend.globals import (
     gamemode_available,
     gamescope_available,
     mangohud_available,
     obs_vkc_available,
+    sandbox_available,
     vkbasalt_available,
     vmtouch_available,
+    ntsync_available,
 )
 from bottles.backend.logger import Logger
 from bottles.backend.managers.library import LibraryManager
@@ -40,6 +47,7 @@ from bottles.backend.runner import Runner
 from bottles.backend.utils.display import DisplayUtils
 from bottles.backend.utils.gpu import GPUUtils, GPUVendors
 from bottles.backend.utils.manager import ManagerUtils
+from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.threading import RunAsync
 from bottles.backend.wine.regkeys import RegKeys
 from bottles.frontend.utils.gtk import GtkUtils
@@ -82,6 +90,9 @@ class PreferencesView(Adw.PreferencesPage):
     row_obsvkc = Gtk.Template.Child()
     row_wayland = Gtk.Template.Child()
     row_winebridge = Gtk.Template.Child()
+    row_umu = Gtk.Template.Child()
+    row_proton_scripts = Gtk.Template.Child()
+    row_proton_log = Gtk.Template.Child()
     row_manage_display = Gtk.Template.Child()
     row_runtime = Gtk.Template.Child()
     row_steam_runtime = Gtk.Template.Child()
@@ -98,6 +109,9 @@ class PreferencesView(Adw.PreferencesPage):
     switch_wayland = Gtk.Template.Child()
     switch_winebridge = Gtk.Template.Child()
     switch_nvapi = Gtk.Template.Child()
+    switch_umu = Gtk.Template.Child()
+    switch_proton_scripts = Gtk.Template.Child()
+    switch_proton_log = Gtk.Template.Child()
     switch_gamemode = Gtk.Template.Child()
     switch_gamescope = Gtk.Template.Child()
     switch_discrete = Gtk.Template.Child()
@@ -145,80 +159,53 @@ class PreferencesView(Adw.PreferencesPage):
         self.queue = details.queue
         self.details = details
 
-        if not gamemode_available or not Xdp.Portal.running_under_sandbox():
-            return
-
-        _not_available = _("This feature is unavailable on your system.")
-        _flatpak_not_available = _("{} To add this feature, please run").format(
-            _not_available
-        )
-        self._install_commands = {
-            "gamescope": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope",
-            "vkbasalt": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.vkBasalt",
-            "mangohud": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.MangoHud",
-            "obsvkc": "flatpak install flathub com.obsproject.Studio.Plugin.OBSVkCapture",
-        }
-
-        is_flatpak = "FLATPAK_ID" in os.environ
-
         if not gamemode_available:
-            self.switch_gamemode.set_tooltip_text(_not_available)
-            self.__add_unavailable_indicator(self.row_gamemode, None)
+            self.switch_gamemode.set_tooltip_text(
+                _("This feature is unavailable on your system.")
+            )
+            self.switch_gamemode.set_sensitive(False)
 
         if not gamescope_available:
-            _gamescope_command = self._install_commands.get("gamescope")
-            _gamescope_not_available = (
-                f"{_flatpak_not_available} {_gamescope_command}"
-                if is_flatpak
-                else _not_available
+            self.switch_gamescope.set_tooltip_text(
+                _("This feature is unavailable on your system.")
             )
-            self.switch_gamescope.set_tooltip_text(_gamescope_not_available)
-            self.btn_manage_gamescope.set_tooltip_text(_gamescope_not_available)
-            self.__add_unavailable_indicator(
-                self.row_gamescope, _gamescope_command if is_flatpak else None
-            )
+            self.switch_gamescope.set_sensitive(False)
+            self.btn_manage_gamescope.set_sensitive(False)
 
         if not vkbasalt_available:
-            _vkbasalt_command = self._install_commands.get("vkbasalt")
-            _vkbasalt_not_available = (
-                f"{_flatpak_not_available} {_vkbasalt_command}"
-                if is_flatpak
-                else _not_available
+            self.switch_vkbasalt.set_tooltip_text(
+                _("This feature is unavailable on your system.")
             )
-            self.switch_vkbasalt.set_tooltip_text(_vkbasalt_not_available)
-            self.btn_manage_vkbasalt.set_tooltip_text(_vkbasalt_not_available)
-            self.__add_unavailable_indicator(
-                self.row_vkbasalt, _vkbasalt_command if is_flatpak else None
-            )
+            self.switch_vkbasalt.set_sensitive(False)
+            self.btn_manage_vkbasalt.set_sensitive(False)
 
         if not mangohud_available:
-            _mangohud_command = self._install_commands.get("mangohud")
-            _mangohud_not_available = (
-                f"{_flatpak_not_available} {_mangohud_command}"
-                if is_flatpak
-                else _not_available
+            self.switch_mangohud.set_tooltip_text(
+                _("This feature is unavailable on your system.")
             )
-            self.switch_mangohud.set_tooltip_text(_mangohud_not_available)
-            self.btn_manage_mangohud.set_tooltip_text(_mangohud_not_available)
-            self.__add_unavailable_indicator(
-                self.row_mangohud, _mangohud_command if is_flatpak else None
-            )
+            self.switch_mangohud.set_sensitive(False)
+            self.btn_manage_mangohud.set_sensitive(False)
 
         if not obs_vkc_available:
-            _obsvkc_command = self._install_commands.get("obsvkc")
-            _obsvkc_not_available = (
-                f"{_flatpak_not_available} {_obsvkc_command}"
-                if is_flatpak
-                else _not_available
+            self.switch_obsvkc.set_tooltip_text(
+                _("This feature is unavailable on your system.")
             )
-            self.switch_obsvkc.set_tooltip_text(_obsvkc_not_available)
-            self.__add_unavailable_indicator(
-                self.row_obsvkc, _obsvkc_command if is_flatpak else None
-            )
+            self.switch_obsvkc.set_sensitive(False)
 
         if not vmtouch_available:
-            self.switch_vmtouch.set_tooltip_text(_not_available)
-            self.__add_unavailable_indicator(self.row_vmtouch, None)
+            self.switch_vmtouch.set_tooltip_text(
+                _("This feature is unavailable on your system.")
+            )
+            self.switch_vmtouch.set_sensitive(False)
+
+        if not sandbox_available:
+            self.switch_sandbox.set_tooltip_text(
+                _("This feature is unavailable on your system.")
+            )
+            self.switch_sandbox.set_sensitive(False)
+            self.btn_manage_sandbox.set_tooltip_text(
+                _("This feature is unavailable on your system.")
+            )
 
         # region signals
         self.row_manage_display.connect("activated", self.__show_display_settings)
@@ -257,6 +244,13 @@ class PreferencesView(Adw.PreferencesPage):
             "state-set", self.__toggle_feature_cb, "winebridge"
         )
         self.switch_nvapi.connect("state-set", self.__toggle_nvapi)
+        self.switch_umu.connect("state-set", self.__toggle_feature_cb, "use_umu")
+        self.switch_proton_scripts.connect(
+            "state-set", self.__toggle_feature_cb, "use_proton_scripts"
+        )
+        self.switch_proton_log.connect(
+            "state-set", self.__toggle_feature_cb, "proton_log"
+        )
         self.switch_gamemode.connect("state-set", self.__toggle_feature_cb, "gamemode")
         self.switch_gamescope.connect(
             "state-set", self.__toggle_feature_cb, "gamescope"
@@ -308,6 +302,8 @@ class PreferencesView(Adw.PreferencesPage):
         self.btn_manage_mangohud.set_sensitive(mangohud_available)
         self.switch_obsvkc.set_sensitive(obs_vkc_available)
         self.switch_vmtouch.set_sensitive(vmtouch_available)
+        self.switch_sandbox.set_sensitive(sandbox_available)
+        self.btn_manage_sandbox.set_sensitive(sandbox_available)
 
         is_wayland_session = DisplayUtils.display_server_type() == "wayland"
         self.switch_wayland.set_sensitive(is_wayland_session)
@@ -496,8 +492,11 @@ class PreferencesView(Adw.PreferencesPage):
         for index, vkd3d in enumerate(self.manager.vkd3d_available):
             self.str_list_vkd3d.append(vkd3d)
 
-        for index, runner in enumerate(self.manager.runners_available):
-            self.str_list_runner.append(runner)
+        for runner in self.manager.runners_available:
+            _runner = runner
+            if runner.startswith("/"):
+                _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
+            self.str_list_runner.append(_runner)
 
         for index, nvapi in enumerate(self.manager.nvapi_available):
             self.str_list_nvapi.append(nvapi)
@@ -518,6 +517,7 @@ class PreferencesView(Adw.PreferencesPage):
 
     def set_config(self, config: BottleConfig):
         self.config = config
+        self.__update_proton_visibility()
         parameters = self.config.Parameters
 
         # temporary lock functions connected to the widgets
@@ -527,6 +527,9 @@ class PreferencesView(Adw.PreferencesPage):
         self.switch_wayland.handler_block_by_func(self.__toggle_wayland)
         self.switch_winebridge.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_obsvkc.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_umu.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_proton_scripts.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_proton_log.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_gamemode.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_gamescope.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_sandbox.handler_block_by_func(self.__toggle_feature_cb)
@@ -545,12 +548,16 @@ class PreferencesView(Adw.PreferencesPage):
         self.combo_latencyflex.handler_block_by_func(self.__set_latencyflex)
         self.combo_windows.handler_block_by_func(self.__set_windows)
         self.combo_language.handler_block_by_func(self.__set_language)
+        self.combo_sync.handler_block_by_func(self.__set_sync_type)
         self.switch_mangohud.set_active(parameters.mangohud)
         self.switch_obsvkc.set_active(parameters.obsvkc)
         self.switch_vkbasalt.set_active(parameters.vkbasalt)
         self.switch_wayland.set_active(parameters.wayland)
         self.switch_winebridge.set_active(parameters.winebridge)
         self.switch_nvapi.set_active(parameters.dxvk_nvapi)
+        self.switch_umu.set_active(parameters.use_umu)
+        self.switch_proton_scripts.set_active(parameters.use_proton_scripts)
+        self.switch_proton_log.set_active(parameters.proton_log)
         self.switch_gamemode.set_active(parameters.gamemode)
         self.switch_gamescope.set_active(parameters.gamescope)
         self.switch_sandbox.set_active(parameters.sandbox)
@@ -600,6 +607,7 @@ class PreferencesView(Adw.PreferencesPage):
             self.windows_versions["win98"] = "Windows 98"
             self.windows_versions["win95"] = "Windows 95"
 
+        self.str_list_windows.splice(0, self.str_list_windows.get_n_items())
         for index, windows_version in enumerate(self.windows_versions):
             self.str_list_windows.append(self.windows_versions[windows_version])
             if windows_version == self.config.Windows:
@@ -651,6 +659,7 @@ class PreferencesView(Adw.PreferencesPage):
             "wine",
             "esync",
             "fsync",
+            "ntsync",
         ]
         for sync in sync_types:
             if sync == parameters.sync:
@@ -663,6 +672,9 @@ class PreferencesView(Adw.PreferencesPage):
         self.switch_wayland.handler_unblock_by_func(self.__toggle_wayland)
         self.switch_winebridge.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_obsvkc.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_umu.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_proton_scripts.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_proton_log.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_gamemode.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_gamescope.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_sandbox.handler_unblock_by_func(self.__toggle_feature_cb)
@@ -683,6 +695,7 @@ class PreferencesView(Adw.PreferencesPage):
         self.combo_latencyflex.handler_unblock_by_func(self.__set_latencyflex)
         self.combo_windows.handler_unblock_by_func(self.__set_windows)
         self.combo_language.handler_unblock_by_func(self.__set_language)
+        self.combo_sync.handler_unblock_by_func(self.__set_sync_type)
 
         self.__set_steam_rules()
 
@@ -718,12 +731,13 @@ class PreferencesView(Adw.PreferencesPage):
 
     def __set_sync_type(self, *_args):
         """
-        Set the sync type (wine, esync, fsync)
+        Set the sync type (wine, esync, fsync, ntsync)
         """
         sync_types = [
             "wine",
             "esync",
             "fsync",
+            "ntsync",
         ]
         self.queue.add_task()
         self.combo_sync.set_sensitive(False)
@@ -822,6 +836,7 @@ class PreferencesView(Adw.PreferencesPage):
                     )
 
             set_widgets_status(True)
+            self.__update_proton_visibility()
             self.queue.end_task()
 
         set_widgets_status(False)
@@ -1083,6 +1098,16 @@ class PreferencesView(Adw.PreferencesPage):
             self.spinner_latencyflex.stop()
             self.spinner_latencyflex.set_visible(False)
             self.queue.end_task()
+
+    def __update_proton_visibility(self):
+        """Update Proton-specific rows visibility based on the active runner"""
+        runner = self.config.Runner
+        runner_path = ManagerUtils.get_runner_path(runner)
+        is_proton = SteamUtils.is_proton(runner_path)
+
+        self.row_umu.set_visible(is_proton)
+        self.row_proton_scripts.set_visible(is_proton)
+        self.row_proton_log.set_visible(is_proton)
 
     def __set_steam_rules(self):
         """Set the Steam Environment specific rules"""

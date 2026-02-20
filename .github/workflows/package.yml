@@ -1,0 +1,205 @@
+name: CI/CD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: "Validate & Version"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -oP "version: '\K[^']+" meson.build | head -1)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - uses: pre-commit/action@v3.0.1
+
+  tarball:
+    name: "Build Binary Tarball (.tar.gz)"
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            blueprint-compiler \
+            gettext \
+            desktop-file-utils \
+            appstream \
+            python3-dev \
+            python3-pip \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1
+          sudo pip3 install --break-system-packages "meson>=1.5.0"
+          meson --version
+
+      - name: Build Binary Tarball
+        run: |
+          chmod +x build-packages.sh
+          ./build-packages.sh
+
+      - name: Upload Tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-tarball
+          path: "*.tar.gz"
+
+  deb:
+    name: "Build DEB (Debian/Ubuntu)"
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper-compat \
+            meson \
+            ninja-build \
+            blueprint-compiler \
+            gettext \
+            desktop-file-utils \
+            appstream \
+            pkg-config \
+            cmake \
+            gobject-introspection \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libgirepository1.0-dev \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            gir1.2-gtk-4.0 \
+            python3-dev \
+            python3-gi \
+            python3-pip
+          sudo pip3 install --break-system-packages "meson>=1.5.0"
+          meson --version
+
+      - name: Build Debian Package
+        run: |
+          cp -r packaging/deb/debian .
+          # Use -d to skip build dependency check (satisfied by pip meson)
+          dpkg-buildpackage -d -us -uc -b
+          mv ../bottles_*.deb .
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: "bottles_*.deb"
+
+  rpm:
+    name: "Build RPM (Fedora)"
+    needs: [validate]
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          dnf install -y \
+            meson \
+            rpm-build \
+            ninja-build \
+            blueprint-compiler \
+            desktop-file-utils \
+            libappstream-glib \
+            python3-devel \
+            gettext \
+            gcc \
+            python3-gobject-devel \
+            libadwaita-devel \
+            gtk4-devel \
+            python3-pip
+          pip3 install "meson>=1.5.0"
+          meson --version
+
+      - name: Prepare & Build RPM
+        run: |
+          VERSION=$(grep -oP "version: '\K[^']+" meson.build | head -1)
+          # Setup local rpmbuild directory in workspace
+          mkdir -p rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS}
+          # Use tar --transform to add the required directory prefix
+          # Use -h to dereference symlinks, ensuring translation aliases are included as real files
+          tar -h --exclude=.git --exclude=rpmbuild --transform "s|^|Bottles-Deflatpak-${VERSION}/|" -czf rpmbuild/SOURCES/bottles-v${VERSION}.tar.gz .
+
+          cp packaging/rpm/bottles.spec rpmbuild/SPECS/
+          sed -i "s|Source0:.*|Source0: bottles-v${VERSION}.tar.gz|" rpmbuild/SPECS/bottles.spec
+          # Use --nodeps to skip package database checks
+          rpmbuild --nodeps --define "_topdir $(pwd)/rpmbuild" --define "dist %{nil}" -bb rpmbuild/SPECS/bottles.spec
+
+      - name: Upload RPMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: rpmbuild/RPMS/noarch/*.rpm
+
+  release:
+    name: "Create/Update Release"
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    needs: [validate, tarball, deb, rpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets
+          find ./artifacts -type f -name "*.tar.gz" -exec cp {} release-assets/ \;
+          find ./artifacts -type f -name "*.deb" -exec cp {} release-assets/ \;
+          find ./artifacts -type f -name "*.rpm" -exec cp {} release-assets/ \;
+
+      - name: Update Tag and Cleanup Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.validate.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Updating tag $TAG to point to the current commit..."
+          git tag -f "$TAG"
+          git push origin "$TAG" --force
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Deleting existing release $TAG to avoid body duplication..."
+            gh release delete "$TAG" --yes
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: ${{ needs.validate.outputs.version }}
+          files: release-assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

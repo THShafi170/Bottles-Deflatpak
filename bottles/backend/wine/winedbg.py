@@ -24,7 +24,6 @@ class WineDbg(WineProgram):
     def get_processes(self):
         """Get all processes running on the wineprefix."""
         processes = []
-        parent = None
 
         if not self.__wineserver_status():
             return processes
@@ -35,34 +34,55 @@ class WineDbg(WineProgram):
         if not res.ready:
             return processes
 
+        # Regex to match winedbg output:
+        # pid (hex) | (D) flag | child marker \_ | threads (dec) | name (quoted or unquoted)
+        # Examples:
+        #  00000008 1      'C:\windows\system32\services.exe'
+        #  00000009 1       \_ 'C:\windows\system32\winedevice.exe'
+        #  00000020 (D) 1   'C:\windows\system32\services.exe'
+        #  12345678 (D) \_ 2   name
+        pattern = re.compile(
+            r"^\s*"
+            r"(?P<pid>[0-9a-fA-F]+)\s+"  # PID in hex
+            r"(?:\(D\)\s+)?"  # Optional (D) flag
+            r"(?P<child>\\_\s+)?"  # Optional child marker
+            r"(?P<threads>\d+)\s+"  # Thread count
+            r"(?P<name>.*)$"  # Executable name
+        )
+
         lines = res.data.split("\n")
-        for w in lines[1:]:  # remove the first line from the output (the header)
-            w = re.sub("\\s{2,}", " ", w)[1:].replace("'", "")
+        last_pid = None
 
-            if "\\_" in w:
-                w = w.replace("\\_ ", "")
-                w += " child"
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("pid"):
+                continue
 
-            w = w.split(" ")
+            match = pattern.match(line)
+            if not match:
+                continue
+
+            d = match.groupdict()
+            w_pid = d["pid"]
+            w_threads = d["threads"]
+            w_name = d["name"].strip().strip("'").strip('"')
+            is_child = bool(d["child"])
+
+            # Determine parent PID
             w_parent = None
+            if is_child:
+                w_parent = last_pid
+            else:
+                last_pid = w_pid
 
-            if len(w) >= 3 and w[1].isdigit():
-                w_pid = w[0]
-                w_threads = w[1]
-                w_name = w[2]
-
-                if len(w) == 3:
-                    parent = w_pid
-                else:
-                    w_parent = parent
-
-                w = {
+            processes.append(
+                {
                     "pid": w_pid,
                     "threads": w_threads,
                     "name": w_name,
                     "parent": w_parent,
                 }
-                processes.append(w)
+            )
 
         return processes
 

@@ -96,7 +96,7 @@ class Reg(WineProgram):
         """Remove a key from the registry"""
         config = self.config
         logging.info(
-            f"Removing Value: [{key}] from Key: [{value}] in " f"{config.Name} registry"
+            f"Removing Value: [{key}] from Key: [{value}] in {config.Name} registry"
         )
         winedbg = WineDbg(config)
         args = "delete '%s' /v %s /f" % (key, value)

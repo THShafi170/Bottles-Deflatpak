@@ -1,4 +1,4 @@
-# steam.py
+# sandbox.py
 #
 # Copyright 2025 mirkobrombin <brombin94@gmail.com>
 #
@@ -15,11 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import os
 import shlex
 import subprocess
-from typing import Optional
+from typing import Optional, List
 
 
 class SandboxManager:
@@ -37,7 +36,7 @@ class SandboxManager:
         share_sound: bool = True,
         share_gpu: bool = True,
     ):
-        self.envs = envs
+        self.envs = envs or {}
         self.chdir = chdir
         self.clear_env = clear_env
         self.share_paths_ro = list(share_paths_ro or [])
@@ -48,108 +47,156 @@ class SandboxManager:
         self.share_display = share_display
         self.share_sound = share_sound
         self.share_gpu = share_gpu
-        self.__uid = os.environ.get("UID", "1000")
+        self.__uid = os.environ.get("UID", os.getuid())
+        self.__xdg_runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
 
-    def __get_bwrap(self, cmd: str):
-        _cmd = ["bwrap"]
+    def __get_bwrap_args(self) -> List[str]:
+        args = ["bwrap", "--unshare-all", "--die-with-parent"]
 
-        if self.envs:
-            _cmd += [f"--setenv {k} {shlex.quote(v)}" for k, v in self.envs.items()]
-
-        if self.share_host_ro:
-            _cmd.append("--ro-bind / /")
-
-        if self.chdir:
-            _cmd.append(f"--chdir {shlex.quote(self.chdir)}")
-            _cmd.append(f"--bind {shlex.quote(self.chdir)} {shlex.quote(self.chdir)}")
-
+        # Environment variables
         if self.clear_env:
-            _cmd.append("--clearenv")
+            args.append("--clearenv")
+        for k, v in self.envs.items():
+            args.extend(["--setenv", k, v])
 
-        if self.share_paths_ro:
-            _cmd += [
-                f"--ro-bind {shlex.quote(p)} {shlex.quote(p)}"
-                for p in self.share_paths_ro
-            ]
+        # Basic filesystem
+        args.extend(["--proc", "/proc"])
+        args.extend(["--dev", "/dev"])
+        args.extend(["--tmpfs", "/tmp"])
+        args.extend(["--dir", "/var"])
+        args.extend(["--dir", "/run"])
 
-        if self.share_paths_rw:
-            _cmd += [
-                f"--bind {shlex.quote(p)} {shlex.quote(p)}" for p in self.share_paths_rw
-            ]
+        # Essential system paths
+        for p in ["/usr", "/lib", "/lib64", "/bin", "/sbin"]:
+            if os.path.exists(p):
+                args.extend(["--ro-bind", p, p])
 
-        if self.share_sound:
-            _cmd.append(
-                f"--ro-bind /run/user/{self.__uid}/pulse /run/user/{self.__uid}/pulse"
-            )
+        # Essential config files
+        for p in [
+            "/etc/ld.so.cache",
+            "/etc/ld.so.conf",
+            "/etc/ld.so.conf.d",
+            "/etc/alternatives",
+            "/etc/fonts",
+        ]:
+            if os.path.exists(p):
+                args.extend(["--ro-bind", p, p])
 
-        if self.share_gpu:
-            pass  # not implemented yet
-
-        if self.share_display:
-            _cmd.append("--dev-bind /dev/video0 /dev/video0")
-
-        _cmd.append("--share-net" if self.share_net else "--unshare-net")
-        _cmd.append("--share-user" if self.share_user else "--unshare-user")
-        _cmd.append(cmd)
-
-        return _cmd
-
-    def __get_flatpak_spawn(self, cmd: str):
-        _cmd = ["flatpak-spawn", "--sandbox"]
-
-        if self.envs:
-            _cmd += [f"--env={k}={shlex.quote(v)}" for k, v in self.envs.items()]
-
-        if self.clear_env:
-            _cmd.append("--clear-env")
-
-        if self.chdir:
-            quoted_dir = shlex.quote(self.chdir)
-            _cmd.append(f"--directory={quoted_dir}")
-            _cmd.append(f"--sandbox-expose-path={quoted_dir}")
-
+        # Host access
         if self.share_host_ro:
-            _cmd.append("--sandbox-expose-path-ro=/")
+            args.extend(["--ro-bind-try", "/etc", "/etc"])
+            # We don't bind-try / because it would override our unshare-all philosophy
+            # but if the user explicitly wants share_host_ro, maybe they expect more?
+            # For now, we stick to essential host bins/libs already added.
 
-        if self.share_paths_ro:
-            _cmd += [
-                f"--sandbox-expose-path-ro={shlex.quote(p)}"
-                for p in self.share_paths_ro
-            ]
+        # Working directory
+        if self.chdir:
+            args.extend(["--chdir", self.chdir])
+            args.extend(["--bind", self.chdir, self.chdir])
 
-        if self.share_paths_rw:
-            _cmd += [
-                f"--sandbox-expose-path={shlex.quote(p)}" for p in self.share_paths_rw
-            ]
+        # Custom shared paths
+        for p in self.share_paths_ro:
+            if os.path.exists(p):
+                args.extend(["--ro-bind", p, p])
+        for p in self.share_paths_rw:
+            if os.path.exists(p):
+                args.extend(["--bind", p, p])
 
-        if not self.share_net:
-            _cmd.append("--no-network")
+        # Networking
+        if self.share_net:
+            args.append("--share-net")
+            # Need /etc/resolv.conf for DNS
+            if os.path.exists("/etc/resolv.conf"):
+                args.extend(["--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf"])
 
+        # User isolation
+        if self.share_user:
+            args.append("--share-user")
+
+        # Display sharing
         if self.share_display:
-            _cmd.append("--sandbox-flag=share-display")
+            # X11
+            x_display = os.environ.get("DISPLAY")
+            if x_display:
+                args.extend(["--setenv", "DISPLAY", x_display])
+                display_num = x_display.split(":")[-1].split(".")[0]
+                x_socket = f"/tmp/.X11-unix/X{display_num}"
+                if os.path.exists(x_socket):
+                    args.extend(["--bind", x_socket, x_socket])
 
+                # Xauthority
+                xauth = os.environ.get("XAUTHORITY") or os.path.expanduser(
+                    "~/.Xauthority"
+                )
+                if os.path.exists(xauth):
+                    args.extend(["--setenv", "XAUTHORITY", xauth])
+                    args.extend(["--ro-bind", xauth, xauth])
+
+            # Wayland
+            wayland_display = os.environ.get("WAYLAND_DISPLAY")
+            if wayland_display and self.__xdg_runtime_dir:
+                args.extend(["--setenv", "WAYLAND_DISPLAY", wayland_display])
+                wayland_socket = os.path.join(self.__xdg_runtime_dir, wayland_display)
+                if os.path.exists(wayland_socket):
+                    args.extend(["--bind", wayland_socket, wayland_socket])
+
+        # Sound sharing
         if self.share_sound:
-            _cmd.append("--sandbox-flag=share-sound")
+            if self.__xdg_runtime_dir:
+                # PulseAudio
+                pulse_socket = os.getenv("PULSE_SERVER")
+                if pulse_socket and pulse_socket.startswith("unix:"):
+                    pulse_path = pulse_socket[5:]
+                    if os.path.exists(pulse_path):
+                        args.extend(["--bind", pulse_path, pulse_path])
+                else:
+                    pulse_dir = os.path.join(self.__xdg_runtime_dir, "pulse")
+                    if os.path.exists(pulse_dir):
+                        args.extend(["--bind", pulse_dir, pulse_dir])
 
+                # PipeWire
+                pw_socket = os.path.join(self.__xdg_runtime_dir, "pipewire-0")
+                if os.path.exists(pw_socket):
+                    args.extend(["--bind", pw_socket, pw_socket])
+
+        # GPU sharing
         if self.share_gpu:
-            _cmd.append("--sandbox-flag=share-gpu")
+            if os.path.exists("/dev/dri"):
+                args.extend(["--dev-bind", "/dev/dri", "/dev/dri"])
 
-        _cmd.append(cmd)
+            # NVIDIA support
+            for i in range(16):
+                dev = f"/dev/nvidia{i}"
+                if os.path.exists(dev):
+                    args.extend(["--dev-bind", dev, dev])
+            for dev in [
+                "/dev/nvidiactl",
+                "/dev/nvidia-modeset",
+                "/dev/nvidia-uvm",
+                "/dev/nvidia-uvm-tools",
+            ]:
+                if os.path.exists(dev):
+                    args.extend(["--dev-bind", dev, dev])
 
-        return _cmd
+        return args
 
-    def get_cmd(self, cmd: str):
-        if "FLATPAK_ID" in os.environ:
-            _cmd = self.__get_flatpak_spawn(cmd)
-        else:
-            _cmd = self.__get_bwrap(cmd)
+    def get_cmd_list(self, cmd: str) -> List[str]:
+        args = self.__get_bwrap_args()
+        # The command to run within bwrap
+        # If cmd is a string, we might need to wrap it in a shell to handle arguments correctly
+        # but Bottles usually passes the full command string.
+        # To be safe and avoid shell injection, we'll try to split if it's a simple command.
+        # However, Wine commands are often complex.
+        # Let's use /bin/sh -c to run the command inside.
+        args.extend(["/bin/sh", "-c", cmd])
+        return args
 
-        return " ".join(_cmd)
+    def get_cmd(self, cmd: str) -> str:
+        return " ".join([shlex.quote(a) for a in self.get_cmd_list(cmd)])
 
     def run(self, cmd: str) -> subprocess.Popen[bytes]:
         return subprocess.Popen(
-            self.get_cmd(cmd),
-            shell=True,
+            self.get_cmd_list(cmd),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

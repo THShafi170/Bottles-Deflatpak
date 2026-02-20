@@ -35,9 +35,10 @@ from bottles.frontend.params import (
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("GtkSource", "5")
-gi.require_version("Xdp", "1.0")
-# gi.require_version("XdpGtk4", "1.0")
-
+try:
+    gi.require_version("Xdp", "1.0")
+except (ValueError, ImportError):
+    pass
 # ruff: noqa: E402
 from gi.repository import Adw, Gio, GLib, GObject  # type: ignore
 
@@ -84,6 +85,7 @@ _ = gettext.gettext
 class Bottles(Adw.Application):
     arg_exe = None
     arg_bottle = None
+    arg_program = None
     dark_provider = None
     journal_window = None
 
@@ -195,13 +197,11 @@ class Bottles(Adw.Application):
                     )
 
         uri = commands.lookup_value(GLib.OPTION_REMAINING)
-        logging.info(
-            _("Launching with URI: {0}").format(uri),
-        )
         if uri:
-            return self.__process_uri(uri)
+            self.__process_uri(uri)
+            return 0
 
-        self.do_activate()
+        self.activate()
         return 0
 
     def __process_uri(self, uri):
@@ -219,9 +219,14 @@ class Bottles(Adw.Application):
             uri = uri.replace("bottles:run/", "")
             bottle, program = uri.split("/")
 
-            import subprocess
+            logging.info(f"Processing URI: run {program} in {bottle}")
 
-            subprocess.Popen(["bottles-cli", "run", "-b", bottle, "-p", program])
+            if hasattr(self, "win") and self.win:
+                self.win.run_program_by_name(bottle, program)
+            else:
+                self.arg_bottle = bottle
+                self.arg_program = program
+                self.activate()
             return 0
 
         try:
@@ -257,10 +262,18 @@ class Bottles(Adw.Application):
         Adw.Application.do_activate(self)
         win = self.props.active_window
         if not win:
-            win = BottlesWindow(application=self, arg_bottle=self.arg_bottle)
+            win = BottlesWindow(
+                application=self,
+                arg_bottle=self.arg_bottle,
+                arg_program=self.arg_program,
+            )
         self.win = win
 
         win.present()
+
+        if self.arg_program:
+            win.run_program_by_name(self.arg_bottle, self.arg_program)
+            self.arg_program = None
 
     def __quit(self, *args):
         """

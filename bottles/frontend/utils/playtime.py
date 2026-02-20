@@ -110,7 +110,8 @@ class PlaytimeService:
     def is_enabled(self) -> bool:
         """Check if playtime tracking is currently enabled."""
         try:
-            return self.manager.playtime_tracker.enabled
+            tracker = getattr(self.manager, "playtime_tracker", None)
+            return tracker.enabled if tracker else False
         except AttributeError:
             return False
 
@@ -133,6 +134,10 @@ class PlaytimeService:
             logging.debug("Playtime service: tracking disabled")
             return None
 
+        if not program_path or not bottle_path:
+            logging.debug("Playtime service: missing path(s)")
+            return None
+
         program_id = _compute_program_id(bottle_id, bottle_path, program_path)
         logging.debug(
             f"Computed program_id: {program_id} for bottle={bottle_id}, path={program_path}"
@@ -145,10 +150,14 @@ class PlaytimeService:
 
         # Fetch from backend
         try:
+            tracker = getattr(self.manager, "playtime_tracker", None)
+            if not tracker:
+                return None
+
             logging.debug(
                 f"Calling backend get_totals(bottle_id={bottle_id}, program_id={program_id})"
             )
-            data = self.manager.playtime_tracker.get_totals(bottle_id, program_id)
+            data = tracker.get_totals(bottle_id, program_id)
             logging.debug(f"Backend returned: {data}")
             if data is None:
                 logging.debug(f"No playtime data found for {program_name}")
@@ -171,7 +180,9 @@ class PlaytimeService:
             self.cache.set(bottle_id, program_id, record)
             return record
         except Exception as e:
-            logging.error(f"Failed to fetch playtime for {program_name}: {e}", exc=e)
+            logging.error(
+                f"Failed to fetch playtime for {program_name}: {e}", exc_info=True
+            )
             return None
 
     def get_bottle_playtime(self, bottle_id: str) -> Optional[PlaytimeRecord]:

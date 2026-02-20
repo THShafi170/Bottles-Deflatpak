@@ -77,7 +77,9 @@ class DependencyManager:
 
     @staticmethod
     def __notify_progress(
-        callback: Optional[Callable[[str], None]], message: str, task: Optional[Task] = None
+        callback: Optional[Callable[[str], None]],
+        message: str,
+        task: Optional[Task] = None,
     ) -> None:
         if not message:
             return
@@ -126,9 +128,7 @@ class DependencyManager:
         file_name = step.get("rename") or step.get("file_name")
 
         descriptions = {
-            "download_archive": _("Downloading {0}…").format(
-                file_name or _("archive")
-            ),
+            "download_archive": _("Downloading {0}…").format(file_name or _("archive")),
             "install_exe": _("Running {0}…").format(file_name or _("installer")),
             "install_msi": _("Running {0}…").format(file_name or _("installer")),
             "install_cab_fonts": _("Installing fonts…"),
@@ -151,7 +151,9 @@ class DependencyManager:
             "uninstall": _("Running uninstaller…"),
         }
 
-        return descriptions.get(action, _("Running {0}…").format(action.replace("_", " ")))
+        return descriptions.get(
+            action, _("Running {0}…").format(action.replace("_", " "))
+        )
 
     def install(
         self,
@@ -180,9 +182,7 @@ class DependencyManager:
         task_id = TaskManager.add(Task(title=dependency[0]))
         task = TaskManager.get(task_id)
 
-        self.__notify_progress(
-            progress_cb, _("Preparing installation…"), task=task
-        )
+        self.__notify_progress(progress_cb, _("Preparing installation…"), task=task)
 
         logging.info(
             "Installing dependency [%s] in bottle [%s]." % (dependency[0], config.Name),
@@ -289,9 +289,7 @@ class DependencyManager:
         if installed_new:
             RegistryRuleManager.apply_rules(config, trigger="dependencies")
         self.__notify_progress_fraction(progress_progress_cb, None)
-        self.__notify_progress(
-            progress_cb, _("Finalizing installation…"), task=task
-        )
+        self.__notify_progress(progress_cb, _("Finalizing installation…"), task=task)
         if not uninstaller:
             return Result(status=True, data={"uninstaller": False})
         return Result(status=True, data={"uninstaller": True})

@@ -15,9 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import re
 from gettext import gettext as _
 
-from gi.repository import Adw, GLib, GObject, Gtk
+from gi.repository import Adw, GLib, GObject, Gtk, Gio
 
 from bottles.backend.logger import Logger
 from bottles.backend.utils.manager import ManagerUtils
@@ -34,6 +35,11 @@ class LaunchOptionsDialog(Adw.Window):
 
     # region Widgets
     entry_arguments = Gtk.Template.Child()
+    combo_path_mode = Gtk.Template.Child()
+    str_list_path_mode = Gtk.Template.Child()
+    entry_executable = Gtk.Template.Child()
+    btn_executable_reset = Gtk.Template.Child()
+    btn_executable_browse = Gtk.Template.Child()
     btn_save = Gtk.Template.Child()
     btn_pre_script = Gtk.Template.Child()
     btn_pre_script_reset = Gtk.Template.Child()
@@ -66,6 +72,7 @@ class LaunchOptionsDialog(Adw.Window):
     __default_cwd_msg = _("Choose from where start the program.")
     __msg_disabled = _("{0} is disabled globally for this bottle.")
     __msg_override = _("This setting overrides the bottle's global setting.")
+    __path_re = re.compile(r"^[A-Za-z]:|^\\\\")
 
     def __set_disabled_switches(self):
         if not self.global_dxvk:
@@ -99,6 +106,22 @@ class LaunchOptionsDialog(Adw.Window):
         if program.get("arguments") not in ["", None]:
             self.entry_arguments.set_text(program.get("arguments"))
 
+        self.str_list_path_mode.splice(
+            0,
+            0,
+            [_("Automatic"), _("Force Unix Path"), _("Force Windows Path")],
+        )
+        self.combo_path_mode.set_selected(program.get("path_mode", 0))
+
+        executable = (
+            program.get("path_override")
+            or program.get("windows_path")
+            or program.get("path", "")
+        )
+        if executable not in ["", None]:
+            self.entry_executable.set_text(executable)
+            self.btn_executable_reset.set_visible(True)
+
         # keeps track of toggled switches
         self.toggled = {}
         self.toggled["dxvk"] = False
@@ -116,8 +139,11 @@ class LaunchOptionsDialog(Adw.Window):
         self.btn_post_script_reset.connect("clicked", self.__reset_post_script)
         self.btn_cwd.connect("clicked", self.__choose_cwd)
         self.btn_cwd_reset.connect("clicked", self.__reset_cwd)
+        self.btn_executable_reset.connect("clicked", self.__reset_executable)
+        self.btn_executable_browse.connect("clicked", self.__choose_executable)
         self.btn_reset_defaults.connect("clicked", self.__reset_defaults)
         self.entry_arguments.connect("activate", self.__save)
+        self.entry_executable.connect("changed", self.__executable_changed)
 
         # set overrides status
         self.global_dxvk = program_dxvk = config.Parameters.dxvk
@@ -234,6 +260,26 @@ class LaunchOptionsDialog(Adw.Window):
         )
         self.__set_override("winebridge", program_winebridge, self.global_winebridge)
         self.program["arguments"] = self.entry_arguments.get_text()
+
+        self.program["path_mode"] = self.combo_path_mode.get_selected()
+
+        exec_path = self.entry_executable.get_text().strip()
+        # Strip surrounding quotes if present
+        if (
+            len(exec_path) >= 2
+            and exec_path[0] in ('"', "'")
+            and exec_path[-1] == exec_path[0]
+        ):
+            exec_path = exec_path[1:-1]
+
+        # Deduplicate and Migrate
+        if exec_path == self.program.get("path"):
+            self.program["path_override"] = None
+        else:
+            self.program["path_override"] = exec_path if exec_path else None
+
+        # Clear legacy key
+        self.program["windows_path"] = None
 
         pre_args = self.entry_pre_script_args.get_text()
         post_args = self.entry_post_script_args.get_text()
@@ -373,7 +419,50 @@ class LaunchOptionsDialog(Adw.Window):
         self.action_cwd.set_subtitle(self.__default_cwd_msg)
         self.btn_cwd_reset.set_visible(False)
 
+    def __executable_changed(self, *_args):
+        text = self.entry_executable.get_text().strip()
+        self.btn_executable_reset.set_visible(text != "")
+
+        is_windows = bool(self.__path_re.match(text))
+        is_unix = text.startswith("/")
+        is_valid = is_windows or is_unix or text == ""
+
+        if is_valid or text == "":
+            self.entry_executable.remove_css_class("error")
+            self.btn_save.set_sensitive(True)
+        else:
+            self.entry_executable.add_css_class("error")
+            self.btn_save.set_sensitive(False)
+
+    def __reset_executable(self, *_args):
+        self.entry_executable.set_text(self.program.get("path", ""))
+        self.btn_executable_reset.set_visible(False)
+
+    def __choose_executable(self, *_args):
+        def on_response(_dialog, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                path = _dialog.get_file().get_path()
+                self.entry_executable.set_text(path)
+            _dialog.destroy()
+
+        dialog = Gtk.FileChooserNative.new(
+            title=_("Select Executable"),
+            action=Gtk.FileChooserAction.OPEN,
+            parent=self,
+            accept_label=_("Select"),
+        )
+        dialog.set_modal(True)
+        dialog.set_current_folder(
+            Gio.File.new_for_path(ManagerUtils.get_bottle_path(self.config))
+        )
+        dialog.connect("response", on_response)
+        dialog.show()
+
     def __reset_defaults(self, *_args):
+        self.entry_executable.set_text("")
+        self.entry_executable.remove_css_class("error")
+        self.btn_save.set_sensitive(True)
+        self.btn_executable_reset.set_visible(False)
         self.switch_dxvk.set_active(self.global_dxvk)
         self.switch_vkd3d.set_active(self.global_vkd3d)
         self.switch_nvapi.set_active(self.global_nvapi)

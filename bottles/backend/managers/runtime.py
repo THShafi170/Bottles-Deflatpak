@@ -114,7 +114,7 @@ class RuntimeManager:
 
     @staticmethod
     def __get_bottles_runtime():
-        paths = ["/app/etc/runtime", Paths.runtimes]
+        paths = [Paths.runtimes]
         structure = ["lib", "lib32"]
 
         return RuntimeManager.__get_runtime(paths, structure)

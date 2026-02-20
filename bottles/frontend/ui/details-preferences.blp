@@ -190,6 +190,7 @@ template $DetailsPreferences: Adw.PreferencesPage {
           _("System"),
           _("Esync"),
           _("Fsync"),
+          _("NTsync"),
         ]
       };
     }
@@ -305,6 +306,36 @@ template $DetailsPreferences: Adw.PreferencesPage {
       visible: false;
 
       Switch switch_runtime {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow row_umu {
+      activatable-widget: switch_umu;
+      title: _("Use umu-launcher");
+      subtitle: _("Use umu-launcher to run Proton with better compatibility and fixes.");
+
+      Switch switch_umu {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow row_proton_scripts {
+      activatable-widget: switch_proton_scripts;
+      title: _("Use Proton scripts");
+      subtitle: _("Use the Proton script as launcher. May improve compatibility with some games.");
+
+      Switch switch_proton_scripts {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow row_proton_log {
+      activatable-widget: switch_proton_log;
+      title: _("Proton Logging");
+      subtitle: _("Enable Proton logging. Logs will be saved in the bottle directory.");
+
+      Switch switch_proton_log {
         valign: center;
       }
     }

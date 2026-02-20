@@ -756,6 +756,7 @@ class Manager(metaclass=Singleton):
                         tmp_runners = self.supported_wine_runners
                         runner_name = next(iter(tmp_runners))
                     self.component_manager.install("runner", runner_name)
+                    self.runners_available.insert(0, runner_name)
                 except StopIteration:
                     return False
             else:
@@ -765,10 +766,6 @@ class Manager(metaclass=Singleton):
 
     def check_runtimes(self, install_latest: bool = True) -> bool:
         self.runtimes_available = []
-        if "FLATPAK_ID" in os.environ:
-            self.runtimes_available = ["flatpak-managed"]
-            return True
-
         runtimes = os.listdir(Paths.runtimes)
 
         if len(runtimes) == 0:
@@ -829,15 +826,16 @@ class Manager(metaclass=Singleton):
         missing_installation = len(winebridge) == 0 or not installed_identifier
         needs_latest = False
         if latest_supported:
-            needs_latest = (
-                missing_installation
-                or _is_newer(latest_supported, installed_identifier)
+            needs_latest = missing_installation or _is_newer(
+                latest_supported, installed_identifier
             )
 
         return latest_supported, installed_identifier, needs_latest
 
     def winebridge_update_status(self) -> dict:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
         return {
             "latest_supported": latest_supported,
             "installed_identifier": installed_identifier,
@@ -848,7 +846,9 @@ class Manager(metaclass=Singleton):
     def check_winebridge(
         self, install_latest: bool = True, update: bool = False
     ) -> bool:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
 
         can_install = install_latest or update
         if can_install and needs_latest and latest_supported:
@@ -1073,7 +1073,7 @@ class Manager(metaclass=Singleton):
         """
         Process External_Programs
         """
-        for _, _program in ext_programs.items():
+        for program_id, _program in ext_programs.items():
             found.append(_program["executable"])
             if winepath.is_windows(_program["path"]):
                 program_folder = ManagerUtils.get_exe_parent_dir(
@@ -1100,6 +1100,8 @@ class Manager(metaclass=Singleton):
                     "pulseaudio_latency": _program.get("pulseaudio_latency"),
                     "virtual_desktop": _program.get("virtual_desktop"),
                     "winebridge": _program.get("winebridge"),
+                    "path_override": _program.get("path_override"),
+                    "windows_path": _program.get("windows_path"),
                     "removed": _program.get("removed"),
                     "id": _program.get("id"),
                 }
@@ -1355,7 +1357,7 @@ class Manager(metaclass=Singleton):
         wineserver = WineServer(_config)
         bottle_path = ManagerUtils.get_bottle_path(config)
 
-        if key == "sync":
+        if key == "sync" and config.Parameters.sync != value:
             """
             Workaround <https://github.com/bottlesdevs/Bottles/issues/916>
             Sync type change requires wineserver restart or wine will fail

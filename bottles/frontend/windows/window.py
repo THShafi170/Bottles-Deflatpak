@@ -18,11 +18,15 @@
 import contextlib
 import os
 import webbrowser
-from datetime import datetime, timedelta
 from gettext import gettext as _
 from typing import Optional
 
-from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Xdp
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk
+
+try:
+    from gi.repository import Xdp
+except (ImportError, ValueError):
+    Xdp = None
 
 from bottles.backend.globals import Paths
 from bottles.backend.health import HealthChecker
@@ -49,7 +53,7 @@ from bottles.frontend.windows.crash import CrashReportDialog
 from bottles.frontend.windows.depscheck import DependenciesCheckDialog
 from bottles.frontend.windows.onboard import OnboardDialog
 from bottles.frontend.windows.winebridgeupdate import WineBridgeUpdateDialog
-from bottles.frontend.windows.funding import FundingDialog
+
 
 logging = Logger()
 
@@ -78,36 +82,19 @@ class BottlesWindow(Adw.ApplicationWindow):
     argument_executed = False
     _winebridge_dialog_shown = False
 
-    def __init__(self, arg_bottle, **kwargs):
+    def __init__(self, arg_bottle, arg_program=None, **kwargs):
         width = self.settings.get_int("window-width")
         height = self.settings.get_int("window-height")
 
         super().__init__(**kwargs, default_width=width, default_height=height)
 
         self.data_mgr = DataManager()
-        self._show_funding = False
-        
-        show_funding_setting = self.settings.get_boolean("show-funding")
-        dismissed = self.data_mgr.get(UserDataKeys.FundingDismissed, False)
-        
-        if show_funding_setting and not dismissed:
-            last_prompt = self.data_mgr.get(UserDataKeys.LastFundingPrompt, "")
-            
-            if not last_prompt:
-                self._show_funding = True
-            else:
-                try:
-                    last_date = datetime.strptime(last_prompt, "%Y-%m-%d")
-                    if datetime.now() - last_date >= timedelta(days=7):
-                        self._show_funding = True
-                except ValueError:
-                    self._show_funding = True
-
         self.utils_conn = ConnectionUtils(
             force_offline=self.settings.get_boolean("force-offline")
         )
         self.manager = None
         self.arg_bottle = arg_bottle
+        self.arg_program = arg_program
         self._showing_onboard = False
         self._winebridge_prompt_attempts = 0
         self.app = kwargs.get("application")
@@ -123,35 +110,6 @@ class BottlesWindow(Adw.ApplicationWindow):
         if self.settings.get_boolean("dark-theme"):
             manager = Adw.StyleManager.get_default()
             manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
-
-        # Be VERY explicit that non-sandboxed environments are unsupported
-        if not Xdp.Portal.running_under_sandbox():
-
-            def response(dialog, response, *args):
-                if response == "close":
-                    quit(1)
-
-            body = _(
-                "Bottles is only supported within a sandboxed environment. Official sources of Bottles are available at"
-            )
-            download_url = "usebottles.com/download"
-
-            error_dialog = Adw.AlertDialog.new(
-                _("Unsupported Environment"),
-                f"{body} <a href='https://{download_url}' title='https://{download_url}'>{download_url}.</a>",
-            )
-
-            error_dialog.add_response("close", _("Close"))
-            error_dialog.set_body_use_markup(True)
-            error_dialog.connect("response", response)
-            error_dialog.present(self)
-            logging.error(
-                _(
-                    "Bottles is only supported within a sandboxed format. Official sources of Bottles are available at:"
-                )
-            )
-            logging.error("https://usebottles.com/download/")
-            return
 
         # Loading view
         self.page_loading = LoadingView()
@@ -191,7 +149,6 @@ class BottlesWindow(Adw.ApplicationWindow):
         logging.info(
             "Bottles Started!",
         )
-        GLib.idle_add(self.__maybe_show_funding_dialog)
 
     def __schedule_donate_icon_swap(self):
         GLib.timeout_add_seconds(5, self.__on_donate_icon_timeout)
@@ -459,27 +416,6 @@ class BottlesWindow(Adw.ApplicationWindow):
 
             if crash_log:
                 CrashReportDialog(self, crash_log).present()
-
-    def __maybe_show_funding_dialog(self):
-        if not self._show_funding:
-            return
-
-        count = self.data_mgr.get(UserDataKeys.FundingPromptCount) or 0
-        self.data_mgr.set(UserDataKeys.FundingPromptCount, count + 1)
-        
-        today = datetime.now().strftime("%Y-%m-%d")
-        self.data_mgr.set(UserDataKeys.LastFundingPrompt, today)
-
-        dialog = FundingDialog(self, show_dont_show=count >= 7)
-        dialog.connect("response", self.__funding_response)
-        dialog.present()
-
-    def __funding_response(self, dialog, response):
-        if response == "dismiss":
-            self.data_mgr.set(UserDataKeys.FundingDismissed, True)
-            self.settings.set_boolean("show-funding", False)
-
-        dialog.destroy()
 
     def toggle_selection_mode(self, status: bool = True):
         context = self.headerbar.get_style_context()

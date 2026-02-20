@@ -18,7 +18,12 @@
 from datetime import datetime
 from gettext import gettext as _
 
-from gi.repository import Adw, GLib, Gtk, Xdp
+from gi.repository import Adw, GLib, Gtk
+
+try:
+    from gi.repository import Xdp
+except (ImportError, ValueError):
+    Xdp = None
 
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
@@ -82,8 +87,6 @@ class BottlesBottleRow(Adw.ActionRow):
 
     def run_executable(self, *_args):
         """Display file dialog for executable"""
-        if not Xdp.Portal.running_under_sandbox():
-            return
 
         def set_path(_dialog, response):
             if response != Gtk.ResponseType.ACCEPT:

@@ -7,7 +7,9 @@ from bottles.backend.wine.executor import WineExecutor
 from bottles.backend.wine.winecommand import WineCommand, WineEnv
 
 
-def _make_config(name: str = "TestBottle", path: str = "TestBottlePath") -> BottleConfig:
+def _make_config(
+    name: str = "TestBottle", path: str = "TestBottlePath"
+) -> BottleConfig:
     return BottleConfig(Name=name, Path=path, Custom_Path="", Environment="Custom")
 
 
@@ -40,8 +42,6 @@ def test_replace_placeholders_handles_unknown_tokens():
 
 
 def test_run_program_substitutes_placeholders(monkeypatch):
-    captured: dict[str, object] = {}
-
     def fake_init(
         self,
         *,
@@ -65,6 +65,8 @@ def test_run_program_substitutes_placeholders(monkeypatch):
         program_gamescope=None,
         program_virt_desktop=None,
         program_winebridge=None,
+        umu_id="none",
+        umu_store="none",
     ):
         # mimic original __init__ contract enough for run() stub
         self.config = config
@@ -198,3 +200,79 @@ def test_winecommand_filters_host_environment(monkeypatch, tmp_path):
     env = winecmd.get_env()
     assert env["DISPLAY"] == ":1"
     assert "SHOULD_NOT_PASS" not in env
+
+
+def test_winecommand_ntsync_flag(monkeypatch, tmp_path):
+    """PROTON_USE_NTSYNC should be added when sync is set to ntsync and the
+    runner is Proton or UMU is enabled."""
+
+    # base environment setup copied from previous test
+    bottle_path = tmp_path / "TestBottle"
+    bottle_path.mkdir()
+    runner_path = tmp_path / "runner"
+    (runner_path / "lib").mkdir(parents=True, exist_ok=True)
+
+    config = BottleConfig(Name="Test", Path=str(bottle_path), Runner="test")
+    params = BottleParams()
+    params.sync = "ntsync"
+    config.Parameters = params
+
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.ManagerUtils.get_bottle_path",
+        lambda _config: str(bottle_path),
+    )
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.ManagerUtils.get_runner_path",
+        lambda _runner: str(runner_path),
+    )
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.DisplayUtils.check_nvidia_device",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.DisplayUtils.display_server_type",
+        lambda: "x11",
+    )
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.GPUUtils.get_gpu",
+        lambda self: {
+            "prime": {"discrete": None, "integrated": {"icd": "/tmp/icd", "envs": {}}},
+            "vendors": {},
+        },
+    )
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.RuntimeManager.get_runtime_env",
+        lambda *_: [],
+    )
+
+    # case 1: not proton, not UMU -> variable should not be present
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.SteamUtils.is_proton", lambda *_: False
+    )
+    winecmd = WineCommand.__new__(WineCommand)
+    winecmd.config = config
+    winecmd.minimal = True
+    winecmd.arguments = ""
+    winecmd.runner = "/usr/bin/wine"
+    winecmd.runner_runtime = ""
+    winecmd.gamescope_activated = False
+    winecmd.terminal = False
+    env = winecmd.get_env()
+    assert "PROTON_USE_NTSYNC" not in env
+
+    # case 2: proton runner -> variable should be set
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.SteamUtils.is_proton", lambda *_: True
+    )
+    winecmd.runner = "/usr/bin/proton"
+    env = winecmd.get_env()
+    assert env.get("PROTON_USE_NTSYNC") == "1"
+
+    # case 3: UMU enabled also triggers variable even if not proton
+    monkeypatch.setattr(
+        "bottles.backend.wine.winecommand.SteamUtils.is_proton", lambda *_: False
+    )
+    config.Parameters.use_umu = True
+    winecmd.config = config
+    env = winecmd.get_env()
+    assert env.get("PROTON_USE_NTSYNC") == "1"
