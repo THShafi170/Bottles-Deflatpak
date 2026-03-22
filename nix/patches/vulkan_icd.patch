@@ -1,0 +1,13 @@
+diff --git a/bottles/backend/utils/vulkan.py b/bottles/backend/utils/vulkan.py
+index 9191004..6673493 100644
+--- a/bottles/backend/utils/vulkan.py
++++ b/bottles/backend/utils/vulkan.py
+@@ -26,5 +26,7 @@ class VulkanUtils:
+         "/usr/share/vulkan",
+         "/etc/vulkan",
+         "/usr/local/share/vulkan",
+-        "/usr/local/etc/vulkan",
++        "/usr/local/etc/vulkan",
++        "/run/opengl-driver/share/vulkan",
++        "/run/opengl-driver-32/share/vulkan",
+     ]

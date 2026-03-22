@@ -190,6 +190,7 @@ template $DetailsPreferences: Adw.PreferencesPage {
           _("System"),
           _("Esync"),
           _("Fsync"),
+          _("NTsync"),
         ]
       };
     }
@@ -309,6 +310,36 @@ template $DetailsPreferences: Adw.PreferencesPage {
       }
     }
 
+    Adw.ActionRow row_umu {
+      activatable-widget: switch_umu;
+      title: _("Use umu-launcher");
+      subtitle: _("Use umu-launcher to run Proton with better compatibility and fixes.");
+
+      Switch switch_umu {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow row_proton_scripts {
+      activatable-widget: switch_proton_scripts;
+      title: _("Use Proton scripts");
+      subtitle: _("Use the Proton script as launcher. May improve compatibility with some games.");
+
+      Switch switch_proton_scripts {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow row_proton_log {
+      activatable-widget: switch_proton_log;
+      title: _("Proton Logging");
+      subtitle: _("Enable Proton logging. Logs will be saved in the bottle directory.");
+
+      Switch switch_proton_log {
+        valign: center;
+      }
+    }
+
     Adw.ActionRow row_winebridge {
       activatable-widget: switch_winebridge;
       title: _("Use WineBridge");
@@ -402,4 +433,47 @@ template $DetailsPreferences: Adw.PreferencesPage {
     }
   }
 
+  Adw.PreferencesGroup {
+    title: _("Snapshots");
+
+    Adw.ActionRow {
+      activatable-widget: switch_auto_versioning;
+      title: _("Automatic Snapshots");
+      subtitle: _("Automatically create snapshots before installing software or changing settings.");
+
+      Switch switch_auto_versioning {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow {
+      activatable-widget: switch_versioning_compression;
+      title: _("Compression");
+      subtitle: _("Compress snapshots to reduce space. This will slow down the creation of snapshots.");
+
+      Switch switch_versioning_compression {
+        valign: center;
+      }
+    }
+
+    Adw.ActionRow {
+      activatable-widget: switch_versioning_patterns;
+      title: _("Use Exclusion Patterns");
+      subtitle: _("Exclude paths in snapshots.");
+
+      Button btn_manage_versioning_patterns {
+        tooltip-text: _("Manage Patterns");
+        valign: center;
+        icon-name: "applications-system-symbolic";
+
+        styles [
+          "flat",
+        ]
+      }
+
+      Switch switch_versioning_patterns {
+        valign: center;
+      }
+    }
+  }
 }

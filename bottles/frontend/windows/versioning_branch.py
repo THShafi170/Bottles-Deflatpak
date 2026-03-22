@@ -15,8 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from gettext import gettext as _
 from gi.repository import Adw, Gtk
+
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/dialog-versioning-branch.ui")
 class VersioningBranchDialog(Adw.PreferencesDialog):
@@ -28,7 +28,7 @@ class VersioningBranchDialog(Adw.PreferencesDialog):
         super().__init__(**kwargs)
         self.parent = parent
         self.callback = callback
-        
+
         self.entry_name.connect("apply", self.on_apply)
 
     def on_apply(self, widget):

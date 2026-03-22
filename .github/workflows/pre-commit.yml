@@ -1,14 +1,21 @@
 name: pre-commit
 
-on:
-  pull_request:
-  push:
-    branches: [main]
+on: [workflow_dispatch]
 
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+    - name: Install system dependencies for pre-commit hooks
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libcairo2-dev \
+          libgirepository-2.0-dev \
+          gobject-introspection \
+          gir1.2-gtk-4.0 \
+          libgtk-4-dev \
+          pkg-config
     - uses: pre-commit/action@v3.0.1

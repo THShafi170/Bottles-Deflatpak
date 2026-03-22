@@ -1,5 +1,4 @@
-"""Schema meta assertions: indices and PRAGMA user_version.
-"""
+"""Schema meta assertions: indices and PRAGMA user_version."""
 
 import sqlite3
 

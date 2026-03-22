@@ -1,6 +1,5 @@
 class Samples:
     data = {
-        "funding_dialog_dismissed": False,
         "personal_repositories": {},
     }
     default_inherited_environment = [
@@ -64,6 +63,7 @@ class Samples:
         "ENABLE_VKBASALT": ("vkbasalt", True),
         "WINEESYNC": ("sync", "esync"),
         "WINEFSYNC": ("sync", "fsync"),
+        "PROTON_USE_NTSYNC": ("sync", "ntsync"),
         "GAMESCOPE": ("gamescope", False),
         "DRI_PRIME": ("discrete_gpu", True),
         "__NV_PRIME_RENDER_OFFLOAD": ("discrete_gpu", True),

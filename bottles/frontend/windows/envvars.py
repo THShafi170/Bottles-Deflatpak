@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re
 from gettext import gettext as _
 
 from gi.repository import Adw, Gtk
@@ -224,7 +223,9 @@ class EnvironmentVariablesDialog(Adw.Dialog):
             self.group_vars.add(_entry)
 
     def __validate_inherited(self, *_args):
-        self.__valid_inherited_name = GtkUtils.validate_env_var_name(self.entry_new_inherited)
+        self.__valid_inherited_name = GtkUtils.validate_env_var_name(
+            self.entry_new_inherited
+        )
 
     def __toggle_inherited_limit(self, *_args):
         active = self.switch_limit_inherited.get_active()
@@ -279,7 +280,10 @@ class EnvironmentVariablesDialog(Adw.Dialog):
         self.__update_inherited_placeholder()
 
     def __save_inherited_var(self, *_args):
-        if not self.switch_limit_inherited.get_active() or not self.__valid_inherited_name:
+        if (
+            not self.switch_limit_inherited.get_active()
+            or not self.__valid_inherited_name
+        ):
             return
 
         new_name = self.entry_new_inherited.get_text().strip()

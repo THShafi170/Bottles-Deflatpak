@@ -56,37 +56,32 @@ class Logger(logging.getLoggerClass()):
         self.root.addHandler(handler)
 
     def debug(self, message, **kwargs):
-        self.root.debug(
-            self.__color("debug", message),
-        )
+        self.root.debug(self.__color("debug", message), **kwargs)
 
     def info(self, message, jn=False, **kwargs):
-        self.root.info(
-            self.__color("info", message),
-        )
+        self.root.info(self.__color("info", message), **kwargs)
         if jn:
             JournalManager.write(JournalSeverity.INFO, message)
 
     def warning(self, message, jn=True, **kwargs):
-        self.root.warning(
-            self.__color("warning", message),
-        )
+        self.root.warning(self.__color("warning", message), **kwargs)
         if jn:
             JournalManager.write(JournalSeverity.WARNING, message)
 
     def error(self, message, jn=True, **kwargs):
-        self.root.error(
-            self.__color("error", message),
-        )
+        self.root.error(self.__color("error", message), **kwargs)
         if jn:
             JournalManager.write(JournalSeverity.ERROR, message)
 
     def critical(self, message, jn=True, **kwargs):
-        self.root.critical(
-            self.__color("critical", message),
-        )
+        self.root.critical(self.__color("critical", message), **kwargs)
         if jn:
             JournalManager.write(JournalSeverity.CRITICAL, message)
+
+    def exception(self, message, jn=True, **kwargs):
+        self.root.exception(self.__color("error", message), **kwargs)
+        if jn:
+            JournalManager.write(JournalSeverity.ERROR, message)
 
     @staticmethod
     def write_log(data: list):
@@ -108,6 +103,10 @@ class Logger(logging.getLoggerClass()):
         JournalManager.write(
             severity=JournalSeverity.CRASH, message="A crash has been detected."
         )
+
+    @property
+    def debug_mode(self) -> bool:
+        return self.root.level <= logging.DEBUG
 
     def set_silent(self):
         self.root.handlers = []

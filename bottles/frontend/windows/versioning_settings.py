@@ -16,8 +16,6 @@
 #
 
 
-from gettext import gettext as _
-
 from gi.repository import Adw, Gtk
 
 from bottles.backend.models.config import BottleConfig

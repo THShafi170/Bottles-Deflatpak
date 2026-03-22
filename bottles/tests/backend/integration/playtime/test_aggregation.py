@@ -74,4 +74,3 @@ def test_different_programs_separate_rows(manager):
     cur = con.cursor()
     cur.execute("SELECT COUNT(*) FROM playtime_totals WHERE bottle_id=?", ("b1",))
     assert cur.fetchone()[0] == 2
-

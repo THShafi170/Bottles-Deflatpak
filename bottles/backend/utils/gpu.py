@@ -15,6 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import re
+import shutil
 import subprocess
 from enum import Enum
 from functools import lru_cache
@@ -45,17 +47,16 @@ class GPUUtils:
 
     def list_all(self):
         found = []
-        for _vendor in self.__vendors:
-            _proc = subprocess.Popen(
-                f"lspci | grep '{self.__vendors[_vendor]}'",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                shell=True,
-            )
-            stdout, stderr = _proc.communicate()
-
-            if len(stdout) > 0:
-                found.append(_vendor)
+        if not shutil.which("lspci"):
+            logging.warning("lspci not found, cannot detect GPUs natively via lspci.")
+            return found
+        try:
+            stdout = subprocess.check_output(["lspci"], text=True)
+            for _vendor in self.__vendors:
+                if self.__vendors[_vendor] in stdout:
+                    found.append(_vendor)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
         return found
 
@@ -71,16 +72,13 @@ class GPUUtils:
 
     @staticmethod
     def is_nouveau():
-        _proc = subprocess.Popen(
-            "lsmod | grep nouveau",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-        )
-        stdout, stderr = _proc.communicate()
-        if len(stdout) > 0:
-            logging.warning("Nouveau driver detected, this may cause issues")
-            return True
+        try:
+            stdout = subprocess.check_output(["lsmod"], text=True)
+            if "nouveau" in stdout:
+                logging.warning("Nouveau driver detected, this may cause issues")
+                return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
         return False
 
     def get_gpu(self):
@@ -118,18 +116,14 @@ class GPUUtils:
             gpus["nvidia"]["envs"] = {"DRI_PRIME": "1"}
             gpus["nvidia"]["icd"] = ""
 
-        for _check in checks:
-            _query = checks[_check]["query"]
-            _proc = subprocess.Popen(
-                f"lspci | grep -iP '{_query}'",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                shell=True,
-            )
-            stdout, stderr = _proc.communicate()
-            if len(stdout) > 0:
-                found.append(_check)
-                result["vendors"][_check] = gpus[_check]
+        try:
+            stdout = subprocess.check_output(["lspci"], text=True)
+            for _check in checks:
+                if re.search(checks[_check]["query"], stdout, re.IGNORECASE):
+                    found.append(_check)
+                    result["vendors"][_check] = gpus[_check]
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
         if len(found) >= 2:
             _discrete = self.assume_discrete(found)
@@ -144,11 +138,8 @@ class GPUUtils:
     @staticmethod
     @lru_cache
     def is_gpu(vendor: GPUVendors) -> bool:
-        _proc = subprocess.Popen(
-            f"lspci | grep -iP '{vendor.value}'",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-        )
-        stdout, stderr = _proc.communicate()
-        return len(stdout) > 0
+        try:
+            stdout = subprocess.check_output(["lspci"], text=True)
+            return re.search(vendor.value, stdout, re.IGNORECASE) is not None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False

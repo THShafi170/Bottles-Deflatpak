@@ -65,7 +65,7 @@ class StateEntry(Adw.ActionRow):
 
             self.label_date.set_text(date_str)
             self.label_comment.set_text(state[1].get("Comment", ""))
-            
+
             if str(state[0]) == str(config.State):
                 self.add_css_class("current-state")
         else:
@@ -74,7 +74,7 @@ class StateEntry(Adw.ActionRow):
             )
             self.label_date.set_text(date_str)
             self.label_comment.set_text(state[1].get("message", ""))
-            
+
             if active:
                 self.add_css_class("current-state")
         self.config = config
@@ -91,8 +91,10 @@ class StateEntry(Adw.ActionRow):
         def handle_response(dialog, response_id):
             if response_id == "ok":
                 self.queue.add_task()
-                
-                versioning_view = getattr(self.window.page_details, "view_versioning", None)
+
+                versioning_view = getattr(
+                    self.window.page_details, "view_versioning", None
+                )
                 if versioning_view and hasattr(versioning_view, "_set_busy"):
                     versioning_view._set_busy(True, _("Restoring state..."))
                 else:
@@ -134,7 +136,7 @@ class StateEntry(Adw.ActionRow):
         """
         if not self.config.Versioning and result.message:
             self.window.show_toast(result.message)
-            
+
         versioning_view = getattr(self.window.page_details, "view_versioning", None)
         if versioning_view and hasattr(versioning_view, "_set_busy"):
             versioning_view._set_busy(False)
@@ -142,11 +144,13 @@ class StateEntry(Adw.ActionRow):
             self.spinner.stop()
             self.spinner.hide()
             self.parent.set_sensitive(True)
-            
+
         self.btn_restore.set_visible(False)
         self.queue.end_task()
-        
-        bottle_config_path = os.path.join(ManagerUtils.get_bottle_path(self.config), "bottle.yml")
+
+        bottle_config_path = os.path.join(
+            ManagerUtils.get_bottle_path(self.config), "bottle.yml"
+        )
         config_load = BottleConfig.load(bottle_config_path)
         if config_load.status:
             self.manager.local_bottles[self.config.Name] = config_load.data

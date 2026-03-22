@@ -16,6 +16,7 @@
 #
 
 
+import os
 from gettext import gettext as _
 from typing import Optional
 
@@ -180,14 +181,13 @@ class DetailsView(Adw.Bin):
             if self.view_bottle.get_parent() is None:
                 self.default_view.append(self.view_bottle)
 
-            if self.view_preferences.get_parent() is None:
-                self.stack_bottle.add_named(self.view_preferences, "preferences")
-                self.stack_bottle.add_named(self.view_dependencies, "dependencies")
-                self.stack_bottle.add_named(self.view_registry_rules, "registry_rules")
-                self.stack_bottle.add_named(self.view_versioning, "versioning")
-                self.stack_bottle.add_named(self.view_installers, "installers")
-                self.stack_bottle.add_named(self.view_taskmanager, "taskmanager")
-                self.stack_bottle.add_named(self.view_eagle, "eagle")
+            self.stack_bottle.add_named(self.view_preferences, "preferences")
+            self.stack_bottle.add_named(self.view_dependencies, "dependencies")
+            self.stack_bottle.add_named(self.view_registry_rules, "registry_rules")
+            self.stack_bottle.add_named(self.view_versioning, "versioning")
+            self.stack_bottle.add_named(self.view_installers, "installers")
+            self.stack_bottle.add_named(self.view_taskmanager, "taskmanager")
+            self.stack_bottle.add_named(self.view_eagle, "eagle")
 
             if self.view_bottle.actions.get_parent() is None:
                 self.set_actions(self.view_bottle.actions)
@@ -257,4 +257,7 @@ class DetailsView(Adw.Bin):
         self.btn_back.set_tooltip_text(_("Return to your bottles."))
 
     def update_runner_label(self, runner: str):
-        self.view_bottle.label_runner.set_text(runner)
+        _runner = runner
+        if runner.startswith("/"):
+            _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
+        self.view_bottle.label_runner.set_text(_runner)

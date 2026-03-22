@@ -23,11 +23,7 @@ params_file = configure_file(
     configuration: conf
 )
 
-fs = import('fs')
 
-if not fs.is_file('/' + '.flatpak-info')
-  error('file does not exist')
-endif
 
 bottles_sources = [
   '__init__.py',

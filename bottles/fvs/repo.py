@@ -19,7 +19,9 @@ import os
 import subprocess
 from datetime import datetime
 from threading import Lock
+from typing import Optional
 
+from bottles.backend.logger import Logger
 from bottles.fvs.exceptions import (
     FVSNothingToCommit,
     FVSNothingToRestore,
@@ -28,13 +30,18 @@ from bottles.fvs.exceptions import (
 
 FVS2_CMD = "fvs2"
 
+logging = Logger()
+
+
 class FVSRepo:
-    def __init__(self, repo_path: str, use_compression: bool = False, no_init: bool = False):
+    def __init__(
+        self, repo_path: str, use_compression: bool = False, no_init: bool = False
+    ):
         self._repo_path = repo_path
         self._use_compression = use_compression
         self._fvs2 = self._get_fvs2_bin()
         self._lock = Lock()
-        
+
         self.__states = {}
         self.__active_state_id = None
         self.__active_branch = None
@@ -42,10 +49,10 @@ class FVSRepo:
         self.__has_no_states = True
         self.__dirty = False
         self.__changed_files = 0
-        
+
         if not no_init:
             self._init_repo()
-            
+
         self._refresh()
 
     def _get_fvs2_bin(self):
@@ -53,13 +60,21 @@ class FVSRepo:
 
     def _run_cmd(self, *args, check=True):
         cmd = [self._fvs2] + list(args)
-        return subprocess.run(cmd, cwd=self._repo_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=check)
+        return subprocess.run(
+            cmd,
+            cwd=self._repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=check,
+        )
 
     def _init_repo(self):
         if not os.path.exists(os.path.join(self._repo_path, ".fvs2")):
             # Prevent auto-init if legacy systems are found
-            if os.path.exists(os.path.join(self._repo_path, ".fvs")) or \
-               os.path.exists(os.path.join(self._repo_path, "states", "states.yml")):
+            if os.path.exists(os.path.join(self._repo_path, ".fvs")) or os.path.exists(
+                os.path.join(self._repo_path, "states", "states.yml")
+            ):
                 logging.info("Legacy versioning detected, skipping FVS2 auto-init")
                 return
 
@@ -74,7 +89,10 @@ class FVSRepo:
             args = ["commit", "-m", message]
             res = self._run_cmd(*args, check=False)
             if res.returncode != 0:
-                if "nothing to commit" in res.stdout.lower() or "nothing to commit" in res.stderr.lower():
+                if (
+                    "nothing to commit" in res.stdout.lower()
+                    or "nothing to commit" in res.stderr.lower()
+                ):
                     raise FVSNothingToCommit()
                 raise RuntimeError(f"FVS commit failed: {res.stderr}")
 
@@ -90,7 +108,7 @@ class FVSRepo:
                     break
             if not matched:
                 raise FVSStateNotFound(state_id)
-                
+
             args = ["restore", "-s", state_id]
             if reset:
                 args.append("--reset")
@@ -108,7 +126,7 @@ class FVSRepo:
             self.__active_branch = None
             self.__branches = []
             self.__has_no_states = True
-            
+
             if not os.path.exists(os.path.join(self._repo_path, ".fvs2")):
                 return
 
@@ -116,7 +134,9 @@ class FVSRepo:
             if status_res.returncode == 0:
                 for sline in status_res.stdout.split("\n"):
                     if sline.startswith("head_commit="):
-                        self.__active_state_id = sline.replace("head_commit=", "").strip()
+                        self.__active_state_id = sline.replace(
+                            "head_commit=", ""
+                        ).strip()
                     elif sline.startswith("branch="):
                         self.__active_branch = sline.replace("branch=", "").strip()
 
@@ -132,7 +152,10 @@ class FVSRepo:
                         time_str = parts[1].strip()
                         message = parts[2].strip()
                         try:
-                            dt = datetime.strptime(time_str.split(".")[0].replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
+                            dt = datetime.strptime(
+                                time_str.split(".")[0].replace("Z", ""),
+                                "%Y-%m-%dT%H:%M:%S",
+                            )
                             timestamp = int(datetime.timestamp(dt))
                         except:
                             timestamp = int(datetime.timestamp(datetime.now()))
@@ -145,7 +168,11 @@ class FVSRepo:
 
             branches_res = self._run_cmd("branch", "list", check=False)
             if branches_res.returncode == 0:
-                self.__branches = [b.strip().lstrip("* ") for b in branches_res.stdout.split("\n") if b.strip()]
+                self.__branches = [
+                    b.strip().lstrip("* ")
+                    for b in branches_res.stdout.split("\n")
+                    if b.strip()
+                ]
 
     def check_dirty(self):
         """Specifically runs the slow dirty check and updates the dirty/changed_files properties."""
@@ -160,7 +187,9 @@ class FVSRepo:
                         self.__dirty = sline.replace("dirty=", "").strip() == "true"
                     elif sline.startswith("changed_files="):
                         try:
-                            self.__changed_files = int(sline.replace("changed_files=", "").strip())
+                            self.__changed_files = int(
+                                sline.replace("changed_files=", "").strip()
+                            )
                         except ValueError:
                             pass
 
@@ -173,11 +202,11 @@ class FVSRepo:
         return self.__states
 
     @property
-    def active_state_id(self) -> str:
+    def active_state_id(self) -> Optional[str]:
         return self.__active_state_id
 
     @property
-    def active_branch(self) -> str:
+    def active_branch(self) -> Optional[str]:
         return self.__active_branch
 
     @property
@@ -191,7 +220,7 @@ class FVSRepo:
     @property
     def branches(self) -> list:
         return self.__branches
-        
+
     def create_branch(self, branch_name: str):
         """Create a branch. Does NOT auto-refresh; caller should refresh if needed."""
         with self._lock:
