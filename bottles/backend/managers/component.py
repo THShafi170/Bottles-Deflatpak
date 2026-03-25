@@ -98,7 +98,7 @@ class ComponentManager:
                         logging.warning(
                             f"{component[0]} was found but it requires "
                             "glibc >= 2.32 and your system is running an older "
-                            "version. Use the Flatpak instead if you can't "
+                            "version. Consider upgrading your system if you can't "
                             "upgrade your system. This runner will be ignored, "
                             "please keep in mind that Bottles and all our "
                             "installers are only tested with Soda and Caffe runners."
@@ -173,12 +173,16 @@ class ComponentManager:
             Otherwise, skip the download.
             """
             if os.path.getsize(file_path) == 0:
-                logging.warning(f"File [{existing_file}] is a 0-byte empty file. Removing to force re-download.")
+                logging.warning(
+                    f"File [{existing_file}] is a 0-byte empty file. Removing to force re-download."
+                )
                 os.remove(file_path)
             else:
-                logging.warning(f"File [{existing_file}] already exists in temp, skipping.")
+                logging.warning(
+                    f"File [{existing_file}] already exists in temp, skipping."
+                )
                 return Result(True)
-        
+
         if not os.path.isfile(file_path):
             """
             As some urls can be redirect, we need to take care of this

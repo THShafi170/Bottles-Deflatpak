@@ -16,6 +16,7 @@
 #
 
 import time
+from gettext import gettext as _
 
 from gi.repository import Adw, Gtk
 
@@ -81,8 +82,18 @@ class DuplicateDialog(Adw.Window):
 
     @GtkUtils.run_in_main_loop
     def finish(self, result, error=None):
-        # TODO: handle result.status == False
         self.parent.manager.update_bottles()
+
+        if not result.status:
+            self.stack_switcher.set_visible_child_name("page_duplicate")
+            self.btn_duplicate.set_visible(True)
+            self.btn_cancel.set_label("Cancel")
+            GtkUtils.show_notification(
+                _("Error while duplicating bottle: {0}").format(result.message),
+                "error",
+            )
+            return
+
         self.stack_switcher.set_visible_child_name("page_duplicated")
 
     def pulse(self):

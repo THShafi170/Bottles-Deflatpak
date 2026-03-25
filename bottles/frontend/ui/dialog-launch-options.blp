@@ -48,6 +48,42 @@ template $LaunchOptionsDialog: Adw.Window {
           tooltip-text: _("e.g.: VAR=value %command% -example1 -example2 -example3=hello");
         }
 
+        Adw.ComboRow combo_path_mode {
+          title: _("Path Mode");
+          subtitle: _("Choose how the path should be handled at launch.");
+          model: StringList str_list_path_mode {};
+        }
+
+        Adw.EntryRow entry_executable {
+          title: _("Command/Executable");
+          tooltip-text: _("Override the executable path. You can use Unix or Windows paths. No quotes needed.");
+
+          [suffix]
+          Box {
+            spacing: 6;
+            valign: center;
+
+            Button btn_executable_reset {
+              tooltip-text: _("Reset to Default");
+              visible: false;
+              icon-name: "edit-undo-symbolic";
+
+              styles [
+                "flat",
+              ]
+            }
+
+            Button btn_executable_browse {
+              tooltip-text: _("Browse for Executable");
+              icon-name: "document-open-symbolic";
+
+              styles [
+                "flat",
+              ]
+            }
+          }
+        }
+
         Adw.ActionRow action_pre_script {
           activatable-widget: btn_pre_script;
           title: _("Pre-run Script");

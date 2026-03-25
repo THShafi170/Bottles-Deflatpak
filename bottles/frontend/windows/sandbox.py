@@ -25,6 +25,10 @@ class SandboxDialog(Adw.Window):
     # region Widgets
     switch_net = Gtk.Template.Child()
     switch_sound = Gtk.Template.Child()
+    switch_gpu = Gtk.Template.Child()
+    switch_host_ro = Gtk.Template.Child()
+    switch_display = Gtk.Template.Child()
+    switch_user = Gtk.Template.Child()
 
     # endregion
 
@@ -41,6 +45,10 @@ class SandboxDialog(Adw.Window):
         # connect signals
         self.switch_net.connect("state-set", self.__set_flag, "share_net")
         self.switch_sound.connect("state-set", self.__set_flag, "share_sound")
+        self.switch_gpu.connect("state-set", self.__set_flag, "share_gpu")
+        self.switch_host_ro.connect("state-set", self.__set_flag, "share_host_ro")
+        self.switch_display.connect("state-set", self.__set_flag, "share_display")
+        self.switch_user.connect("state-set", self.__set_flag, "share_user")
 
     def __set_flag(self, widget, state, flag):
         self.config = self.manager.update_config(
@@ -50,3 +58,7 @@ class SandboxDialog(Adw.Window):
     def __update(self, config):
         self.switch_net.set_active(config.Sandbox.share_net)
         self.switch_sound.set_active(config.Sandbox.share_sound)
+        self.switch_gpu.set_active(config.Sandbox.share_gpu)
+        self.switch_host_ro.set_active(config.Sandbox.share_host_ro)
+        self.switch_display.set_active(config.Sandbox.share_display)
+        self.switch_user.set_active(config.Sandbox.share_user)

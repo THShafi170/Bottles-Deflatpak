@@ -17,5 +17,3 @@ class ProcessFinishedPayload:
     launch_id: str
     status: Literal["success", "unknown"]
     ended_at: int  # epoch seconds
-
-

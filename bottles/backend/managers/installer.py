@@ -99,7 +99,9 @@ class InstallerManager:
                 try:
                     with open(icon_path, "wb") as f:
                         c = pycurl.Curl()
-                        _proxy = os.environ.get("http_proxy") or os.environ.get("https_proxy")
+                        _proxy = os.environ.get("http_proxy") or os.environ.get(
+                            "https_proxy"
+                        )
                         if _proxy:
                             c.setopt(pycurl.PROXY, _proxy)
                         c.setopt(c.URL, icon_url)
@@ -448,9 +450,7 @@ class InstallerManager:
         exec_path = executable.get("path", "")
         if exec_path.startswith("userdir/"):
             _userdir = WineUtils.get_user_dir(bottle)
-            exec_path = exec_path.replace(
-                "userdir/", f"/users/{_userdir}/"
-            )
+            exec_path = exec_path.replace("userdir/", f"/users/{_userdir}/")
             executable["path"] = exec_path
 
         _path = f"C:\\{exec_path}".replace("/", "\\")

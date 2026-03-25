@@ -27,7 +27,9 @@ from bottles.frontend.utils.gtk import GtkUtils
 from bottles.frontend.widgets.state import StateEntry
 from bottles.frontend.windows.versioning_branch import VersioningBranchDialog
 from bottles.frontend.windows.versioning_commit import VersioningCommitDialog
-from bottles.frontend.windows.versioning_manage_branches import VersioningManageBranchesDialog
+from bottles.frontend.windows.versioning_manage_branches import (
+    VersioningManageBranchesDialog,
+)
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/details-versioning.ui")
@@ -66,7 +68,7 @@ class VersioningView(Adw.PreferencesPage):
         self.btn_manage_branches.connect("clicked", self.show_manage_branches_dialog)
         self.banner_dirty.connect("button-clicked", self.show_add_state_dialog)
         self.combo_branch.connect("notify::selected-item", self.on_branch_changed)
-        
+
         self.connect("map", self._on_mapped)
 
     def _on_mapped(self, widget):
@@ -75,18 +77,18 @@ class VersioningView(Adw.PreferencesPage):
     def _refresh_dirty_state(self):
         if not self.config or self.config.Versioning:
             return
-            
+
         def _fetch():
             res = self.versioning_manager.list_states(self.config, check_dirty=True)
             if res and hasattr(res, "data") and res.data:
                 return res.data.get("dirty", False)
             return False
-            
+
         @GtkUtils.run_in_main_loop
         def _apply(dirty, error):
             if not error:
                 self.banner_dirty.set_revealed(dirty)
-                
+
         RunAsync(_fetch, _apply)
 
     def _set_busy(self, busy, label=""):
@@ -111,21 +113,21 @@ class VersioningView(Adw.PreferencesPage):
         item = self.combo_branch.get_selected_item()
         if not item:
             return
-            
+
         branch_name = item.get_string()
         self._set_busy(True, _("Switching branch…"))
-        
+
         @GtkUtils.run_in_main_loop
         def cb(result, error):
             self._set_busy(False)
             self.update()
             self._refresh_details_badge()
-            
+
         RunAsync(
             task_func=self.versioning_manager.checkout_branch,
             callback=cb,
             config=self.config,
-            branch_name=branch_name
+            branch_name=branch_name,
         )
 
     def show_add_branch_dialog(self, widget):
@@ -133,25 +135,27 @@ class VersioningView(Adw.PreferencesPage):
         dialog.present(self.window)
 
     def show_manage_branches_dialog(self, widget):
-        dialog = VersioningManageBranchesDialog(parent=self.window, versioning_view=self)
+        dialog = VersioningManageBranchesDialog(
+            parent=self.window, versioning_view=self
+        )
         dialog.present(self.window)
 
     def create_branch(self, branch_name: str):
         if not branch_name:
             return
         self._set_busy(True, _("Creating branch…"))
-            
+
         @GtkUtils.run_in_main_loop
         def cb(result, error):
             self._set_busy(False)
             self.update()
             self._refresh_details_badge()
-            
+
         RunAsync(
             task_func=self.versioning_manager.create_branch,
             callback=cb,
             config=self.config,
-            branch_name=branch_name
+            branch_name=branch_name,
         )
 
     def empty_list(self):
@@ -167,16 +171,18 @@ class VersioningView(Adw.PreferencesPage):
         """
         if config is None:
             config = self.config
-            
+
         self.config = config
         self.list_states.set_sensitive(False)
 
-        def _do_update(_states, _active, _branches, _active_branch, _dirty=False, _changed_files=0):
+        def _do_update(
+            _states, _active, _branches, _active_branch, _dirty=False, _changed_files=0
+        ):
             @GtkUtils.run_in_main_loop
             def _apply():
                 if not self.config.Versioning and _branches:
                     self.combo_branch.handler_block_by_func(self.on_branch_changed)
-                    
+
                     # Save the current list of branches in Python to lookup items
                     strings = Gtk.StringList.new(_branches)
                     self.combo_branch.set_model(strings)
@@ -190,7 +196,9 @@ class VersioningView(Adw.PreferencesPage):
                 if self.versioning_manager.needs_migration(self.config):
                     self.btn_add.set_sensitive(False)
                     self.btn_add.set_tooltip_text(
-                        _("Please migrate to the new Versioning system to create new states.")
+                        _(
+                            "Please migrate to the new Versioning system to create new states."
+                        )
                     )
                 else:
                     self.banner_dirty.set_revealed(_dirty)
@@ -215,15 +223,19 @@ class VersioningView(Adw.PreferencesPage):
                         return Result(False)
 
                     for state in _states.items():
-                        _is_active = str(_active).startswith(str(state[0])) or str(state[0]).startswith(str(_active))
+                        _is_active = str(_active).startswith(str(state[0])) or str(
+                            state[0]
+                        ).startswith(str(_active))
                         GLib.idle_add(new_state, state, _is_active)
 
                     return Result(True)
 
                 RunAsync(process_states, callback)
+
             _apply()
 
         if states is None:
+
             def _fetch():
                 res = self.versioning_manager.list_states(config, check_dirty=False)
                 if not self.versioning_manager.needs_migration(config):
@@ -239,17 +251,19 @@ class VersioningView(Adw.PreferencesPage):
                     _act_br = ""
                     _changed_files = 0
                 return _sts, _act, _brs, _act_br, False, _changed_files
-                
+
             def _on_fetched(result, error):
                 if not error and result:
-                    _do_update(result[0], result[1], result[2], result[3], result[4], result[5])
+                    _do_update(
+                        result[0], result[1], result[2], result[3], result[4], result[5]
+                    )
                 else:
                     _do_update({}, active, [], "", False, 0)
-                    
+
             RunAsync(_fetch, _on_fetched)
         else:
             _do_update(states, active, [], "", False, 0)
-        
+
         self._refresh_details_badge()
 
     def show_add_state_dialog(self, widget):
@@ -273,4 +287,3 @@ class VersioningView(Adw.PreferencesPage):
             config=self.config,
             message=message,
         )
-

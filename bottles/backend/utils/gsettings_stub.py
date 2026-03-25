@@ -15,5 +15,10 @@ class GSettingsStub:
         return "default"
 
     @staticmethod
+    def get_int(key: str) -> int:
+        logging.warning(f"Stub GSettings key {key}=0")
+        return 0
+
+    @staticmethod
     def set_string(key: str, value: str) -> None:
         logging.warning(f"Stub GSettings set {key}='{value}'")

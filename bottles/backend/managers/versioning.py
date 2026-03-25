@@ -70,35 +70,35 @@ class VersioningManager:
         - states/states.yml (internal legacy system)
         """
         bottle_path = ManagerUtils.get_bottle_path(config)
-        
+
         # Check for FVS v1
         if os.path.exists(os.path.join(bottle_path, ".fvs")):
             return True
-            
+
         # Check for absolute legacy (internal)
         if os.path.exists(os.path.join(bottle_path, "states", "states.yml")):
             return True
-            
+
         # Fallback to config flag if any (and FVS2 is NOT there yet)
         if config.Versioning and not os.path.exists(os.path.join(bottle_path, ".fvs2")):
             return True
-            
+
         return False
 
     @staticmethod
     def re_initialize(config: BottleConfig):
         bottle_path = ManagerUtils.get_bottle_path(config)
-        
+
         # Clean up FVS v1
         fvs_path = os.path.join(bottle_path, ".fvs")
         if os.path.exists(fvs_path):
             shutil.rmtree(fvs_path)
-            
+
         # Clean up absolute legacy
         states_path = os.path.join(bottle_path, "states")
         if os.path.exists(states_path):
             shutil.rmtree(states_path)
-            
+
         # Clean up FVS2 for a fresh start
         fvs2_path = os.path.join(bottle_path, ".fvs2")
         if os.path.exists(fvs2_path):
@@ -128,7 +128,12 @@ class VersioningManager:
             message=_("New state [{0}] created successfully!").format(
                 repo.active_state_id
             ),
-            data={"state_id": repo.active_state_id, "states": repo.states, "branches": repo.branches, "active_branch": repo.active_branch},
+            data={
+                "state_id": repo.active_state_id,
+                "states": repo.states,
+                "branches": repo.branches,
+                "active_branch": repo.active_branch,
+            },
         )
 
     def list_states(
@@ -160,7 +165,14 @@ class VersioningManager:
             return Result(
                 status=True,
                 message=_("States list retrieved successfully!"),
-                data={"state_id": repo.active_state_id, "states": repo.states, "branches": repo.branches, "active_branch": repo.active_branch, "dirty": repo.dirty, "changed_files": repo.changed_files},
+                data={
+                    "state_id": repo.active_state_id,
+                    "states": repo.states,
+                    "branches": repo.branches,
+                    "active_branch": repo.active_branch,
+                    "dirty": repo.dirty,
+                    "changed_files": repo.changed_files,
+                },
             )
 
         bottle_path = ManagerUtils.get_bottle_path(config)
@@ -198,7 +210,11 @@ class VersioningManager:
             except FVSStateNotFound:
                 logging.error(f"State {state_id} not found.")
                 res = Result(status=False, message=_("State not found"))
-            except (FVSNothingToRestore, FVSStateZeroNotDeletable, FVSNothingToCommit): # Added FVSNothingToCommit just in case
+            except (
+                FVSNothingToRestore,
+                FVSStateZeroNotDeletable,
+                FVSNothingToCommit,
+            ):  # Added FVSNothingToCommit just in case
                 logging.error(f"State {state_id} is the active state.")
                 res = Result(
                     status=False,
@@ -335,7 +351,7 @@ class VersioningManager:
                 repo_path=ManagerUtils.get_bottle_path(config),
                 use_compression=config.Parameters.versioning_compression,
             )
-            return repo.active_branch
+            return repo.active_branch or ""
         except Exception as e:
             logging.error(f"Failed to get active FVS branch: {e}")
             return ""

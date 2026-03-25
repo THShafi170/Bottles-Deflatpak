@@ -31,8 +31,8 @@ logging = Logger()
 
 class ConnectionUtils:
     """
-    This class is used to check the connection, pinging the official
-    Bottle's website. If the connection is offline, the user will be
+    This class is used to check the connection, pinging the mainline
+    Bottles website. If the connection is offline, the user will be
     notified and False will be returned, otherwise True.
     """
 
@@ -109,6 +109,6 @@ class ConnectionUtils:
                 )
             self.last_check = datetime.now()
             self.status = False
-        
+
         self.do_check_connection = True
         return self.status
