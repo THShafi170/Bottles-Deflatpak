@@ -1,10 +1,10 @@
 import os
 import re
 import shlex
-import shutil
 import stat
 import subprocess
 import tempfile
+from pathlib import Path
 from typing import Iterable, Optional
 
 from bottles.backend.globals import (
@@ -26,6 +26,8 @@ from bottles.backend.utils.gpu import GPUUtils
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.terminal import TerminalUtils
+from bottles.backend.utils.umu import UMUUtils
+from bottles.backend.utils.wine import WineUtils
 
 logging = Logger()
 
@@ -38,7 +40,9 @@ class WineEnv:
     __env: dict = {}
     __result: dict = {"envs": {}, "overrides": []}
 
-    def __init__(self, clean: bool = False, allowed_keys: Optional[Iterable[str]] = None):
+    def __init__(
+        self, clean: bool = False, allowed_keys: Optional[Iterable[str]] = None
+    ):
         self.__env = {}
         if clean:
             return
@@ -147,12 +151,17 @@ class WineCommand:
         pre_script_args: Optional[str] = None,
         post_script_args: Optional[str] = None,
         cwd: Optional[str] = None,
+        umu_id: str = "none",
+        umu_store: str = "none",
     ):
         _environment = environment.copy()
         self.config = self._get_config(config)
         self.minimal = minimal
         self.arguments = arguments
         self.cwd = self._get_cwd(cwd)
+        self.umu_id = umu_id
+        self.umu_store = umu_store
+        self.proton_script: Optional[str] = None
         self.runner, self.runner_runtime = self._get_runner_info()
         self.gamescope_activated = (
             environment["GAMESCOPE"] == "1"
@@ -259,6 +268,18 @@ class WineCommand:
         if config.Environment_Variables:
             for key, value in config.Environment_Variables.items():
                 env.add(key, value, override=True)
+        if SteamUtils.is_proton(ManagerUtils.get_runner_path(config.Runner)):
+            env.add("STEAM_COMPAT_DATA_PATH", bottle, override=True)
+            env.add(
+                "STEAM_COMPAT_CLIENT_INSTALL_PATH",
+                os.path.join(Path.home(), ".steam/steam"),
+                override=True,
+            )
+            env.add("PROTON_USE_SECCOMP", "1", override=True)
+
+            if params.proton_log:
+                env.add("PROTON_LOG", "1", override=True)
+                env.add("PROTON_LOG_DIR", bottle, override=True)
 
         # Environment variables from argument
         if environment:
@@ -355,7 +376,9 @@ class WineCommand:
                     if os.path.exists(os.path.join(runner_path, lib)):
                         gst_env_path.append(os.path.join(runner_path, lib))
                 if len(gst_env_path) > 0:
-                    env.add("GST_PLUGIN_SYSTEM_PATH", ":".join(gst_env_path), override=True)
+                    env.add(
+                        "GST_PLUGIN_SYSTEM_PATH", ":".join(gst_env_path), override=True
+                    )
 
         # DXVK environment variables
         if params.dxvk and not return_steam_env:
@@ -435,6 +458,12 @@ class WineCommand:
         if params.sync == "fsync":
             env.add("WINEFSYNC", "1")
 
+        # NTsync environment variable (Proton only)
+        if params.sync == "ntsync" and (
+            SteamUtils.is_proton(self.runner) or params.use_umu
+        ):
+            env.add("PROTON_USE_NTSYNC", "1")
+
         # Wine debug level
         if not return_steam_env:
             debug_level = "fixme-all"
@@ -500,6 +529,13 @@ class WineCommand:
             # Wine arch
             env.add("WINEARCH", arch)
 
+        if params.use_umu and hasattr(self, "umu_proton_path"):
+            env.add("PROTONPATH", self.umu_proton_path)
+            env.add("GAMEID", self.umu_id)
+            env.add("STORE", self.umu_store)
+            env.add("UMU_RUNTIME_UPDATE", "0")
+            env.add("UMU_LOG", "1" if logging.debug_mode else "0")
+
         apply_wayland_preferences(env, params)
 
         return env.get()["envs"]
@@ -523,6 +559,15 @@ class WineCommand:
             Additionally, check for its corresponding runtime.
             """
             runner_runtime = SteamUtils.get_associated_runtime(runner)
+            if config.Parameters.use_umu and UMUUtils.is_umu_available():
+                self.umu_proton_path = runner
+                runner = UMUUtils.get_umu_run_path()
+                return runner, ""
+
+            _proton_script = os.path.join(runner, "proton")
+            if os.path.isfile(_proton_script) and config.Parameters.use_proton_scripts:
+                self.proton_script = _proton_script
+
             runner = os.path.join(SteamUtils.get_dist_directory(runner), "bin/wine")
 
         elif runner.startswith("sys-"):
@@ -530,7 +575,9 @@ class WineCommand:
             If the runner type is system, set the runner binary
             path to the system command. Else set it to the full path.
             """
-            runner = shutil.which("wine")
+            runner = WineUtils.find_system_wine()
+            if runner is None:
+                return "", ""
 
         else:
             runner = f"{runner}/bin/wine"
@@ -564,7 +611,10 @@ class WineCommand:
             return_steam_cmd = True
 
         if not return_steam_cmd and not return_clean_cmd:
-            command = f"{runner} {command}"
+            if self.proton_script and not params.use_umu:
+                command = f"{self.proton_script} run {command}"
+            else:
+                command = f"{runner} {command}"
 
         if not self.minimal:
             if gamemode_available and params.gamemode:
@@ -745,13 +795,23 @@ class WineCommand:
         )
 
     def _get_sandbox_manager(self) -> SandboxManager:
+        share_paths_rw = [ManagerUtils.get_bottle_path(self.config)]
+        share_paths_rw.extend(self.config.Sandbox.share_paths_rw)
+
+        share_paths_ro = [p for p in [Paths.runners, Paths.temp] if p]
+        share_paths_ro.extend(self.config.Sandbox.share_paths_ro)
+
         return SandboxManager(
             envs=self.env,
             chdir=self.cwd,
-            share_paths_rw=[ManagerUtils.get_bottle_path(self.config)],
-            share_paths_ro=[p for p in [Paths.runners, Paths.temp] if p],
+            share_paths_rw=share_paths_rw,
+            share_paths_ro=share_paths_ro,
             share_net=self.config.Sandbox.share_net,
             share_sound=self.config.Sandbox.share_sound,
+            share_host_ro=self.config.Sandbox.share_host_ro,
+            share_gpu=self.config.Sandbox.share_gpu,
+            share_display=self.config.Sandbox.share_display,
+            share_user=self.config.Sandbox.share_user,
         )
 
     def run(self) -> Result[Optional[str]]:

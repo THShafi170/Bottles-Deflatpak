@@ -692,19 +692,36 @@ class Manager(metaclass=Singleton):
                     if os.path.isfile(winemenubuilder):
                         os.rename(winemenubuilder, f"{winemenubuilder}.lock")
 
-        # check system wine
-        if shutil.which("wine") is not None:
-            """
-            If the Wine command is available, get the runner version
-            and add it to the runners_available list.
-            """
-            version = (
-                subprocess.Popen("wine --version", stdout=subprocess.PIPE, shell=True)
-                .communicate()[0]
-                .decode("utf-8")
-            )
-            version = "sys-" + version.split("\n")[0].split(" ")[0]
-            runners_available.append(version)
+        # check system wine flavors
+        wine_flavors = [
+            "wine",
+            "wine64",
+            "wine-stable",
+            "wine-staging",
+            "wine-development",
+        ]
+        for flavor in wine_flavors:
+            if (wine_path := shutil.which(flavor)) is not None:
+                """
+                If the Wine command is available, get the runner version
+                and add it to the runners_available list.
+                """
+                try:
+                    version = (
+                        subprocess.check_output([wine_path, "--version"], text=True)
+                        .strip()
+                        .split(" ")[0]
+                    )
+                    # For display clarity, use flavor name if different from version
+                    # e.g. "sys-wine-staging-9.0"
+                    if flavor != "wine":
+                        version = f"{flavor}-{version}"
+
+                    version = "sys-" + version
+                    if version not in runners_available:
+                        runners_available.append(version)
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    continue
 
         # check bottles runners
         for runner in runners:
@@ -756,6 +773,7 @@ class Manager(metaclass=Singleton):
                         tmp_runners = self.supported_wine_runners
                         runner_name = next(iter(tmp_runners))
                     self.component_manager.install("runner", runner_name)
+                    self.runners_available.insert(0, runner_name)
                 except StopIteration:
                     return False
             else:
@@ -765,10 +783,6 @@ class Manager(metaclass=Singleton):
 
     def check_runtimes(self, install_latest: bool = True) -> bool:
         self.runtimes_available = []
-        if "FLATPAK_ID" in os.environ:
-            self.runtimes_available = ["flatpak-managed"]
-            return True
-
         runtimes = os.listdir(Paths.runtimes)
 
         if len(runtimes) == 0:
@@ -829,15 +843,16 @@ class Manager(metaclass=Singleton):
         missing_installation = len(winebridge) == 0 or not installed_identifier
         needs_latest = False
         if latest_supported:
-            needs_latest = (
-                missing_installation
-                or _is_newer(latest_supported, installed_identifier)
+            needs_latest = missing_installation or _is_newer(
+                latest_supported, installed_identifier
             )
 
         return latest_supported, installed_identifier, needs_latest
 
     def winebridge_update_status(self) -> dict:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
         return {
             "latest_supported": latest_supported,
             "installed_identifier": installed_identifier,
@@ -848,7 +863,9 @@ class Manager(metaclass=Singleton):
     def check_winebridge(
         self, install_latest: bool = True, update: bool = False
     ) -> bool:
-        latest_supported, installed_identifier, needs_latest = self.__winebridge_status()
+        latest_supported, installed_identifier, needs_latest = (
+            self.__winebridge_status()
+        )
 
         can_install = install_latest or update
         if can_install and needs_latest and latest_supported:
@@ -1073,7 +1090,7 @@ class Manager(metaclass=Singleton):
         """
         Process External_Programs
         """
-        for _, _program in ext_programs.items():
+        for program_id, _program in ext_programs.items():
             found.append(_program["executable"])
             if winepath.is_windows(_program["path"]):
                 program_folder = ManagerUtils.get_exe_parent_dir(
@@ -1100,6 +1117,8 @@ class Manager(metaclass=Singleton):
                     "pulseaudio_latency": _program.get("pulseaudio_latency"),
                     "virtual_desktop": _program.get("virtual_desktop"),
                     "winebridge": _program.get("winebridge"),
+                    "path_override": _program.get("path_override"),
+                    "windows_path": _program.get("windows_path"),
                     "removed": _program.get("removed"),
                     "id": _program.get("id"),
                 }
@@ -1315,7 +1334,7 @@ class Manager(metaclass=Singleton):
             if config.Parameters.dxvk_nvapi:
                 NVAPIComponent.check_bottle_nvngx(real_path, config)
 
-        for b in sorted(bottles):
+        for b in bottles:
             """
             For each bottle add the path name to the `local_bottles` variable
             and append the config.
@@ -1360,7 +1379,7 @@ class Manager(metaclass=Singleton):
         wineserver = WineServer(_config)
         bottle_path = ManagerUtils.get_bottle_path(config)
 
-        if key == "sync":
+        if key == "sync" and config.Parameters.sync != value:
             """
             Workaround <https://github.com/bottlesdevs/Bottles/issues/916>
             Sync type change requires wineserver restart or wine will fail
@@ -1651,7 +1670,9 @@ class Manager(metaclass=Singleton):
 
         if not latencyflex:
             # if no latencyflex is specified, use the first one from available
-            latencyflex = self.latencyflex_available[0] if self.latencyflex_available else ""
+            latencyflex = (
+                self.latencyflex_available[0] if self.latencyflex_available else ""
+            )
         latencyflex_name = latencyflex
 
         # define bottle parameters
@@ -2159,6 +2180,7 @@ class Manager(metaclass=Singleton):
         # dxvk, vkd3d and nvapi require Vulkan to be present on the host.
         if not remove and component in ("dxvk", "vkd3d", "nvapi"):
             from bottles.backend.utils.vulkan import VulkanUtils
+
             if not VulkanUtils.check_support():
                 logging.warning(
                     f"Skipping {component} installation: Vulkan is not available on this system."
@@ -2171,17 +2193,29 @@ class Manager(metaclass=Singleton):
                 )
 
         if component == "dxvk":
-            _version = version or config.DXVK or (self.dxvk_available[0] if self.dxvk_available else "")
+            _version = (
+                version
+                or config.DXVK
+                or (self.dxvk_available[0] if self.dxvk_available else "")
+            )
             if not _version:
                 return Result(status=False, message=_("No DXVK version available."))
             manager = DXVKComponent(_version)
         elif component == "vkd3d":
-            _version = version or config.VKD3D or (self.vkd3d_available[0] if self.vkd3d_available else "")
+            _version = (
+                version
+                or config.VKD3D
+                or (self.vkd3d_available[0] if self.vkd3d_available else "")
+            )
             if not _version:
                 return Result(status=False, message=_("No VKD3D version available."))
             manager = VKD3DComponent(_version)
         elif component == "nvapi":
-            _version = version or config.NVAPI or (self.nvapi_available[0] if self.nvapi_available else "")
+            _version = (
+                version
+                or config.NVAPI
+                or (self.nvapi_available[0] if self.nvapi_available else "")
+            )
             if not _version:
                 return Result(status=False, message=_("No NVAPI version available."))
             manager = NVAPIComponent(_version)
@@ -2190,9 +2224,13 @@ class Manager(metaclass=Singleton):
             if not _version:
                 if len(self.latencyflex_available) == 0:
                     self.check_latencyflex(install_latest=True)
-                _version = self.latencyflex_available[0] if self.latencyflex_available else ""
+                _version = (
+                    self.latencyflex_available[0] if self.latencyflex_available else ""
+                )
             if not _version:
-                return Result(status=False, message=_("No LatencyFleX version available."))
+                return Result(
+                    status=False, message=_("No LatencyFleX version available.")
+                )
             manager = LatencyFleXComponent(_version)
         else:
             return Result(
@@ -2249,7 +2287,9 @@ class Manager(metaclass=Singleton):
                 state = p.get_state()
 
                 if name != "wineserver" and state != "Z":
-                    logging.info(f"Prefix {prefix} is active (e.g. {name}), protecting.")
+                    logging.info(
+                        f"Prefix {prefix} is active (e.g. {name}), protecting."
+                    )
                     protected_prefixes.add(prefix)
                     break
 

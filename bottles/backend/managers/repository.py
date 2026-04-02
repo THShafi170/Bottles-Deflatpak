@@ -122,7 +122,9 @@ class RepositoryManager:
 
                 for url in (__index, __fallback):
                     c = pycurl.Curl()
-                    _proxy = os.environ.get("http_proxy") or os.environ.get("https_proxy")
+                    _proxy = os.environ.get("http_proxy") or os.environ.get(
+                        "https_proxy"
+                    )
                     if _proxy:
                         c.setopt(pycurl.PROXY, _proxy)
                     c.setopt(c.URL, url)

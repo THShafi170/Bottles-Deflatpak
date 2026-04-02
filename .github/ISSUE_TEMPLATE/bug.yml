@@ -13,7 +13,7 @@ body:
         Please visit [WineHQ](https://www.winehq.org) and [ProtonDB](https://www.protondb.com).
 
         ## 🙅 NO ISSUES FOR NON-FLATHUB PACKAGES
-        **We ONLY support the official [Flathub package](https://flathub.org/apps/details/com.usebottles.bottles).**
+        **We ONLY support non-Flatpak packages (RPM, DEB, source, Nix, etc.).**
 
         ```text
         *******************************************************************************
@@ -25,8 +25,8 @@ body:
         *  1. DO NOT OPEN ISSUES FOR WINDOWS PROGRAMS NOT WORKING IN BOTTLES!         *
         *     (This is usually a Wine/Proton problem, NOT a Bottles bug)              *
         *                                                                             *
-        *  2. DO NOT OPEN ISSUES FOR BUGS OUTSIDE OF BOTTLES ON FLATHUB!              *
-        *     (We ONLY support the official Flathub package)                         *
+        *  2. DO NOT OPEN ISSUES FOR BUGS IN THE FLATPAK PACKAGE!                     *
+        *     (This fork does NOT support the Flatpak package)                       *
         *                                                                             *
         *******************************************************************************
         ```
@@ -62,14 +62,14 @@ body:
     id: package
     attributes:
       label: Package
+
+
       description: |
         How did you install Bottles?
-
-        If you use Bottles from your distribution package manager, please install [Bottles from Flathub](https://flathub.org/apps/details/com.usebottles.bottles) and try to reproduce the bug there. You might/will not get help if you don't run Bottles from Flathub.
       options:
-        - Flatpak from Flathub
-        - Flatpak from Flathub Beta
-        - Flatpak from GitHub Artifacts
+        - Source
+        - Distribution Package (RPM/DEB)
+        - Other
     validations:
       required: true
 
@@ -89,7 +89,7 @@ body:
       description: |
         In Bottles, press the hamburger menu (`☰`) at the top right. Then press "About Bottles". Select "Troubleshooting", then "Debugging Information". Lastly, copy text and paste here.
 
-        If you are unable to run Bottles, then you can retrieve information by running `flatpak run --command=bottles-cli com.usebottles.bottles info health-check` in the terminal.
+        If you are unable to run Bottles, then you can retrieve information by running `bottles-cli info health-check` in the terminal.
       render: shell
       placeholder: |
         Display:
@@ -132,7 +132,7 @@ body:
     id: log
     attributes:
       label: Troubleshooting Logs
-      description: If applicable, run `flatpak run com.usebottles.bottles`, reproduce the issue and paste the logs here.
+      description: If applicable, run `bottles`, reproduce the issue and paste the logs here.
       render: shell
       placeholder: |
         [Errno 2] No such file or directory: '/home/USER/.var/app/com.usebottles.bottles/data/bottles/bottles/Opera-GX__185/bottle.yml'  File "/app/share/bottles/bottles/frontend/utils/threading.py", line 61, in __target

@@ -8,27 +8,22 @@ class DisplayUtils:
     @lru_cache
     def get_x_display():
         """Get the X display port."""
-        env_var = "DISPLAY"
-        ports_range = range(3)
+        if os.environ.get("DISPLAY"):
+            return os.environ.get("DISPLAY")
 
-        if os.environ.get(env_var):
-            return os.environ.get(env_var)
-
-        for i in ports_range:
+        for i in range(3):
             _port = f":{i}"
-            _proc = (
-                subprocess.Popen(
-                    f"xdpyinfo -display :{i}",
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True,
-                )
-                .communicate()[0]
-                .decode("utf-8")
-                .lower()
-            )
-            if "x.org" in _proc:
-                return _port
+            try:
+                # Check if xdpyinfo reports a valid X.org display
+                output = subprocess.check_output(
+                    ["xdpyinfo", "-display", _port],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                ).lower()
+                if "x.org" in output:
+                    return _port
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
 
         return False
 
@@ -36,20 +31,15 @@ class DisplayUtils:
     def check_nvidia_device():
         """Check if there is an nvidia device connected"""
         _query = "NVIDIA Corporation".lower()
-        _proc = (
-            subprocess.Popen(
-                "lspci | grep 'VGA'",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                shell=True,
-            )
-            .communicate()[0]
-            .decode("utf-8")
-            .lower()
-        )
+        try:
+            # Check lspci output for VGA controllers with NVIDIA vendor
+            output = subprocess.check_output(["lspci"], text=True).lower()
+            for line in output.splitlines():
+                if "vga" in line and _query in line:
+                    return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
-        if _query in _proc:
-            return True
         return False
 
     @staticmethod

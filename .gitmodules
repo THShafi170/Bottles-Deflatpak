@@ -1,3 +1,0 @@
-[submodule "build-aux/req2flatpak"]
-	path = build-aux/req2flatpak
-	url = https://github.com/johannesjh/req2flatpak.git

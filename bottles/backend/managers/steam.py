@@ -75,13 +75,13 @@ class SteamManager:
             ]
         else:
             paths = [
-                os.path.join(
-                    Path.home(), ".var/app/com.valvesoftware.Steam/data/Steam"
-                ),
                 os.path.join(Path.home(), ".local/share/Steam"),
                 os.path.join(Path.home(), ".steam/debian-installation"),
                 os.path.join(Path.home(), ".steam/steam"),
                 os.path.join(Path.home(), ".steam"),
+                os.path.join(
+                    Path.home(), ".var/app/com.valvesoftware.Steam/data/Steam"
+                ),
             ]
 
         for path in paths:
@@ -532,12 +532,8 @@ class SteamManager:
 
     def add_shortcut(self, program_name: str, program_path: str):
         logging.info(f"Adding shortcut for {program_name}")
-        if "FLATPAK_ID" in os.environ:
-            cmd = "flatpak"
-            args = f"run --command=bottles-cli {os.environ['FLATPAK_ID']} run -b '{{0}}' -p '{{1}}'"
-        else:
-            cmd = "bottles-cli"
-            args = "run -b '{0}' -p '{1}'"
+        cmd = "bottles-cli"
+        args = "run -b '{0}' -p '{1}'"
 
         if self.userdata_path is None:
             logging.warning("Userdata path is not set")

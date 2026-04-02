@@ -80,7 +80,9 @@ class SteamUtils:
         data = SteamUtils.parse_vdf(f.read())
         tool_appid = data.get("manifest", {}).get("require_tool_appid", {})
 
-        if "1628350" in tool_appid:
+        if "2348590" in tool_appid:
+            runtime = "medic"
+        elif "1628350" in tool_appid:
             runtime = "sniper"
         elif "1391110" in tool_appid:
             runtime = "soldier"

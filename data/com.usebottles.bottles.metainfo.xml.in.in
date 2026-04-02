@@ -23,7 +23,8 @@
     <color type="primary" scheme_preference="dark">#892119</color>
   </branding>
   <description>
-    <p>Bottles lets you run Windows software on Linux, such as applications and games. It introduces a workflow that helps you organize by categorizing each software to your liking. Bottles provides several tools and integrations to help you manage and optimize your applications.</p>
+    <p>Bottles lets you run Windows software on Linux, such as applications and games. This fork (Bottles-Deflatpak) is specifically optimized for native Linux execution and NixOS support, removing Flatpak-specific sandboxing assumptions while providing a robust FHS-based environment.</p>
+    <p>It introduces a workflow that helps you organize by categorizing each software to your liking. Bottles provides several tools and integrations to help you manage and optimize your applications.</p>
     <p>Features:</p>
     <ul>
       <li>Use pre-configured environments as a base</li>
@@ -70,12 +71,12 @@
   <translation type="gettext">@APP_ID@</translation>
   <content_rating type="oars-1.1"/>
   <url type="homepage">https://usebottles.com</url>
-  <url type="bugtracker">https://github.com/bottlesdevs/Bottles/issues</url>
+  <url type="bugtracker">https://github.com/THShafi170/Bottles-Deflatpak/issues</url>
   <url type="help">https://docs.usebottles.com</url>
   <url type="donation">https://usebottles.com/funding</url>
   <url type="translate">https://hosted.weblate.org/engage/bottles</url>
-  <url type="vcs-browser">https://github.com/bottlesdevs/Bottles</url>
-  <url type="contribute">https://github.com/bottlesdevs/Bottles/blob/main/CONTRIBUTING.md</url>
+  <url type="vcs-browser">https://github.com/THShafi170/Bottles-Deflatpak</url>
+  <url type="contribute">https://github.com/THShafi170/Bottles-Deflatpak/blob/main/CONTRIBUTING.md</url>
   <recommends>
     <control>pointing</control>
     <control>keyboard</control>

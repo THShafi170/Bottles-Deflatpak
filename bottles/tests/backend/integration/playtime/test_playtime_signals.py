@@ -27,7 +27,9 @@ def _new_manager(tmpdir: str) -> Manager:
     base_dir = os.path.join(tmpdir, "bottles")
     os.makedirs(base_dir, exist_ok=True)
     db_path = os.path.join(base_dir, "process_metrics.sqlite")
-    m.playtime_tracker = ProcessSessionTracker(db_path=db_path, heartbeat_interval=5, enabled=True)
+    m.playtime_tracker = ProcessSessionTracker(
+        db_path=db_path, heartbeat_interval=5, enabled=True
+    )
     # Reset launch map if present
     try:
         m._launch_to_session.clear()
@@ -96,4 +98,3 @@ def test_signals_flow_unknown_failure():
         )
         assert cur.fetchone()[0] == "unknown"
         m.playtime_tracker.shutdown()
-

@@ -17,6 +17,7 @@ from bottles.backend.models.process import (
 from bottles.backend.models.result import Result
 from bottles.backend.state import SignalManager, Signals
 from bottles.backend.utils.manager import ManagerUtils
+from bottles.backend.utils.umu import UMUUtils
 from bottles.backend.wine.cmd import CMD
 from bottles.backend.wine.explorer import Explorer
 from bottles.backend.wine.msiexec import MsiExec
@@ -60,9 +61,13 @@ class WineExecutor:
         program_gamescope: Optional[bool] = None,
         program_virt_desktop: Optional[bool] = None,
         program_winebridge: Optional[bool] = None,
+        umu_id: str = "none",
+        umu_store: str = "none",
     ):
         logging.info("Launching an executable…")
         self.config = config
+        self.umu_id = umu_id
+        self.umu_store = umu_store
         self.__validate_path(exec_path)
 
         if monitoring is None:
@@ -139,9 +144,25 @@ class WineExecutor:
         def _resolve(field: str):
             return cls._replace_placeholders((program or {}).get(field), placeholders)
 
+        exec_path = (
+            program.get("path_override")
+            or program.get("windows_path")
+            or program.get("path")
+        )
+        path_mode = program.get("path_mode", 0)
+
+        if path_mode == 1:  # Force Unix
+            winepath = WinePath(config)
+            if winepath.is_windows(exec_path):
+                exec_path = winepath.to_unix(exec_path)
+        elif path_mode == 2:  # Force Windows
+            winepath = WinePath(config)
+            if winepath.is_unix(exec_path):
+                exec_path = winepath.to_windows(exec_path)
+
         return cls(
             config=config,
-            exec_path=program.get("path"),
+            exec_path=exec_path,
             args=_resolve("arguments"),
             pre_script=cls._replace_placeholders(
                 program.get("pre_script"), placeholders
@@ -159,6 +180,8 @@ class WineExecutor:
             program_gamescope=program.get("gamescope"),
             program_virt_desktop=program.get("virtual_desktop"),
             program_winebridge=program.get("winebridge"),
+            umu_id=UMUUtils.get_umu_id(program or {}),
+            umu_store=UMUUtils.get_umu_store(program or {}),
         ).run()
 
     @staticmethod
@@ -230,11 +253,8 @@ class WineExecutor:
             return True
 
         if not os.path.isfile(exec_path):
-            _msg = f"Executable file path does not exist: {exec_path}"
-            if "FLATPAK_ID" in os.environ:
-                _msg = f"Executable file path does not exist or is not accessible by the Flatpak: {exec_path}"
             logging.error(
-                _msg,
+                f"Executable file path does not exist: {exec_path}",
             )
             return False
 
@@ -301,21 +321,28 @@ class WineExecutor:
             os.path.basename(self._raw_exec_path) if self._raw_exec_path else "unknown"
         )
         program_path = self._raw_exec_path or self.exec_path
-        
+
         try:
-            fonts_dir = os.path.join(ManagerUtils.get_bottle_path(self.config), "drive_c", "windows", "Fonts")
-            stamp_file = os.path.join(ManagerUtils.get_bottle_path(self.config), ".fonts_stamp")
+            fonts_dir = os.path.join(
+                ManagerUtils.get_bottle_path(self.config), "drive_c", "windows", "Fonts"
+            )
+            stamp_file = os.path.join(
+                ManagerUtils.get_bottle_path(self.config), ".fonts_stamp"
+            )
             if os.path.exists(fonts_dir):
                 fonts_mtime = os.path.getmtime(fonts_dir)
                 stamp_mtime = 0.0
                 if os.path.exists(stamp_file):
                     with open(stamp_file, "r") as f:
                         stamp_mtime = float(f.read().strip() or 0)
-                
+
                 if fonts_mtime > stamp_mtime:
-                    logging.info("Fonts directory modified manually, running wineboot to update fonts registry.")
+                    logging.info(
+                        "Fonts directory modified manually, running wineboot to update fonts registry."
+                    )
                     from bottles.backend.wine.wineboot import WineBoot
-                    WineBoot(self.config).launch(update=True)
+
+                    WineBoot(self.config).update()
                     with open(stamp_file, "w") as f:
                         f.write(str(fonts_mtime))
         except Exception as e:
@@ -442,6 +469,8 @@ class WineExecutor:
             pre_script_args=self.pre_script_args,
             post_script_args=self.post_script_args,
             cwd=self.cwd,
+            umu_id=self.umu_id,
+            umu_store=self.umu_store,
         )
         res = winecmd.run()
         self.__set_monitors()

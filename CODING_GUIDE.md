@@ -1,48 +1,73 @@
-## Build & Run locally
+# Coding Guide
 
-### use flatpak
+## Development Environment
 
-#### Build & install
+### Using Nix (Recommended)
+
+If you have Nix installed, you can enter a perfectly reproducible development environment with all dependencies (including GTK4, Adwaita, and build tools) pre-configured:
 
 ```bash
-flatpak-builder --install --user --force-clean ./.flatpak-builder/out ./build-aux/com.usebottles.bottles.Devel.json
+nix develop
+```
+
+Within this shell, you can use `meson` and `ninja` as usual. The development shell includes all dependencies from the **unwrapped** package.
+
+### Local Installation (Other Distros)
+
+Ensure you have the dependencies listed in the [README](README.md#prerequisites).
+
+#### Build & Install
+
+```bash
+meson setup build --prefix=/usr
+meson compile -C build
+sudo meson install -C build
 ```
 
 #### Run
 
 ```bash
-flatpak run com.usebottles.bottles.Devel
+bottles
 ```
 
-#### Uninstall devel version
+#### Uninstall
 
 ```bash
-flatpak uninstall com.usebottles.bottles.Devel
+sudo ninja -C build uninstall
 ```
 
-## Unit Test
+## Pre-Commit Checks
 
-### run all tests
+Run all linters and formatters before committing. If you are in the `nix develop` shell, these are already available:
 
 ```bash
-pytest .
+./venv/bin/python -m pre_commit run --all-files
 ```
 
-## Dependencies
+This runs: `ruff`, `ruff-format`, `mypy`, `autoflake`, and various file checks.
 
-Regenerate PYPI dependency manifest when requirements.txt changed
+## Testing
+
+### Unit Tests
 
 ```bash
-python ./build-aux/flatpak-pip-generator.py --runtime org.gnome.Sdk -r requirements.txt -o com.usebottles.bottles.pypi-deps --yaml
+./venv/bin/python -m pytest bottles/tests/ -v
 ```
 
-## I18n files
+> [!NOTE]
+> Tests that import GTK/GI modules require system GObject Introspection typelibs to be available. If you are using `nix develop`, these are provided automatically.
+
+### Sandbox Testing
+
+Since this fork uses a custom `bubblewrap` sandbox, you should test that your changes haven't broken the sandbox logic. You can launch a bottle and check the terminal output for any `bwrap` errors.
+
+## I18n Files
 
 ### `po/POTFILES`
 
 List of source files containing translatable strings.
-Regenerate this file when you added/moved/removed/renamed files
-that contains translatable strings.
+Regenerate this file when you add/move/remove/rename files
+that contain translatable strings.
 
 ```bash
 cat > po/POTFILES <<EOF
@@ -59,9 +84,9 @@ EOF
 
 ### `po/bottles.pot` and `po/*.po`
 
-We have a main pot file, which is template for other `.po` files
-And for each language listed in `po/LINGUAS` we have a corresponding `.po` file
-Regenerate these files when any translatable string added/changed/removed
+We have a main `.pot` file which is a template for the `.po` files.
+For each language listed in `po/LINGUAS` there is a corresponding `.po` file.
+Regenerate these when any translatable string is added/changed/removed:
 
 ```bash
 # make sure you have `meson` and `blueprint-compiler` installed

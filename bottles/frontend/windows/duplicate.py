@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import time
+from gettext import gettext as _
 
 from gi.repository import Adw, GLib, Gtk
 from bottles.backend.managers.backup import BackupManager
@@ -90,8 +90,18 @@ class DuplicateDialog(Adw.Window):
         if self.pulse_id:
             GLib.source_remove(self.pulse_id)
             self.pulse_id = None
-        # TODO: handle result.status == False
         self.parent.manager.update_bottles()
+
+        if not result.status:
+            self.stack_switcher.set_visible_child_name("page_duplicate")
+            self.btn_duplicate.set_visible(True)
+            self.btn_cancel.set_label("Cancel")
+            GtkUtils.show_notification(
+                _("Error while duplicating bottle: {0}").format(result.message),
+                "error",
+            )
+            return
+
         self.stack_switcher.set_visible_child_name("page_duplicated")
 
     def pulse(self):

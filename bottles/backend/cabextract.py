@@ -87,9 +87,12 @@ class CabExtract:
 
                     command = [
                         self.cabextract_bin,
-                        "-F", f"*{file}*",
-                        "-d", self.destination,
-                        "-q", self.path,
+                        "-F",
+                        f"*{file}*",
+                        "-d",
+                        self.destination,
+                        "-q",
+                        self.path,
                     ]
                     subprocess.run(command, check=False)
 
@@ -104,8 +107,10 @@ class CabExtract:
             else:
                 command_list = [
                     self.cabextract_bin,
-                    "-d", self.destination,
-                    "-q", self.path,
+                    "-d",
+                    self.destination,
+                    "-q",
+                    self.path,
                 ]
                 subprocess.run(command_list, check=False)
 

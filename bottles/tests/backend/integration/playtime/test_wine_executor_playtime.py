@@ -24,7 +24,9 @@ def _new_manager(tmpdir: str) -> Manager:
     base_dir = os.path.join(tmpdir, "bottles")
     os.makedirs(base_dir, exist_ok=True)
     db_path = os.path.join(base_dir, "process_metrics.sqlite")
-    m.playtime_tracker = ProcessSessionTracker(db_path=db_path, heartbeat_interval=5, enabled=True)
+    m.playtime_tracker = ProcessSessionTracker(
+        db_path=db_path, heartbeat_interval=5, enabled=True
+    )
     try:
         m._launch_to_session.clear()
     except Exception:
@@ -45,10 +47,20 @@ def test_wine_executor_emits_and_updates_totals(mocker):
 
         # Stub the launch paths to avoid running wine; make them return success Result
         _stub_result = Result(True, data={"output": b"ok"})
-        mocker.patch.object(WineExecutor, "_WineExecutor__launch_with_bridge", return_value=_stub_result)
-        mocker.patch.object(WineExecutor, "_WineExecutor__launch_batch", return_value=_stub_result)
-        mocker.patch.object(WineExecutor, "_WineExecutor__launch_with_starter", return_value=_stub_result)
-        mocker.patch.object(WineExecutor, "_WineExecutor__launch_dll", return_value=_stub_result)
+        mocker.patch.object(
+            WineExecutor, "_WineExecutor__launch_with_bridge", return_value=_stub_result
+        )
+        mocker.patch.object(
+            WineExecutor, "_WineExecutor__launch_batch", return_value=_stub_result
+        )
+        mocker.patch.object(
+            WineExecutor,
+            "_WineExecutor__launch_with_starter",
+            return_value=_stub_result,
+        )
+        mocker.patch.object(
+            WineExecutor, "_WineExecutor__launch_dll", return_value=_stub_result
+        )
 
         # Stub WinePath conversions to avoid system calls / missing libs
         # Instance methods are bound; side_effect receives only the path argument
@@ -72,4 +84,3 @@ def test_wine_executor_emits_and_updates_totals(mocker):
         )
         assert cur.fetchone()[0] == 1
         m.playtime_tracker.shutdown()
-

@@ -21,6 +21,7 @@ from gi.repository import Adw, Gtk
 
 from bottles.backend.models.result import Result
 from bottles.backend.state import TaskManager
+from bottles.frontend.utils.gtk import GtkUtils
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/task-entry.ui")
@@ -47,9 +48,6 @@ class TaskEntry(Adw.ActionRow):
 
     def update(self, subtitle: str):
         self.set_subtitle(subtitle)
-
-
-from bottles.frontend.utils.gtk import GtkUtils
 
 
 class TaskSyncer:

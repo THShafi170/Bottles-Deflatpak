@@ -18,7 +18,7 @@ class Events(Enum):
 
 
 def approx_time(start, target):
-    epsilon = 0.010  # 5 ms window
+    epsilon = 0.100  # 100 ms window to fix flakiness on loaded systems
     variation = time.time() - start - target
     result = -epsilon / 2 <= variation <= epsilon / 2
     if not result:

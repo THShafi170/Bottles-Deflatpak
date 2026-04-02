@@ -57,6 +57,7 @@ class Paths:
             "/usr/lib/extensions/vulkan/vkBasalt/etc/vkBasalt",
             "/usr/local",
             "/usr/share/vkBasalt",
+            "/run/current-system/sw/share/vkBasalt",
         ]
         for path in vkbasalt_paths:
             if os.path.exists(path):
@@ -75,27 +76,15 @@ class TrdyPaths:
 # check if bottles exists in xdg data path
 os.makedirs(Paths.base, exist_ok=True)
 
-def check_flatpak_extension(cmd: str, path: str):
-    if "FLATPAK_ID" in os.environ:
-        if not os.path.exists(path):
-            return False
-    return shutil.which(cmd) or False
-
 # Check if some tools are available
 gamemode_available = shutil.which("gamemoderun") or False
-gamescope_available = check_flatpak_extension("gamescope", "/usr/lib/extensions/vulkan/gamescope/bin/gamescope")
+gamescope_available = shutil.which("gamescope") or False
 vkbasalt_available = Paths.is_vkbasalt_available()
-mangohud_available = check_flatpak_extension("mangohud", "/usr/lib/extensions/vulkan/MangoHud/bin/mangohud")
-obs_vkc_available = check_flatpak_extension("obs-vkcapture", "/usr/lib/extensions/vulkan/OBSVkCapture/bin/obs-vkcapture")
+mangohud_available = shutil.which("mangohud") or False
+obs_vkc_available = shutil.which("obs-vkcapture") or False
+sandbox_available = shutil.which("bwrap") or False
 vmtouch_available = shutil.which("vmtouch") or False
-base_version = ""
-if os.path.isfile("/app/manifest.json"):
-    with open("/app/manifest.json", mode="r", encoding="utf-8") as file:
-        base_version = (
-            json.load(file)  # type: ignore
-            .get("base-version", "")
-            .removeprefix("stable-")
-        )
+ntsync_available = os.path.exists("/dev/ntsync")
 
 # encoding detection correction, following windows defaults
 locale_encodings: Dict[str, str] = {"ja_JP": "cp932", "zh_CN": "gbk"}

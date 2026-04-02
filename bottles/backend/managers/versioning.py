@@ -70,7 +70,7 @@ class VersioningManager:
         - states/states.yml (internal legacy system)
         """
         bottle_path = ManagerUtils.get_bottle_path(config)
-        
+
         # If FVS2 is already initialized, no migration needed
         if os.path.exists(os.path.join(bottle_path, ".fvs2")):
             return False
@@ -78,31 +78,31 @@ class VersioningManager:
         # Check for FVS v1
         if os.path.exists(os.path.join(bottle_path, ".fvs")):
             return True
-            
+
         # Check for absolute legacy (internal)
         if os.path.exists(os.path.join(bottle_path, "states", "states.yml")):
             return True
-            
-        # Fallback to config flag if any
-        if config.Versioning:
+
+        # Fallback to config flag if any (and FVS2 is NOT there yet)
+        if config.Versioning and not os.path.exists(os.path.join(bottle_path, ".fvs2")):
             return True
-            
+
         return False
 
     @staticmethod
     def re_initialize(config: BottleConfig):
         bottle_path = ManagerUtils.get_bottle_path(config)
-        
+
         # Clean up FVS v1
         fvs_path = os.path.join(bottle_path, ".fvs")
         if os.path.exists(fvs_path):
             shutil.rmtree(fvs_path)
-            
+
         # Clean up absolute legacy
         states_path = os.path.join(bottle_path, "states")
         if os.path.exists(states_path):
             shutil.rmtree(states_path)
-            
+
         # Clean up FVS2 for a fresh start
         fvs2_path = os.path.join(bottle_path, ".fvs2")
         if os.path.exists(fvs2_path):
@@ -117,11 +117,15 @@ class VersioningManager:
         patterns = self.__get_patterns(config)
 
         drive_c_path = os.path.join(bottle_path, "drive_c")
-        drive_c_size = FileUtils().get_path_size(drive_c_path, human=False) if os.path.exists(drive_c_path) else 0
-        
+        drive_c_size = (
+            FileUtils().get_path_size(drive_c_path, human=False)
+            if os.path.exists(drive_c_path)
+            else 0
+        )
+
         required_space = drive_c_size + (50 * 1024 * 1024)
         disk_usage = FileUtils().get_disk_size(path=bottle_path, human=False)
-        
+
         if disk_usage["free"] < required_space:
             human_req = FileUtils.get_human_size(required_space)
             return Result(
@@ -202,7 +206,14 @@ class VersioningManager:
             return Result(
                 status=True,
                 message=_("States list retrieved successfully!"),
-                data={"state_id": repo.active_state_id, "states": repo.states, "branches": repo.branches, "active_branch": repo.active_branch, "dirty": repo.dirty, "changed_files": repo.changed_files},
+                data={
+                    "state_id": repo.active_state_id,
+                    "states": repo.states,
+                    "branches": repo.branches,
+                    "active_branch": repo.active_branch,
+                    "dirty": repo.dirty,
+                    "changed_files": repo.changed_files,
+                },
             )
 
         bottle_path = ManagerUtils.get_bottle_path(config)
@@ -214,7 +225,9 @@ class VersioningManager:
             states_file.close()
             if states_file_yaml:
                 states = states_file_yaml.get("States", {})
-                logging.info(f"Found [{len(states)}] states for bottle: [{config.Name}]")
+                logging.info(
+                    f"Found [{len(states)}] states for bottle: [{config.Name}]"
+                )
             else:
                 logging.info(f"No states found for bottle: [{config.Name}]")
         except (FileNotFoundError, yaml.YAMLError, AttributeError):
@@ -243,7 +256,11 @@ class VersioningManager:
             except FVSStateNotFound:
                 logging.error(f"State {state_id} not found.")
                 res = Result(status=False, message=_("State not found"))
-            except (FVSNothingToRestore, FVSStateZeroNotDeletable, FVSNothingToCommit): # Added FVSNothingToCommit just in case
+            except (
+                FVSNothingToRestore,
+                FVSStateZeroNotDeletable,
+                FVSNothingToCommit,
+            ):  # Added FVSNothingToCommit just in case
                 logging.error(f"State {state_id} is the active state.")
                 res = Result(
                     status=False,
@@ -380,7 +397,7 @@ class VersioningManager:
                 repo_path=ManagerUtils.get_bottle_path(config),
                 use_compression=config.Parameters.versioning_compression,
             )
-            return repo.active_branch
+            return repo.active_branch or ""
         except Exception as e:
             logging.error(f"Failed to get active FVS branch: {e}")
             return ""

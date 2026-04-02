@@ -28,7 +28,7 @@ clut (or lut): Color LookUp Table
 import os
 
 from gi.repository import Adw, GLib, Gtk
-from vkbasalt.lib import ParseConfig, parse  # type: ignore [import-untyped]
+from vkbasalt.lib import ParseConfig, parse  # type: ignore [import-not-found, import-untyped]
 
 from bottles.backend.logger import Logger
 from bottles.backend.utils.manager import ManagerUtils
