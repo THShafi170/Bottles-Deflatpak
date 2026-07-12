@@ -76,6 +76,14 @@ class TrdyPaths:
 # check if bottles exists in xdg data path
 os.makedirs(Paths.base, exist_ok=True)
 
+try:
+    os.getcwd()
+except OSError:
+    try:
+        os.chdir(Paths.base)
+    except OSError:
+        pass
+
 # Check if some tools are available
 gamemode_available = shutil.which("gamemoderun") or False
 gamescope_available = shutil.which("gamescope") or False

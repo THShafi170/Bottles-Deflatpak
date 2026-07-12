@@ -52,6 +52,8 @@ class WineEnv:
             return
 
         for key in allowed_keys:
+            if not isinstance(key, str):
+                continue
             if key in os.environ:
                 self.__env[key] = os.environ[key]
 
@@ -272,6 +274,9 @@ class WineCommand:
 
         if config.Environment_Variables:
             for key, value in config.Environment_Variables.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    logging.warning(f"Ignoring malformed environment variable {key!r}")
+                    continue
                 env.add(key, value, override=True)
         if SteamUtils.is_proton(ManagerUtils.get_runner_path(config.Runner)):
             env.add("STEAM_COMPAT_DATA_PATH", bottle, override=True)
@@ -786,12 +791,14 @@ class WineCommand:
     def _vmtouch_preload(self):
         vmtouch_flags = "-t -v -l -d"
         vmtouch_file_size = " -m 1024M"
+        try:
+            last_token = shlex.split(self.command)[-1]
+        except (ValueError, IndexError):
+            last_token = self.command.split(" ")[-1]
         if self.command.find("C:\\") > 0:
-            s = (
-                self.cwd + "/" + (self.command.split(" ")[-1].split("\\")[-1])
-            ).replace("'", "")
+            s = (self.cwd + "/" + last_token.split("\\")[-1]).replace("'", "")
         else:
-            s = self.command.split(" ")[-1]
+            s = last_token
         self.vmtouch_files = shlex.quote(s)
 
         # if self.config.Parameters.vmtouch_cache_cwd:

@@ -1938,7 +1938,10 @@ class Manager(metaclass=Singleton):
             if (
                 "soda" not in runner_name.lower() and "caffe" not in runner_name.lower()
             ):  # Caffe/Soda came with win10 by default
-                rk.lg_set_windows(config.Windows)
+                try:
+                    rk.lg_set_windows(config.Windows)
+                except ValueError as e:
+                    logging.warning(str(e))
                 wineboot.update()
 
             FileUtils.wait_for_files(reg_files)
@@ -1992,11 +1995,16 @@ class Manager(metaclass=Singleton):
             env = Samples.environments[environment.lower()]
         elif custom_environment:
             try:
-                with open(custom_environment, "r") as f:
+                with open(custom_environment, "r", encoding="utf-8") as f:
                     env = yaml.load(f.read())
                     logging.warning("Using a custom environment recipe…")
                     log_update(_("(!) Using a custom environment recipe…"))
-            except (FileNotFoundError, PermissionError, yaml.YAMLError):
+            except (
+                FileNotFoundError,
+                PermissionError,
+                UnicodeError,
+                yaml.YAMLError,
+            ):
                 logging.error("Recipe not not found or not valid…")
                 log_update(_("(!) Recipe not not found or not valid…"))
                 return Result(False)
@@ -2415,6 +2423,9 @@ class Manager(metaclass=Singleton):
             return False
 
         logging.info("Removing applications installed with the bottle…")
+        for program in config.External_Programs.values():
+            ManagerUtils.remove_desktop_entry(config, program)
+
         for inst in glob(f"{Paths.applications}/{config.Name}--*"):
             os.remove(inst)
 

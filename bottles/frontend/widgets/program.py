@@ -448,9 +448,15 @@ class ProgramEntry(Adw.ActionRow):
 
     def uninstall_program(self, _widget):
         uninstaller = Uninstaller(self.config)
+
+        def update(_result=False, _error=False):
+            if not _error:
+                ManagerUtils.remove_desktop_entry(self.config, self.program)
+            self.update_programs()
+
         RunAsync(
             task_func=uninstaller.from_name,
-            callback=self.update_programs,
+            callback=update,
             name=self.program["name"],
         )
 
@@ -477,6 +483,7 @@ class ProgramEntry(Adw.ActionRow):
         ).data["config"]
 
     def remove_program(self, _widget=None):
+        ManagerUtils.remove_desktop_entry(self.config, self.program)
         self.config = self.manager.update_config(
             config=self.config,
             key=self.program["id"],
@@ -492,6 +499,21 @@ class ProgramEntry(Adw.ActionRow):
             if new_name == self.program["name"]:
                 return
             old_name = self.program["name"]
+
+            old_program = dict(self.program)
+            old_filename = ManagerUtils.get_desktop_entry_filename(
+                self.config, old_program
+            )
+            entry_dirs = [os.path.expanduser("~/.local/share/applications")]
+            _desktop_dir = GLib.get_user_special_dir(
+                GLib.UserDirectory.DIRECTORY_DESKTOP
+            )
+            if _desktop_dir:
+                entry_dirs.append(_desktop_dir)
+            had_desktop_entry = any(
+                os.path.exists(os.path.join(d, old_filename)) for d in entry_dirs
+            )
+
             self.program["name"] = new_name
             self.manager.update_config(
                 config=self.config,
@@ -499,6 +521,17 @@ class ProgramEntry(Adw.ActionRow):
                 value=self.program,
                 scope="External_Programs",
             )
+
+            if had_desktop_entry:
+                ManagerUtils.remove_desktop_entry(self.config, old_program)
+                ManagerUtils.create_desktop_entry(
+                    config=self.config,
+                    program={
+                        "name": new_name,
+                        "executable": self.program["executable"],
+                        "path": self.program["path"],
+                    },
+                )
 
             def async_work():
                 library_manager = LibraryManager()

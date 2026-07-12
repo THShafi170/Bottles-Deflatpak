@@ -21,6 +21,7 @@ from gettext import gettext as _
 from typing import Optional
 
 import icoextract  # type: ignore [import-untyped]
+import gi
 
 from bottles.backend.params import APP_ID
 
@@ -33,6 +34,7 @@ from bottles.backend.utils.generic import get_mime
 from bottles.backend.utils.imagemagick import ImageMagickUtils
 
 from gi.repository import GLib, Gio
+
 
 logging = Logger()
 
@@ -319,14 +321,9 @@ class ManagerUtils:
 
         def create_manual_fallback(icon_path, exec_cmd):
             """Create desktop entry manually when portal is unavailable or fails."""
-            safe_name = "".join(
-                [c for c in program.get("name") if c.isalnum() or c in ("-", "_")]
-            )
-            safe_bottle = "".join(
-                [c for c in config.get("Name") if c.isalnum() or c in ("-", "_")]
-            )
-            filename = f"bottles-{safe_bottle}-{safe_name}.desktop"
+            filename = ManagerUtils.get_desktop_entry_filename(config, program)
             executable = program.get("executable") or program.get("name") or "bottles"
+
             content = (
                 f"[Desktop Entry]\n"
                 f"Exec={exec_cmd}\n"
@@ -370,6 +367,7 @@ class ManagerUtils:
         exec_cmd = "bottles-cli run -p {} -b {} -- %u".format(
             shlex.quote(program.get("name")), shlex.quote(config.get("Name"))
         )
+
 
         # Attempt via XDG DynamicLauncher portal (works on GNOME, KDE, and
         # any desktop that implements xdg-desktop-portal).  Falls back to
@@ -457,6 +455,60 @@ class ManagerUtils:
         create_manual_fallback(icon, exec_cmd)
 
     @staticmethod
+    def get_desktop_entry_id(config, program: dict):
+        launcher_id = f"{config.get('Name')}.{program.get('name')}"
+        return "{}.App_{}.desktop".format(
+            APP_ID,
+            GLib.compute_checksum_for_string(
+                GLib.ChecksumType.SHA1,
+                launcher_id,
+                -1,
+            ),
+        )
+
+    @staticmethod
+    def get_desktop_entry_filename(config, program: dict):
+        safe_name = "".join(
+            [c for c in program.get("name") if c.isalnum() or c in ("-", "_")]
+        )
+        safe_bottle = "".join(
+            [c for c in config.get("Name") if c.isalnum() or c in ("-", "_")]
+        )
+        return f"bottles-{safe_bottle}-{safe_name}.desktop"
+
+    @staticmethod
+    def remove_desktop_entry(config, program: dict):
+        desktop_entry_id = ManagerUtils.get_desktop_entry_id(config, program)
+        try:
+            portal.dynamic_launcher_uninstall(desktop_entry_id)
+            logging.info(f"Desktop entry removed: {desktop_entry_id}")
+        except GLib.Error as e:
+            logging.debug(f"Failed to remove desktop entry {desktop_entry_id}: {e}")
+
+        desktop_entry_filename = ManagerUtils.get_desktop_entry_filename(
+            config, program
+        )
+        entry_paths = [
+            os.path.join(
+                os.path.expanduser("~/.local/share/applications"),
+                desktop_entry_filename,
+            )
+        ]
+        desktop_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
+        if desktop_dir:
+            entry_paths.append(os.path.join(desktop_dir, desktop_entry_filename))
+
+        for entry_path in entry_paths:
+            if not os.path.exists(entry_path):
+                continue
+
+            try:
+                os.remove(entry_path)
+                logging.info(f"Desktop entry removed: {entry_path}")
+            except OSError as e:
+                logging.warning(f"Failed to remove desktop entry {entry_path}: {e}")
+
+    @staticmethod
     def browse_wineprefix(wineprefix: dict):
         """Presents a dialog to browse the wineprefix."""
         ManagerUtils.open_filemanager(
@@ -530,9 +582,9 @@ class ManagerUtils:
             _("Slovenian"),
             _("Swedish"),
             _("Turkish"),
-            _("Chinese"),
+            _("Chinese (Simplified)"),
             _("Japanese"),
-            _("Taiwanese"),
+            _("Chinese (Traditional)"),
             _("Korean"),
         ]
 
