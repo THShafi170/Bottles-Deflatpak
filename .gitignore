@@ -10,7 +10,7 @@
 /build
 /build-dir
 /mesonbuild
-
+.pre-commit-cache
 __pycache__
 .coverage
 /install dir
@@ -68,3 +68,4 @@ packagecache
 /build-flatpak.sh
 
 /FVS*/
+/result

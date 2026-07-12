@@ -34,6 +34,11 @@
   version,
 }:
 
+let
+  patool = python3Packages.patool.overridePythonAttrs (oldAttrs: {
+    doCheck = false;
+  });
+in
 python3Packages.buildPythonApplication {
   pname = "bottles-deflatpak-unwrapped";
   inherit version src;

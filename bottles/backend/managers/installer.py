@@ -382,7 +382,11 @@ class InstallerManager:
         steps = manifest.get("Steps")
         checks = manifest.get("Checks")
 
-        if not isinstance(executable, dict) or not executable.get("file") or not executable.get("name"):
+        if (
+            not isinstance(executable, dict)
+            or not executable.get("file")
+            or not executable.get("name")
+        ):
             logging.error("Installer manifest has no valid Executable block.")
             return Result(
                 False,

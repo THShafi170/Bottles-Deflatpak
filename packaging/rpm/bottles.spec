@@ -53,6 +53,7 @@ Requires:       python3dist(icoextract)
 Requires:       python3dist(patool)
 Requires:       python3dist(pathvalidate)
 Requires:       python3dist(pefile)
+Requires:       python3dist(vkbasalt-cli)
 Requires:       python3dist(yara-python)
 
 # Optional dependencies which may be required for running 32-bit bottles.

@@ -160,8 +160,6 @@ class PreferencesView(Adw.PreferencesPage):
         self.queue = details.queue
         self.details = details
 
-
-
         if not gamemode_available:
             self.switch_gamemode.set_tooltip_text(
                 _("This feature is unavailable on your system.")

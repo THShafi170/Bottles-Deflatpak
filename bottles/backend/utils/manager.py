@@ -21,7 +21,6 @@ from gettext import gettext as _
 from typing import Optional
 
 import icoextract  # type: ignore [import-untyped]
-import gi
 
 from bottles.backend.params import APP_ID
 
@@ -367,7 +366,6 @@ class ManagerUtils:
         exec_cmd = "bottles-cli run -p {} -b {} -- %u".format(
             shlex.quote(program.get("name")), shlex.quote(config.get("Name"))
         )
-
 
         # Attempt via XDG DynamicLauncher portal (works on GNOME, KDE, and
         # any desktop that implements xdg-desktop-portal).  Falls back to

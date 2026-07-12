@@ -175,18 +175,17 @@ class BottleConfig(DictCompatMixIn):
             if isinstance(file, IOBase):
                 yaml.dump(self.to_dict(), file, indent=indent, encoding=encoding)
             else:
-                directory = os.path.dirname(os.path.abspath(file))
+                file_path: str = file  # type: ignore[assignment]  # narrowed: not IOBase
+                directory = os.path.dirname(os.path.abspath(file_path))
                 fd, tmp_path = tempfile.mkstemp(
                     dir=directory, prefix=".bottle-", suffix=".tmp"
                 )
                 try:
                     with os.fdopen(fd, mode=mode) as f:
-                        yaml.dump(
-                            self.to_dict(), f, indent=indent, encoding=encoding
-                        )
+                        yaml.dump(self.to_dict(), f, indent=indent, encoding=encoding)
                         f.flush()
                         os.fsync(f.fileno())
-                    os.replace(tmp_path, file)
+                    os.replace(tmp_path, file_path)
                 except BaseException:
                     with contextlib.suppress(OSError):
                         os.remove(tmp_path)

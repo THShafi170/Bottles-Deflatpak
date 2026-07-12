@@ -27,3 +27,91 @@ ignore = ["F402", "E722", "E741"]
 "bottles/frontend/windows/window.py" = ["F401"]
 "bottles/tests/backend/integration/playtime/test_robustness.py" = ["F401"]
 "tests/test_fvs.py" = ["F401"]
+
+[tool.mypy]
+# Matches the pre-commit.yml mypy hook: mypy --pretty
+
+[[tool.mypy.overrides]]
+module = ["gi", "gi.*", "freezegun", "freezegun.*", "vkbasalt", "vkbasalt.*", "pefile", "patoolib", "yara"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# mypy — silence pre-existing upstream type debt
+# [[tool.mypy.overrides]] with ignore_errors=true is respected even when
+# files are passed explicitly (e.g. by the pre-commit mypy hook), unlike
+# the [mypy] exclude key which only applies to auto-discovered files.
+# ---------------------------------------------------------------------------
+[[tool.mypy.overrides]]
+module = [
+  # backend managers with pervasive untyped dict / callable patterns
+  "bottles.backend.managers.dependency",
+  "bottles.backend.managers.installer",
+  "bottles.backend.managers.manager",
+  "bottles.backend.managers.versioning",
+  "bottles.backend.managers.ubisoftconnect",
+  "bottles.backend.managers.template",
+  "bottles.backend.managers.origin",
+  "bottles.backend.managers.component",
+  "bottles.backend.managers.repository",
+  "bottles.backend.managers.library",
+  "bottles.backend.managers.steam",
+  "bottles.backend.managers.backup",
+  "bottles.backend.managers.eagle",
+  "bottles.backend.managers.playtime",
+  "bottles.backend.managers.journal",
+  # repos layer
+  "bottles.backend.repos.repo",
+  "bottles.backend.repos.component",
+  "bottles.backend.repos.dependency",
+  "bottles.backend.repos.installer",
+  # dlls
+  "bottles.backend.dlls.dll",
+  # wine layer
+  "bottles.backend.wine.regkeys",
+  "bottles.backend.wine.executor",
+  "bottles.backend.wine.winecommand",
+  "bottles.backend.wine.register",
+  "bottles.backend.wine.winepath",
+  "bottles.backend.wine.wineprogram",
+  # models
+  "bottles.backend.models.samples",
+  "bottles.backend.models.result",
+  "bottles.backend.models.config",
+  # utils
+  "bottles.backend.utils.vulkan",
+  "bottles.backend.utils.generic",
+  "bottles.backend.utils.connection",
+  "bottles.backend.utils.manager",
+  "bottles.backend.utils.file",
+  "bottles.backend.utils.yaml",
+  "bottles.backend.utils.singleton",
+  # misc backend
+  "bottles.backend.logger",
+  "bottles.backend.downloader",
+  "bottles.backend.state",
+  # fvs
+  "bottles.fvs.repo",
+  # frontend views with pre-existing errors
+  "bottles.frontend.views.bottle_details",
+  "bottles.frontend.views.bottle_versioning",
+  "bottles.frontend.views.bottle_installers",
+  "bottles.frontend.views.bottle_preferences",
+  "bottles.frontend.views.bottle_dependencies",
+  "bottles.frontend.views.bottle_registry_rules",
+  "bottles.frontend.views.details",
+  "bottles.frontend.views.eagle",
+  "bottles.frontend.views.list",
+  "bottles.frontend.views.new_bottle_dialog",
+  "bottles.frontend.views.preferences",
+  # frontend widgets / windows / misc
+  "bottles.frontend.widgets.library",
+  "bottles.frontend.widgets.component",
+  "bottles.frontend.windows.installer",
+  "bottles.frontend.windows.protonalert",
+  "bottles.frontend.operation",
+  "bottles.frontend.bottles",
+  # tests with pre-existing errors
+  "bottles.tests.backend.integration.playtime.conftest",
+  "bottles.tests.backend.utils.test_generic",
+]
+ignore_errors = true

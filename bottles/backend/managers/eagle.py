@@ -821,23 +821,35 @@ class EagleManager:
                     self._send_step("[Engines] Unreal Engine")
 
                 is_root_launcher = os.path.exists(os.path.join(exe_dir, "Engine"))
-                if (is_root_launcher
-                        and "shipping" not in basename.lower()
-                        and os.path.getsize(executable_path) < 1_048_576):
-                    self._send_step("[!] Unreal Engine bootstrapper detected – searching for shipping binary...")
+                if (
+                    is_root_launcher
+                    and "shipping" not in basename.lower()
+                    and os.path.getsize(executable_path) < 1_048_576
+                ):
+                    self._send_step(
+                        "[!] Unreal Engine bootstrapper detected – searching for shipping binary..."
+                    )
                     try:
                         with os.scandir(exe_dir) as it:
                             for entry in it:
                                 if not entry.is_dir():
                                     continue
                                 for arch in ("Win64", "Win32"):
-                                    binaries_path = os.path.join(entry.path, "Binaries", arch)
+                                    binaries_path = os.path.join(
+                                        entry.path, "Binaries", arch
+                                    )
                                     if not os.path.isdir(binaries_path):
                                         continue
                                     for f in os.listdir(binaries_path):
-                                        if f.lower().endswith(f"-{arch.lower()}-shipping.exe"):
-                                            ue_shipping_exe = os.path.join(binaries_path, f)
-                                            self._send_step(f"[Engines] Shipping binary found: {f}")
+                                        if f.lower().endswith(
+                                            f"-{arch.lower()}-shipping.exe"
+                                        ):
+                                            ue_shipping_exe = os.path.join(
+                                                binaries_path, f
+                                            )
+                                            self._send_step(
+                                                f"[Engines] Shipping binary found: {f}"
+                                            )
                                             break
                                     if ue_shipping_exe:
                                         break
@@ -1157,17 +1169,19 @@ class EagleManager:
             messages = []
 
             if ue_shipping_exe:
-                messages.append({
-                    "name": "Unreal Engine Bootstrapper",
-                    "description": (
-                        "This is the Unreal Engine launcher, not the game binary. "
-                        "It runs a VC++ prerequisite check that often fails in Wine even when "
-                        "the runtime is correctly installed, causing a misleading error dialog. "
-                        "Add the shipping binary directly to avoid this."
-                    ),
-                    "severity": "high",
-                    "context": [ue_shipping_exe],
-                })
+                messages.append(
+                    {
+                        "name": "Unreal Engine Bootstrapper",
+                        "description": (
+                            "This is the Unreal Engine launcher, not the game binary. "
+                            "It runs a VC++ prerequisite check that often fails in Wine even when "
+                            "the runtime is correctly installed, causing a misleading error dialog. "
+                            "Add the shipping binary directly to avoid this."
+                        ),
+                        "severity": "high",
+                        "context": [ue_shipping_exe],
+                    }
+                )
 
             # Generalized patrns and hints
             warns = flat_insights.get("Warning", [])

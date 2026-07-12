@@ -113,6 +113,13 @@ class VersioningManager:
         return self.manager.update_config(config, "Versioning", False)
 
     def create_state(self, config: BottleConfig, message: str = "No message"):
+        if not shutil.which("fvs2"):
+            return Result(
+                status=False,
+                message=_(
+                    "FVS2 is not installed or not in PATH. Snapshot support requires FVS2."
+                ),
+            )
         bottle_path = ManagerUtils.get_bottle_path(config)
         patterns = self.__get_patterns(config)
 
@@ -185,6 +192,12 @@ class VersioningManager:
         of the given bottle and return them as a dict.
         """
         if not self.needs_migration(config):
+            if not shutil.which("fvs2"):
+                return Result(
+                    status=False,
+                    message=_("FVS2 is not installed or not in PATH."),
+                    data={},
+                )
             try:
                 repo = FVSRepo(
                     repo_path=ManagerUtils.get_bottle_path(config),
@@ -239,6 +252,13 @@ class VersioningManager:
         self, config: BottleConfig, state_id: str | int, after: callable = None
     ) -> Result:
         if not self.needs_migration(config):
+            if not shutil.which("fvs2"):
+                return Result(
+                    status=False,
+                    message=_(
+                        "FVS2 is not installed or not in PATH. Snapshot support requires FVS2."
+                    ),
+                )
             patterns = self.__get_patterns(config)
             repo = FVSRepo(
                 repo_path=ManagerUtils.get_bottle_path(config),

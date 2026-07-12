@@ -239,11 +239,20 @@ class VersioningView(Adw.PreferencesPage):
             def _fetch():
                 res = self.versioning_manager.list_states(config, check_dirty=False)
                 if not self.versioning_manager.needs_migration(config):
-                    _act = res.data.get("state_id")
-                    _sts = res.data.get("states")
-                    _brs = res.data.get("branches", [])
-                    _act_br = res.data.get("active_branch", "")
-                    _changed_files = res.data.get("changed_files", 0)
+                    if isinstance(res, Result) and not res.status:
+                        _sts = {}
+                        _act = active
+                        _brs = []
+                        _act_br = ""
+                        _changed_files = 0
+                    else:
+                        _act = res.data.get("state_id") if res.data else active
+                        _sts = res.data.get("states") if res.data else {}
+                        _brs = res.data.get("branches", []) if res.data else []
+                        _act_br = res.data.get("active_branch", "") if res.data else ""
+                        _changed_files = (
+                            res.data.get("changed_files", 0) if res.data else 0
+                        )
                 else:
                     _sts = res
                     _act = active

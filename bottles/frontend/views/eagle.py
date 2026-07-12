@@ -461,14 +461,13 @@ class EagleView(Gtk.Box):
                     description = item.get("description", "")
                     context = item.get("context", [])
                     source = item.get("source", "")
-                    is_ue_bootstrapper = (name == "Unreal Engine Bootstrapper")
+                    is_ue_bootstrapper = name == "Unreal Engine Bootstrapper"
 
                     details_list = []
                     if source and source != "Main Executable":
                         details_list.append(f"Source: {source}")
 
                     if context and not is_ue_bootstrapper:
-
                         ctx_str = ", ".join(context[:5])
                         if len(context) > 5:
                             ctx_str += "..."
