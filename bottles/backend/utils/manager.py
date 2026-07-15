@@ -477,11 +477,12 @@ class ManagerUtils:
     @staticmethod
     def remove_desktop_entry(config, program: dict):
         desktop_entry_id = ManagerUtils.get_desktop_entry_id(config, program)
-        try:
-            portal.dynamic_launcher_uninstall(desktop_entry_id)
-            logging.info(f"Desktop entry removed: {desktop_entry_id}")
-        except GLib.Error as e:
-            logging.debug(f"Failed to remove desktop entry {desktop_entry_id}: {e}")
+        if portal_available and portal:
+            try:
+                portal.dynamic_launcher_uninstall(desktop_entry_id)
+                logging.info(f"Desktop entry removed: {desktop_entry_id}")
+            except GLib.Error as e:
+                logging.debug(f"Failed to remove desktop entry {desktop_entry_id}: {e}")
 
         desktop_entry_filename = ManagerUtils.get_desktop_entry_filename(
             config, program
