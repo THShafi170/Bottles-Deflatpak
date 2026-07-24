@@ -95,6 +95,8 @@ let
         SDL2
         udev
         vulkan-loader
+        vulkan-tools
+        mesa-demos
         libglvnd
 
         # Visual Tools

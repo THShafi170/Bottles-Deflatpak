@@ -153,9 +153,11 @@ class SandboxManager:
             if os.path.exists("/etc/resolv.conf"):
                 args.extend(["--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf"])
 
-        # User namespace
+        # User namespace & Home directory sharing
         if self.share_user:
-            args.append("--share-user")
+            home = os.path.expanduser("~")
+            if os.path.exists(home):
+                args.extend(["--bind", home, home])
 
         # Display sharing — X11 + Wayland
         if self.share_display:
@@ -196,15 +198,12 @@ class SandboxManager:
             if os.path.exists(pw_socket):
                 args.extend(["--bind", pw_socket, pw_socket])
 
-        # GPU sharing — DRI + NVIDIA + NixOS OpenGL drivers
+        # GPU sharing — DRI + NVIDIA + Vulkan / EGL ICDs + NixOS OpenGL drivers
         if self.share_gpu:
             if os.path.exists("/dev/dri"):
                 args.extend(["--dev-bind", "/dev/dri", "/dev/dri"])
 
-            for p in ["/run/opengl-driver", "/run/opengl-driver-32"]:
-                if os.path.exists(p):
-                    args.extend(["--ro-bind", p, p])
-
+            # Device nodes
             for i in range(16):
                 dev = f"/dev/nvidia{i}"
                 if os.path.exists(dev):
@@ -214,9 +213,28 @@ class SandboxManager:
                 "/dev/nvidia-modeset",
                 "/dev/nvidia-uvm",
                 "/dev/nvidia-uvm-tools",
+                "/dev/dma_heap",
+                "/dev/ion",
             ]:
                 if os.path.exists(dev):
                     args.extend(["--dev-bind", dev, dev])
+
+            # Drivers & ICD manifests (Standard distros & NixOS)
+            for p in [
+                "/usr/share/vulkan",
+                "/etc/vulkan",
+                "/usr/share/glvnd",
+                "/etc/glvnd",
+                "/usr/lib/dri",
+                "/usr/lib64/dri",
+                "/usr/lib/x86_64-linux-gnu/dri",
+                "/usr/lib/i386-linux-gnu/dri",
+                "/run/opengl-driver",
+                "/run/opengl-driver-32",
+                "/etc/static",
+            ]:
+                if os.path.exists(p):
+                    args.extend(["--ro-bind", p, p])
 
         return args
 
