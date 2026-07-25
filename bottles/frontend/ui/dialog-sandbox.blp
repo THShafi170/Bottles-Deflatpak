@@ -21,26 +21,12 @@ template $SandboxDialog: Adw.Window {
 
     Adw.PreferencesPage {
       Adw.PreferencesGroup {
-        Adw.ActionRow {
-          title: _("Share Network");
-          activatable-widget: switch_net;
-
-          Switch switch_net {
-            valign: center;
-          }
-        }
-
-        Adw.ActionRow {
-          title: _("Share Sound");
-          activatable-widget: switch_sound;
-
-          Switch switch_sound {
-            valign: center;
-          }
-        }
+        title: _("Hardware & Resources");
+        description: _("Configure resource access for the native Bubblewrap sandbox.");
 
         Adw.ActionRow {
           title: _("Share GPU");
+          subtitle: _("Expose Mesa, Vulkan ICDs, and graphics devices for 3D acceleration");
           activatable-widget: switch_gpu;
 
           Switch switch_gpu {
@@ -49,16 +35,18 @@ template $SandboxDialog: Adw.Window {
         }
 
         Adw.ActionRow {
-          title: _("Share Host Filesystem (Read-Only)");
-          activatable-widget: switch_host_ro;
+          title: _("Share Sound");
+          subtitle: _("Expose PipeWire and PulseAudio sound sockets");
+          activatable-widget: switch_sound;
 
-          Switch switch_host_ro {
+          Switch switch_sound {
             valign: center;
           }
         }
 
         Adw.ActionRow {
           title: _("Share Display");
+          subtitle: _("Expose X11 and Wayland display sockets");
           activatable-widget: switch_display;
 
           Switch switch_display {
@@ -67,7 +55,22 @@ template $SandboxDialog: Adw.Window {
         }
 
         Adw.ActionRow {
-          title: _("Share User");
+          title: _("Share Network");
+          subtitle: _("Allow internet and local network access");
+          activatable-widget: switch_net;
+
+          Switch switch_net {
+            valign: center;
+          }
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: _("Filesystem Access");
+
+        Adw.ActionRow {
+          title: _("Share Home Directory");
+          subtitle: _("Allow read-write access to your home directory (~)");
           activatable-widget: switch_user;
 
           Switch switch_user {
@@ -75,6 +78,15 @@ template $SandboxDialog: Adw.Window {
           }
         }
 
+        Adw.ActionRow {
+          title: _("Share Host System Files");
+          subtitle: _("Bind system configuration (/etc) read-only");
+          activatable-widget: switch_host_ro;
+
+          Switch switch_host_ro {
+            valign: center;
+          }
+        }
       }
     }
   }
