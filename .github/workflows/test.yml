@@ -1,0 +1,79 @@
+name: Test changes and Packaging
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'bottles/**'
+      - 'data/**'
+      - 'meson.build'
+      - 'meson_options.txt'
+      - 'build-packages.sh'
+      - 'pyproject.toml'
+
+jobs:
+  validate:
+    name: "Validate & Version"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -oP "version: '\K[^']+" meson.build | head -1)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install system dependencies for pre-commit hooks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcairo2-dev \
+            libgirepository-2.0-dev \
+            gobject-introspection \
+            gir1.2-gtk-4.0 \
+            libgtk-4-dev \
+            pkg-config
+      - uses: pre-commit/action@v3.0.1
+
+  tarball:
+    name: "Build Binary Tarball (.tar.gz)"
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            blueprint-compiler \
+            gettext \
+            desktop-file-utils \
+            appstream \
+            python3-dev \
+            python3-pip \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1
+          sudo pip3 install --break-system-packages "meson>=1.5.0"
+          meson --version
+
+      - name: Build Tarball Package
+        run: |
+          chmod +x build-packages.sh
+          ./build-packages.sh
+
+      - name: Upload Tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-tarball
+          path: "*.tar.gz"
