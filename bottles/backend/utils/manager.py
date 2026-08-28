@@ -15,15 +15,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-import shlex
+import re
 import shutil
+import subprocess
+from collections.abc import Callable
 from gettext import gettext as _
 from typing import Optional
 
 import icoextract  # type: ignore [import-untyped]
 
 from bottles.backend.params import APP_ID
-
 from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
 from bottles.backend.models.config import BottleConfig
@@ -58,6 +59,8 @@ class ManagerUtils:
     directly related to the Manager.
     """
 
+    external_runner_paths: dict[str, str] = {}
+
     @staticmethod
     def open_filemanager(
         config: Optional[BottleConfig] = None,
@@ -79,6 +82,8 @@ class ManagerUtils:
         elif component != "":
             if path_type in ["runner", "runner:proton"]:
                 path = ManagerUtils.get_runner_path(component)
+            elif path_type == "d7vk":
+                path = ManagerUtils.get_d7vk_path(component)
             elif path_type == "dxvk":
                 path = ManagerUtils.get_dxvk_path(component)
             elif path_type == "vkd3d":
@@ -95,8 +100,8 @@ class ManagerUtils:
         if path_type == "custom" and custom_path != "":
             path = custom_path
 
-        path = f"file://{path}"
-        SignalManager.send(Signals.GShowUri, Result(data=path))
+        uri = Gio.File.new_for_path(path).get_uri()
+        SignalManager.send(Signals.GShowUri, Result(data=uri))
 
     @staticmethod
     def get_bottle_path(config: BottleConfig) -> str:
@@ -112,11 +117,44 @@ class ManagerUtils:
     def resolve_portal_path(path: str) -> str:
         """
         Resolve a document portal path (/run/user/<uid>/doc/<id>/...) to its real
-        host path through the Documents portal. These paths are transient: the
-        document id changes between sessions, so storing one (e.g. a program
-        shortcut on a read-only filesystem) breaks the entry on the next launch.
-        Returns the original path unchanged on any failure.
+        host path through the Documents portal when the host path is accessible
+        inside the sandbox. Returns the original path unchanged on any failure.
         """
+        if not path or "/run/user/" not in path or "/doc/" not in path:
+            return path
+
+        resolved = ManagerUtils.get_portal_host_path(path)
+        return resolved if resolved and os.path.exists(resolved) else path
+
+    @staticmethod
+    def is_portal_document_path(path: str) -> bool:
+        if not path:
+            return False
+
+        portal_root = f"/run/user/{os.getuid()}/doc"
+        normalized = os.path.normpath(path)
+        if normalized != path:
+            return False
+
+        try:
+            if os.path.commonpath((portal_root, normalized)) != portal_root:
+                return False
+        except ValueError:
+            return False
+
+        relative_path = os.path.relpath(normalized, portal_root)
+        if len(relative_path.split(os.sep)) < 2:
+            return False
+
+        return (
+            os.path.isfile(normalized)
+            and not os.path.islink(normalized)
+            and os.path.realpath(normalized) == normalized
+        )
+
+    @staticmethod
+    def get_portal_host_path(path: str) -> Optional[str]:
+        """Return the host path represented by a document portal path."""
         if not path or "/run/user/" not in path or "/doc/" not in path:
             return path
 
@@ -148,7 +186,7 @@ class ManagerUtils:
                 ).unpack()[0]
             )
             if not mount or not path.startswith(mount + "/"):
-                return path
+                return None
 
             doc_id, _, remainder = path[len(mount) + 1 :].partition("/")
 
@@ -160,28 +198,41 @@ class ManagerUtils:
                 None,
             ).unpack()[0]
             if doc_id not in hosts:
-                return path
+                return None
 
             host = _to_str(hosts[doc_id])
-            if remainder and os.path.basename(host) != remainder.rstrip("/"):
-                resolved = os.path.join(host, remainder)
-            else:
-                resolved = host
-
-            return resolved if os.path.exists(resolved) else path
+            exported_name, _, nested_path = remainder.partition("/")
+            if exported_name and os.path.basename(host) != exported_name:
+                return None
+            if nested_path:
+                resolved = os.path.normpath(os.path.join(host, nested_path))
+                if os.path.commonpath((host, resolved)) != os.path.normpath(host):
+                    return None
+                return resolved
+            return host
         except Exception as e:
             logging.warning(f"Could not resolve document portal path: {e}")
-            return path
+            return None
 
     @staticmethod
     def get_runner_path(runner: str) -> str:
         if runner.startswith("sys-") or runner.startswith("/"):
             return runner
+        if runner in ManagerUtils.external_runner_paths:
+            return ManagerUtils.external_runner_paths[runner]
         return f"{Paths.runners}/{runner}"
+
+    @staticmethod
+    def set_external_runner_paths(runners: dict[str, str]) -> None:
+        ManagerUtils.external_runner_paths = runners.copy()
 
     @staticmethod
     def get_dxvk_path(dxvk: str) -> str:
         return f"{Paths.dxvk}/{dxvk}"
+
+    @staticmethod
+    def get_d7vk_path(d7vk: str) -> str:
+        return f"{Paths.d7vk}/{d7vk}"
 
     @staticmethod
     def get_vkd3d_path(vkd3d: str) -> str:
@@ -290,7 +341,9 @@ class ManagerUtils:
                     ico_dest_temp = f"{ico_dest_temp}.ico"
                 im = ImageMagickUtils(ico_dest_temp)
                 im.convert(ico_dest)
-                icon = ico_dest
+                os.remove(ico_dest_temp)
+                if os.path.isfile(ico_dest):
+                    icon = ico_dest
             else:
                 shutil.move(ico_dest_temp, ico_dest)
                 icon = ico_dest
@@ -305,6 +358,10 @@ class ManagerUtils:
         program: dict,
         skip_icon: bool = False,
         custom_icon: str = "",
+        callback: Callable[[Result], None] | None = None,
+        on_created=None,
+        on_failed=None,
+        on_cancelled=None,
     ):
         """
         Create a desktop entry for the program.
@@ -318,33 +375,83 @@ class ManagerUtils:
         elif custom_icon:
             icon = custom_icon
 
-        def create_manual_fallback(icon_path, exec_cmd):
-            """Create desktop entry manually when portal is unavailable or fails."""
-            filename = ManagerUtils.get_desktop_entry_filename(config, program)
-            executable = program.get("executable") or program.get("name") or "bottles"
+        def notify(result: Result) -> None:
+            if callback:
+                callback(result)
+                return
+            SignalManager.send(Signals.DesktopEntryCreated, result)
 
-            content = (
-                f"[Desktop Entry]\n"
-                f"Exec={exec_cmd}\n"
-                f"Type=Application\n"
-                f"Terminal=false\n"
-                f"Categories=Game;\n"
-                f"Comment=Launch {program.get('name')} using Bottles.\n"
-                f"StartupWMClass={executable.lower()}\n"
-                f"Name={program.get('name')}\n"
-                f"Icon={icon_path}\n"
+        try:
+            portal_exec_cmd = ManagerUtils.get_desktop_entry_exec(
+                config, program, for_host=True
             )
+            portal_content = ManagerUtils.build_desktop_entry(
+                config, program, portal_exec_cmd
+            )
+        except ValueError as error:
+            logging.error(f"Failed to create desktop entry: {error}")
+            notify(Result(False, message=str(error)))
+            if on_failed:
+                on_failed()
+            return
+
+        def notify_created(method: str, paths=None, message: str = ""):
+            data = {"method": method}
+            if paths is not None:
+                data["paths"] = paths
+            notify(Result(True, data=data, message=message))
+            if on_created:
+                on_created()
+
+        def notify_failed(message: str = "", method=None, paths=None):
+            data = {}
+            if method is not None:
+                data["method"] = method
+            if paths is not None:
+                data["paths"] = paths
+            notify(Result(False, data=data, message=message))
+            if on_failed:
+                on_failed()
+
+        def create_manual_fallback(icon_path):
+            """Create desktop entry manually when portal is unavailable."""
+            filename = ManagerUtils.get_desktop_entry_filename(config, program)
+            _, mime_types, _ = ManagerUtils.resolve_file_associations(
+                program.get("file_extensions", [])
+            )
+            default_apps = {
+                mime_type: Gio.AppInfo.get_default_for_type(mime_type, False)
+                for mime_type in mime_types
+            }
+            host_exec_cmd = ManagerUtils.get_desktop_entry_exec(
+                config, program, for_host=True
+            )
+            if icon_path == "com.usebottles.bottles-program":
+                icon_path = APP_ID
+            content = ManagerUtils.build_desktop_entry(
+                config,
+                program,
+                host_exec_cmd,
+                icon_path,
+            )
+            paths = []
+            errors = []
 
             # Write to application menu (~/.local/share/applications)
             apps_dir = os.path.expanduser("~/.local/share/applications")
-            os.makedirs(apps_dir, exist_ok=True)
             apps_path = os.path.join(apps_dir, filename)
             try:
+                os.makedirs(apps_dir, exist_ok=True)
                 with open(apps_path, "w") as f:
                     f.write(content)
+                paths.append(apps_path)
                 logging.info(f"Desktop entry created at {apps_path}")
-            except Exception as e:
+                ManagerUtils.update_desktop_database(apps_dir, default_apps)
+            except OSError as e:
+                errors.append(str(e))
                 logging.error(f"Failed to write desktop entry to applications: {e}")
+                notify_failed("\n".join(errors), "manual", paths)
+                return
 
             # Also write a shortcut to the desktop surface
             desktop_dir = GLib.get_user_special_dir(
@@ -357,15 +464,288 @@ class ManagerUtils:
                         f.write(content)
                     # Mark executable so KDE/GNOME desktop shells will run it
                     os.chmod(desktop_path, 0o755)
+                    paths.append(desktop_path)
                     logging.info(f"Desktop shortcut created at {desktop_path}")
-                except Exception as e:
+                except OSError as e:
+                    errors.append(str(e))
                     logging.error(f"Failed to write desktop shortcut: {e}")
 
-            SignalManager.send(Signals.DesktopEntryCreated)
+            notify_created("manual", paths, "\n".join(errors))
 
-        exec_cmd = "bottles-cli run -p {} -b {} -- %u".format(
-            shlex.quote(program.get("name")), shlex.quote(config.get("Name"))
+        portal_entry_state = ManagerUtils.get_portal_desktop_entry_state(
+            config, program
         )
+        if portal_entry_state is None:
+            logging.warning("Could not determine the Dynamic Launcher state.")
+            notify_failed()
+            return
+
+        def prepare_install_cb(self, result):
+            # Handle portal preparation failure (e.g., KDE's broken implementation)
+            try:
+                ret = portal.dynamic_launcher_prepare_install_finish(result)
+                if ret is None:
+                    logging.info("Dynamic Launcher portal request cancelled.")
+                    if on_cancelled:
+                        on_cancelled()
+                    return
+            except GLib.Error as e:
+                if ManagerUtils.is_cancelled_portal_error(e):
+                    logging.info("Dynamic Launcher portal request cancelled.")
+                    if on_cancelled:
+                        on_cancelled()
+                    return
+                logging.warning(
+                    f"Dynamic Launcher portal preparation failed: {e}. "
+                    "Using the manual launcher when safe."
+                )
+                if portal_entry_state is False:
+                    create_manual_fallback(icon)
+                else:
+                    notify_failed()
+                return
+
+            try:
+                portal.dynamic_launcher_install(
+                    ret["token"],
+                    ManagerUtils.get_desktop_entry_id(config, program),
+                    portal_content,
+                )
+                if not ManagerUtils.remove_manual_desktop_entry(config, program):
+                    notify_failed()
+                    return
+                notify_created("portal")
+            except GLib.Error as e:
+                logging.warning(
+                    f"Dynamic Launcher portal install failed: {e}. "
+                    "Using the manual launcher when safe."
+                )
+                if portal_entry_state is False:
+                    create_manual_fallback(icon)
+                else:
+                    notify_failed()
+
+        if icon != "com.usebottles.bottles-program" and not os.path.exists(icon):
+            logging.warning(f"Icon file not found: {icon}. Falling back to default.")
+            icon = "com.usebottles.bottles-program"
+
+        try:
+            ManagerUtils.validate_desktop_entry_value(icon)
+        except ValueError as error:
+            logging.error(f"Failed to create desktop entry: {error}")
+            notify_failed()
+            return
+
+        if icon == "com.usebottles.bottles-program":
+            _icon = Gio.File.new_for_uri(
+                f"resource:/com/usebottles/bottles/icons/scalable/apps/{icon}.svg"
+            )
+        else:
+            _icon = Gio.File.new_for_path(icon)
+        icon_v = Gio.BytesIcon.new(_icon.load_bytes()[0]).serialize()
+        try:
+            portal.dynamic_launcher_prepare_install(
+                None,
+                program.get("name"),
+                icon_v,
+                Xdp.LauncherType.APPLICATION,
+                None,
+                True,
+                False,
+                None,
+                prepare_install_cb,
+            )
+        except GLib.Error as error:
+            logging.warning(f"Dynamic Launcher portal request failed: {error}")
+            if portal_entry_state is False:
+                create_manual_fallback(icon)
+            else:
+                notify_failed()
+
+    @staticmethod
+    def resolve_file_associations(value) -> tuple[list[str], list[str], list[str]]:
+        if isinstance(value, str):
+            candidates = [part for part in re.split(r"[\s,;]+", value) if part]
+        elif isinstance(value, list):
+            candidates = value
+        else:
+            candidates = []
+
+        extensions = []
+        mime_types = []
+        invalid = []
+        extension_pattern = re.compile(r"\.[a-z0-9][a-z0-9._+-]{0,31}")
+
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                invalid.append(str(candidate))
+                continue
+
+            extension = candidate.strip().lower()
+            if not extension.startswith("."):
+                extension = f".{extension}"
+
+            if (
+                not extension_pattern.fullmatch(extension)
+                or ".." in extension
+                or extension.endswith(".")
+            ):
+                invalid.append(candidate)
+                continue
+
+            content_type, _uncertain = Gio.content_type_guess(f"file{extension}", None)
+            mime_type = Gio.content_type_get_mime_type(content_type)
+            if not mime_type or mime_type == "application/octet-stream":
+                invalid.append(candidate)
+                continue
+
+            if extension not in extensions:
+                extensions.append(extension)
+            if mime_type not in mime_types:
+                mime_types.append(mime_type)
+
+        return extensions, mime_types, invalid
+
+    @staticmethod
+    def get_desktop_entry_exec(config, program: dict, for_host: bool = False) -> str:
+        umu_game = program.get("umu_game")
+        if umu_game:
+            command = "bottles-cli"
+            flatpak_id = os.environ.get("FLATPAK_ID")
+            if for_host and flatpak_id:
+                command = "flatpak run --command=bottles-cli {}".format(
+                    ManagerUtils.quote_desktop_entry_exec_arg(flatpak_id)
+                )
+            return "{} umu run --game {}".format(
+                command,
+                ManagerUtils.quote_desktop_entry_exec_arg(umu_game),
+            )
+
+        _, mime_types, _ = ManagerUtils.resolve_file_associations(
+            program.get("file_extensions", [])
+        )
+        field_code = "%f" if mime_types else "%u"
+        command = "bottles-cli"
+        field_argument = field_code
+        flatpak_id = os.environ.get("FLATPAK_ID")
+        if for_host and flatpak_id:
+            command = "flatpak run --command=bottles-cli --file-forwarding {}".format(
+                ManagerUtils.quote_desktop_entry_exec_arg(flatpak_id)
+            )
+            forwarding_marker = "@@" if field_code == "%f" else "@@u"
+            field_argument = f"{forwarding_marker} {field_code} @@"
+
+        return "{} run -p {} -b {} -- {}".format(
+            command,
+            ManagerUtils.quote_desktop_entry_exec_arg(program.get("name", "")),
+            ManagerUtils.quote_desktop_entry_exec_arg(config.get("Name", "")),
+            field_argument,
+        )
+
+    @staticmethod
+    def quote_desktop_entry_exec_arg(value: str) -> str:
+        value = ManagerUtils.validate_desktop_entry_value(value)
+        value = value.replace("\\", "\\\\")
+        for character in ('"', "`", "$"):
+            value = value.replace(character, f"\\{character}")
+        value = value.replace("%", "%%")
+        return f'"{value}"'
+
+    @staticmethod
+    def validate_desktop_entry_value(value) -> str:
+        value = str(value or "")
+        if re.search(r"[\x00-\x1f\x7f]", value):
+            raise ValueError("desktop entry values cannot contain control characters")
+        return value
+
+    @staticmethod
+    def update_desktop_database(
+        applications_dir: str, default_apps: Optional[dict] = None
+    ) -> None:
+        updater = shutil.which("update-desktop-database")
+        if not updater:
+            return
+
+        try:
+            result = subprocess.run(
+                [updater, applications_dir],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            if result.returncode != 0:
+                logging.warning(
+                    f"Failed to update the desktop database: {result.stderr.strip()}"
+                )
+                return
+
+            for mime_type, app_info in (default_apps or {}).items():
+                if app_info is None:
+                    continue
+                if not app_info.set_as_default_for_type(mime_type):
+                    logging.warning(
+                        f"Failed to preserve the default application for {mime_type}."
+                    )
+        except OSError as error:
+            logging.warning(f"Failed to update the desktop database: {error}")
+        except GLib.Error as error:
+            logging.warning(f"Failed to preserve a default application: {error}")
+
+    @staticmethod
+    def build_desktop_entry(
+        config,
+        program: dict,
+        exec_cmd: str,
+        icon_path: Optional[str] = None,
+    ) -> str:
+        _, mime_types, _ = ManagerUtils.resolve_file_associations(
+            program.get("file_extensions", [])
+        )
+        name = ManagerUtils.validate_desktop_entry_value(program.get("name", ""))
+        executable = ManagerUtils.validate_desktop_entry_value(
+            program.get("executable", "")
+        )
+        exec_cmd = ManagerUtils.validate_desktop_entry_value(exec_cmd)
+
+        desktop_entry = GLib.KeyFile()
+        group = "Desktop Entry"
+        desktop_entry.set_string(group, "Exec", exec_cmd)
+        desktop_entry.set_string(group, "Type", "Application")
+        desktop_entry.set_boolean(group, "Terminal", False)
+        desktop_entry.set_string(group, "Categories", "Game;")
+        desktop_entry.set_string(group, "Comment", f"Launch {name} using Bottles.")
+        wm_class = executable.lower()
+        app_id = ManagerUtils.get_program_steam_app_id(config, program)
+        if app_id:
+            wm_class = f"steam_app_{app_id}"
+        desktop_entry.set_string(group, "StartupWMClass", wm_class)
+        if mime_types:
+            desktop_entry.set_string(group, "MimeType", f"{';'.join(mime_types)};")
+        if icon_path is not None:
+            desktop_entry.set_string(group, "Name", name)
+            desktop_entry.set_string(
+                group,
+                "Icon",
+                ManagerUtils.validate_desktop_entry_value(icon_path),
+            )
+        return desktop_entry.to_data()[0]
+
+    @staticmethod
+    def get_program_steam_app_id(config, program: dict) -> str:
+        environments = (
+            program.get("environment"),
+            config.get("Environment_Variables"),
+        )
+        for environment in environments:
+            if not isinstance(environment, dict):
+                continue
+            app_id = environment.get("SteamAppId")
+            if isinstance(app_id, str) and re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,117}", app_id
+            ):
+                return app_id
+
+        return ""
 
         # Attempt via XDG DynamicLauncher portal (works on GNOME, KDE, and
         # any desktop that implements xdg-desktop-portal).  Falls back to
@@ -475,28 +855,48 @@ class ManagerUtils:
         return f"bottles-{safe_bottle}-{safe_name}.desktop"
 
     @staticmethod
-    def remove_desktop_entry(config, program: dict):
-        desktop_entry_id = ManagerUtils.get_desktop_entry_id(config, program)
-        if portal_available and portal:
-            try:
-                portal.dynamic_launcher_uninstall(desktop_entry_id)
-                logging.info(f"Desktop entry removed: {desktop_entry_id}")
-            except GLib.Error as e:
-                logging.debug(f"Failed to remove desktop entry {desktop_entry_id}: {e}")
+    def is_missing_portal_entry_error(error: GLib.Error) -> bool:
+        return error.matches(
+            GLib.file_error_quark(), GLib.FileError.NOENT
+        ) or error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.NOT_FOUND)
 
+    @staticmethod
+    def is_cancelled_portal_error(error: GLib.Error) -> bool:
+        return error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.CANCELLED)
+
+    @staticmethod
+    def get_portal_desktop_entry_state(config, program: dict) -> Optional[bool]:
+        desktop_entry_id = ManagerUtils.get_desktop_entry_id(config, program)
+        try:
+            portal.dynamic_launcher_get_desktop_entry(desktop_entry_id)
+            return True
+        except GLib.Error as error:
+            if ManagerUtils.is_missing_portal_entry_error(error):
+                return False
+            logging.warning(
+                f"Failed to query Dynamic Launcher entry {desktop_entry_id}: {error}"
+            )
+            return None
+
+    @staticmethod
+    def get_manual_desktop_entry_paths(config, program: dict) -> tuple[str, list[str]]:
         desktop_entry_filename = ManagerUtils.get_desktop_entry_filename(
             config, program
         )
-        entry_paths = [
-            os.path.join(
-                os.path.expanduser("~/.local/share/applications"),
-                desktop_entry_filename,
-            )
-        ]
+        applications_dir = os.path.expanduser("~/.local/share/applications")
+        entry_paths = [os.path.join(applications_dir, desktop_entry_filename)]
         desktop_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
         if desktop_dir:
             entry_paths.append(os.path.join(desktop_dir, desktop_entry_filename))
+        return applications_dir, entry_paths
 
+    @staticmethod
+    def remove_manual_desktop_entry(config, program: dict) -> bool:
+        applications_dir, entry_paths = ManagerUtils.get_manual_desktop_entry_paths(
+            config, program
+        )
+        application_removed = False
+        success = True
         for entry_path in entry_paths:
             if not os.path.exists(entry_path):
                 continue
@@ -504,8 +904,90 @@ class ManagerUtils:
             try:
                 os.remove(entry_path)
                 logging.info(f"Desktop entry removed: {entry_path}")
-            except OSError as e:
-                logging.warning(f"Failed to remove desktop entry {entry_path}: {e}")
+                if entry_path.startswith(applications_dir + os.sep):
+                    application_removed = True
+            except OSError as error:
+                success = False
+                logging.warning(f"Failed to remove desktop entry {entry_path}: {error}")
+
+        if application_removed:
+            ManagerUtils.update_desktop_database(applications_dir)
+        return success
+
+    @staticmethod
+    def has_desktop_entry(config, program: dict) -> Optional[bool]:
+        portal_state = ManagerUtils.get_portal_desktop_entry_state(config, program)
+        if portal_state is True:
+            return True
+
+        _, entry_paths = ManagerUtils.get_manual_desktop_entry_paths(config, program)
+        if any(os.path.exists(entry_path) for entry_path in entry_paths):
+            return True
+        return portal_state
+
+    @staticmethod
+    def remove_desktop_entry(config, program: dict) -> bool:
+        desktop_entry_id = ManagerUtils.get_desktop_entry_id(config, program)
+        portal_state = ManagerUtils.get_portal_desktop_entry_state(config, program)
+        if portal_state is None:
+            _, entry_paths = ManagerUtils.get_manual_desktop_entry_paths(
+                config, program
+            )
+            if not any(os.path.exists(entry_path) for entry_path in entry_paths):
+                return False
+            return ManagerUtils.remove_manual_desktop_entry(config, program)
+        if portal_state:
+            try:
+                portal.dynamic_launcher_uninstall(desktop_entry_id)
+                logging.info(f"Desktop entry removed: {desktop_entry_id}")
+            except GLib.Error as error:
+                if not ManagerUtils.is_missing_portal_entry_error(error):
+                    logging.warning(
+                        f"Failed to remove desktop entry {desktop_entry_id}: {error}"
+                    )
+                    return False
+
+        return ManagerUtils.remove_manual_desktop_entry(config, program)
+
+    @staticmethod
+    def get_autostart_programs(configs):
+        programs = []
+        for config in configs:
+            for program in getattr(config, "External_Programs", {}).values():
+                if (
+                    program.get("autostart")
+                    and program.get("id")
+                    and not program.get("removed")
+                ):
+                    programs.append((config, program))
+        return programs
+
+    @staticmethod
+    def set_autostart_entry(enabled: bool) -> bool:
+        autostart_dir = os.path.join(GLib.get_user_config_dir(), "autostart")
+        entry_path = os.path.join(autostart_dir, f"{APP_ID}.autostart.desktop")
+
+        try:
+            if not enabled:
+                if os.path.exists(entry_path):
+                    os.remove(entry_path)
+                return True
+
+            os.makedirs(autostart_dir, exist_ok=True)
+            with open(entry_path, "w", encoding="utf-8") as entry:
+                entry.write(
+                    "[Desktop Entry]\n"
+                    "Type=Application\n"
+                    "Name=Bottles\n"
+                    "Comment=Launch selected Bottles programs\n"
+                    "Exec=bottles-cli autostart\n"
+                    "Terminal=false\n"
+                    "NoDisplay=true\n"
+                )
+            return True
+        except OSError as error:
+            logging.error(f"Failed to update the autostart entry: {error}")
+            return False
 
     @staticmethod
     def browse_wineprefix(wineprefix: dict):

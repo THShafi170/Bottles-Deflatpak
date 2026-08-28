@@ -24,11 +24,14 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
 
 from pathvalidate import sanitize_filename
 
+from bottles.backend.globals import is_cpak
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
 from bottles.backend.state import Task, TaskManager
 from bottles.backend.utils.threading import RunAsync
+from bottles.frontend.utils.common import format_runner_name
 from bottles.frontend.utils.filters import add_all_filters, add_yaml_filters
+from bottles.frontend.utils.flatpak import resolve_bottles_directory
 from bottles.frontend.utils.gtk import GtkUtils
 
 
@@ -78,6 +81,7 @@ class BottlesNewBottleDialog(Adw.Dialog):
     str_list_runner = Gtk.Template.Child()
     menu_duplicate = Gtk.Template.Child()
     environment_list_box = Gtk.Template.Child()
+    switch_sandbox = Gtk.Template.Child()
 
     selected_environment = GObject.Property(type=str, default=None)
 
@@ -85,9 +89,14 @@ class BottlesNewBottleDialog(Adw.Dialog):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.combo_runner.set_list_factory(
+            GtkUtils.create_full_width_string_list_factory()
+        )
         # common variables and references
         self.window = GtkUtils.get_parent_window()
-        if not self.window:
+        if not self.window or (
+            not is_cpak() and not Xdp.Portal.running_under_sandbox()
+        ):
             return
 
         self.app = self.window.get_application()
@@ -128,16 +137,9 @@ class BottlesNewBottleDialog(Adw.Dialog):
         # Populate widgets
         self.label_choose_env.set_label(self.default_string)
         self.label_choose_path.set_label(self.default_string)
-        runners = []
-        for runner in self.manager.runners_available:
-            _runner = runner
-            if runner.startswith("/"):
-                if "steam" in runner.lower():
-                    _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
-                else:
-                    _runner = f"{os.path.basename(runner.strip('/'))} (Custom)"
-            runners.append(_runner)
-        self.str_list_runner.splice(0, 0, runners)
+        self.str_list_runner.splice(
+            0, 0, [format_runner_name(r) for r in self.manager.runners_available]
+        )
         self.str_list_arch.splice(0, 0, list(self.arch.values()))
 
         self.selected_environment = (
@@ -212,21 +214,8 @@ class BottlesNewBottleDialog(Adw.Dialog):
             except GLib.Error:
                 return
 
-            path = folder.get_path()
-            if path and "/run/user/" in path and "/doc/" in path:
-                """
-                Folders reached through the document portal are exposed under a
-                temporary mount that does not survive a reboot. A bottle created
-                there would vanish and break on the next session, so reject the
-                selection and ask the user to pick a regular folder.
-                """
-                self.window.show_toast(
-                    _(
-                        "This folder is only available as a temporary location "
-                        "and would be lost after a reboot. Please choose a "
-                        "different folder."
-                    )
-                )
+            path = resolve_bottles_directory(self.window, folder.get_path())
+            if path is None:
                 return
 
             self.custom_path = path
@@ -252,7 +241,12 @@ class BottlesNewBottleDialog(Adw.Dialog):
         self.btn_cancel_creating.set_sensitive(True)
         self.btn_cancel_creating.set_label(_("_Cancel Creation"))
 
-        self.runner = self.manager.runners_available[self.combo_runner.get_selected()]
+        runner_index = self.combo_runner.get_selected()
+        self.runner = (
+            self.manager.runners_available[runner_index]
+            if runner_index < len(self.manager.runners_available)
+            else False
+        )
 
         self.__clear_creation_task()
 
@@ -269,7 +263,8 @@ class BottlesNewBottleDialog(Adw.Dialog):
             environment=self.selected_environment,
             runner=self.runner,
             arch=list(self.arch)[self.combo_arch.get_selected()],
-            dxvk=self.manager.dxvk_available[0],
+            dxvk=self.manager.dxvk_available[0] if self.manager.dxvk_available else False,
+            sandbox=self.switch_sandbox.get_active(),
             fn_logger=self.update_output,
             custom_environment=self.env_recipe_path,
             cancel_event=self._creation_cancel_event,

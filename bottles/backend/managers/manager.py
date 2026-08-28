@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import contextlib
 import fnmatch
 import os
 import random
@@ -24,14 +23,16 @@ import shutil
 import subprocess
 import time
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from gettext import gettext as _
 from glob import glob
 from threading import Event
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 import pathvalidate
 
+from bottles.backend.dlls.d7vk import D7VKComponent
 from bottles.backend.dlls.dxvk import DXVKComponent
 from bottles.backend.dlls.latencyflex import LatencyFleXComponent
 from bottles.backend.dlls.nvapi import NVAPIComponent
@@ -66,6 +67,16 @@ from bottles.backend.state import (
     SignalManager,
     Signals,
 )
+from bottles.backend.umu import (
+    UmuDatabaseClient,
+    UmuExecutor,
+    UmuDependencyInstaller,
+    UmuGameRepository,
+    UmuInstallation,
+    UmuProtonCatalog,
+    UmuProvider,
+    UmuProviderError,
+)
 from bottles.backend.utils import yaml
 from bottles.backend.utils.connection import ConnectionUtils
 from bottles.backend.utils.file import FileUtils
@@ -77,6 +88,8 @@ from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.singleton import Singleton
 from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.threading import RunAsync
+from bottles.backend.utils.wine import WineUtils
+from bottles.backend.wine.drives import Drives
 from bottles.backend.wine.reg import Reg
 from bottles.backend.wine.regkeys import RegKeys
 from bottles.backend.wine.uninstaller import Uninstaller
@@ -100,6 +113,8 @@ class Manager(metaclass=Singleton):
     runtimes_available = []
     winebridge_available = []
     runners_available = []
+    external_runners: set[str] = set()
+    d7vk_available: ClassVar[list] = []
     dxvk_available = []
     vkd3d_available = []
     nvapi_available = []
@@ -110,6 +125,7 @@ class Manager(metaclass=Singleton):
     supported_winebridge = {}
     supported_wine_runners = {}
     supported_proton_runners = {}
+    supported_d7vk: ClassVar[dict] = {}
     supported_dxvk = {}
     supported_vkd3d = {}
     supported_nvapi = {}
@@ -140,6 +156,24 @@ class Manager(metaclass=Singleton):
             force_offline=self.settings.get_boolean("force-offline")
         )
         self.data_mgr = DataManager()
+        umu_data_path = self.settings.get_string("umu-data-path")
+        if umu_data_path in ("", "default"):
+            umu_data_path = None
+        elif not os.path.isdir(umu_data_path) or not os.access(umu_data_path, os.W_OK):
+            logging.error(
+                f"UMU data path {umu_data_path} is not a writable directory! "
+                f"Falling back to the default path."
+            )
+            umu_data_path = None
+        self.umu_repository = UmuGameRepository(umu_data_path)
+        self.umu_repository.recover_interrupted_installations()
+        self.umu_database = UmuDatabaseClient(
+            self.umu_repository.root / "cache" / "umu-database.json"
+        )
+        self.umu_executor: Optional[UmuExecutor] = None
+        self._umu_installation: Optional[UmuInstallation] = None
+        self._umu_probe_complete = False
+        self.umu_error = ""
         _offline = True
 
         if check_connection and not self.utils_conn.force_offline:
@@ -151,20 +185,19 @@ class Manager(metaclass=Singleton):
                 "/run/user/" in user_bottles_path and "/doc/" in user_bottles_path
             )
             if is_portal_path:
-                # a transient document portal path is not usable across sessions
-                # and makes startup crash when it is no longer accessible
+                # Portal-backed paths are not reliable enough for bottle storage.
                 logging.error(
-                    f"Custom bottles path {user_bottles_path} is a temporary "
-                    f"portal path! Falling back to default path."
+                    f"Custom bottles path {user_bottles_path} uses the document "
+                    f"portal! Falling back to default path."
                 )
-            elif os.path.exists(user_bottles_path) and os.access(
+            elif os.path.isdir(user_bottles_path) and os.access(
                 user_bottles_path, os.W_OK
             ):
                 Paths.bottles = user_bottles_path
             else:
                 logging.error(
-                    f"Custom bottles path {user_bottles_path} does not exist or "
-                    f"is not writable! Falling back to default path."
+                    f"Custom bottles path {user_bottles_path} is not a writable "
+                    f"directory! Falling back to default path."
                 )
 
         # sub-managers
@@ -177,6 +210,7 @@ class Manager(metaclass=Singleton):
         self.versioning_manager = VersioningManager(self)
         times["VersioningManager"] = time.time()
         self.component_manager = ComponentManager(self, _offline)
+        self.umu_proton_catalog = UmuProtonCatalog(self)
         self.installer_manager = InstallerManager(self, _offline)
         self.dependency_manager = DependencyManager(self, _offline)
         self.import_manager = ImportManager(self)
@@ -233,6 +267,11 @@ class Manager(metaclass=Singleton):
 
         steps: List[Tuple[Optional[str], str, Callable[[], bool | None]]] = [
             ("check_app_dirs", _("Preparing folders…"), self.check_app_dirs),
+            (
+                "check_d7vk",
+                _("Setting up D7VK..."),
+                lambda: self.check_d7vk(install_latest),
+            ),
             (
                 "check_dxvk",
                 _("Setting up DXVK…"),
@@ -336,6 +375,83 @@ class Manager(metaclass=Singleton):
                 rv.data[data_key] = time.time()
 
         return rv
+
+    def get_umu_installation(self, refresh: bool = False) -> Optional[UmuInstallation]:
+        if self._umu_probe_complete and not refresh:
+            return None if self.umu_error else self._umu_installation
+
+        launcher_path = self.settings.get_string("umu-launcher-path")
+        if launcher_path in ("", "default"):
+            launcher_path = None
+
+        try:
+            installation = UmuProvider(explicit_path=launcher_path).resolve()
+        except UmuProviderError as error:
+            self._umu_probe_complete = True
+            self.umu_error = str(error)
+            if not self.__has_active_umu_processes():
+                self._umu_installation = None
+                self.umu_executor = None
+            return None
+
+        if installation == self._umu_installation and self.umu_executor is not None:
+            self._umu_probe_complete = True
+            self.umu_error = ""
+            return installation
+
+        if self.__has_active_umu_processes():
+            self._umu_probe_complete = True
+            self.umu_error = _("Stop all UMU games before changing the UMU launcher.")
+            return None
+
+        self._umu_installation = installation
+        self.umu_executor = UmuExecutor(
+            installation,
+            data_root=self.umu_repository.root,
+            proton_resolver=self.umu_proton_catalog.resolve_value,
+        )
+        self._umu_probe_complete = True
+        self.umu_error = ""
+        return installation
+
+    def __has_active_umu_processes(self) -> bool:
+        if self.umu_executor is None:
+            return False
+        if self.umu_executor.has_running_processes():
+            return True
+        return any(
+            self.umu_executor.is_running(game)
+            for game in self.umu_repository.list_games()
+        )
+
+    def get_umu_executor(self, for_launch: bool = True) -> Optional[UmuExecutor]:
+        if not self._umu_probe_complete:
+            self.get_umu_installation()
+        if for_launch and self.umu_error:
+            return None
+        return self.umu_executor
+
+    def install_umu_dependencies(
+        self,
+        game,
+        names,
+        progress_cb=None,
+        progress_progress_cb=None,
+    ) -> Result:
+        executor = self.get_umu_executor()
+        if executor is None:
+            return Result(False, message=self.umu_error)
+        installer = UmuDependencyInstaller(
+            self,
+            self.umu_repository,
+            executor,
+        )
+        return installer.install(
+            game,
+            names,
+            progress_cb=progress_cb,
+            progress_progress_cb=progress_progress_cb,
+        )
 
     def __del__(self):
         # best-effort shutdown of playtime tracker
@@ -609,6 +725,10 @@ class Manager(metaclass=Singleton):
             logging.info("Dxvk path doesn't exist, creating now.")
             os.makedirs(Paths.dxvk, exist_ok=True)
 
+        if not os.path.isdir(Paths.d7vk):
+            logging.info("D7VK path doesn't exist, creating now.")
+            os.makedirs(Paths.d7vk, exist_ok=True)
+
         if not os.path.isdir(Paths.vkd3d):
             logging.info("Vkd3d path doesn't exist, creating now.")
             os.makedirs(Paths.vkd3d, exist_ok=True)
@@ -643,6 +763,7 @@ class Manager(metaclass=Singleton):
         self.supported_proton_runners = catalog["proton"]
         self.supported_runtimes = catalog["runtimes"]
         self.supported_winebridge = catalog["winebridge"]
+        self.supported_d7vk = catalog["d7vk"]
         self.supported_dxvk = catalog["dxvk"]
         self.supported_vkd3d = catalog["vkd3d"]
         self.supported_nvapi = catalog["nvapi"]
@@ -681,10 +802,14 @@ class Manager(metaclass=Singleton):
         logging.info(f"Removing {dependency} dependency from {config.Name}")
         uninstallers = config.Uninstallers
 
-        # run dependency uninstaller if available
-        if dependency in uninstallers:
-            uninstaller = uninstallers[dependency]
-            Uninstaller(config).from_name(uninstaller)
+        uninstaller = uninstallers.get(dependency)
+        if not isinstance(uninstaller, str) or uninstaller in ["", "NO_UNINSTALLER"]:
+            return Result(
+                status=False,
+                message=f"No uninstaller is available for {dependency}.",
+            )
+
+        Uninstaller(config).from_name(uninstaller)
 
         # remove dependency from bottle configuration
         if dependency in config.Installed_Dependencies:
@@ -692,6 +817,13 @@ class Manager(metaclass=Singleton):
 
         self.update_config(
             config, key="Installed_Dependencies", value=config.Installed_Dependencies
+        )
+        self.update_config(
+            config,
+            key=dependency,
+            value=None,
+            scope="Uninstallers",
+            remove=True,
         )
         return Result(status=True, data={"removed": True})
 
@@ -702,6 +834,17 @@ class Manager(metaclass=Singleton):
         winemenubuilder tool.
         """
         runners = glob(f"{Paths.runners}/*/")
+        managed_runners = {
+            os.path.basename(os.path.normpath(runner)) for runner in runners
+        }
+        external_runner_paths = {
+            name: path
+            for name, path in self.steam_manager.list_compatibility_tools().items()
+            if name not in managed_runners
+        }
+        ManagerUtils.set_external_runner_paths(external_runner_paths)
+        self.external_runners = set(external_runner_paths)
+        runners.extend(external_runner_paths.values())
         self.runners_available, runners_available = [], []
 
         # lock winemenubuilder.exe
@@ -717,36 +860,25 @@ class Manager(metaclass=Singleton):
                     if os.path.isfile(winemenubuilder):
                         os.rename(winemenubuilder, f"{winemenubuilder}.lock")
 
-        # check system wine flavors
-        wine_flavors = [
-            "wine",
-            "wine64",
-            "wine-stable",
-            "wine-staging",
-            "wine-development",
-        ]
-        for flavor in wine_flavors:
-            if (wine_path := shutil.which(flavor)) is not None:
-                """
-                If the Wine command is available, get the runner version
-                and add it to the runners_available list.
-                """
-                try:
-                    version = (
-                        subprocess.check_output([wine_path, "--version"], text=True)
-                        .strip()
-                        .split(" ")[0]
-                    )
-                    # For display clarity, use flavor name if different from version
-                    # e.g. "sys-wine-staging-9.0"
-                    if flavor != "wine":
-                        version = f"{flavor}-{version}"
-
-                    version = "sys-" + version
-                    if version not in runners_available:
-                        runners_available.append(version)
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    continue
+        # check system wine
+        if system_wine := shutil.which("wine"):
+            """
+            If the Wine command is available, get the runner version
+            and add it to the runners_available list.
+            """
+            try:
+                result = subprocess.run(
+                    [system_wine, "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                version = result.stdout.decode("utf-8").split()
+                if result.returncode == 0 and version:
+                    runners_available.append(f"sys-{version[0]}")
+                else:
+                    logging.warning("System Wine version check failed.")
+            except OSError as error:
+                logging.warning(f"System Wine is not executable: {error}")
 
         # check bottles runners
         for runner in runners:
@@ -779,7 +911,7 @@ class Manager(metaclass=Singleton):
                 "Runners found:\n - {0}".format("\n - ".join(self.runners_available))
             )
 
-        tmp_runners = [x for x in self.runners_available if not x.startswith("sys-")]
+        tmp_runners = self.get_managed_wine_runners()
 
         if len(tmp_runners) == 0 and install_latest:
             logging.warning("No managed runners found.")
@@ -805,6 +937,14 @@ class Manager(metaclass=Singleton):
                 return False
 
         return True
+
+    def get_managed_wine_runners(self) -> list[str]:
+        """Return managed runners that can create regular Wine bottles."""
+        return [
+            runner
+            for runner in self.runners_available
+            if not runner.startswith("sys-")
+        ]
 
     def check_runtimes(self, install_latest: bool = True) -> bool:
         self.runtimes_available = []
@@ -914,6 +1054,11 @@ class Manager(metaclass=Singleton):
             self.dxvk_available = res
         return res is not False
 
+    def check_d7vk(self, install_latest: bool = True) -> bool:
+        res = self.__check_component("d7vk", install_latest)
+        self.d7vk_available = res if isinstance(res, list) else []
+        return res is not False
+
     def check_vkd3d(self, install_latest: bool = True) -> bool:
         res = self.__check_component("vkd3d", install_latest)
         if res:
@@ -936,6 +1081,10 @@ class Manager(metaclass=Singleton):
         self, component_type: str, extra_name_check: str = ""
     ) -> list:
         components = {
+            "d7vk": {
+                "available": self.d7vk_available,
+                "supported": self.supported_d7vk,
+            },
             "dxvk": {
                 "available": self.dxvk_available,
                 "supported": self.supported_dxvk,
@@ -1002,6 +1151,11 @@ class Manager(metaclass=Singleton):
         self, component_type: str, install_latest: bool = True
     ) -> bool | list:
         components = {
+            "d7vk": {
+                "available": self.d7vk_available,
+                "supported": self.supported_d7vk,
+                "path": Paths.d7vk,
+            },
             "dxvk": {
                 "available": self.dxvk_available,
                 "supported": self.supported_dxvk,
@@ -1035,6 +1189,12 @@ class Manager(metaclass=Singleton):
 
         component = components[component_type]
         component["available"] = os.listdir(component["path"])
+        if component_type == "d7vk":
+            component["available"] = [
+                version
+                for version in component["available"]
+                if D7VKComponent(version).checked_dlls
+            ]
 
         if len(component["available"]) > 0:
             logging.info(
@@ -1059,7 +1219,11 @@ class Manager(metaclass=Singleton):
                     else:
                         tmp_components = component["supported"]
                         component_version = next(iter(tmp_components))
-                    self.component_manager.install(component_type, component_version)
+                    installed = self.component_manager.install(
+                        component_type, component_version
+                    )
+                    if not installed.ok:
+                        return False
                     component["available"] = [component_version]
                 except StopIteration:
                     return False
@@ -1071,7 +1235,9 @@ class Manager(metaclass=Singleton):
         except ValueError:
             return sorted(component["available"], reverse=True)
 
-    def get_programs(self, config: BottleConfig) -> List[dict]:
+    def get_programs(
+        self, config: BottleConfig, force_update: bool = False
+    ) -> List[dict]:
         """
         Get the list of programs (both from the drive and the user defined
         in the bottle configuration file).
@@ -1080,7 +1246,7 @@ class Manager(metaclass=Singleton):
             return []
 
         cache_key = config.Name
-        if cache_key in self._programs_cache:
+        if not force_update and cache_key in self._programs_cache:
             return self._programs_cache[cache_key]
 
         bottle = ManagerUtils.get_bottle_path(config)
@@ -1131,6 +1297,8 @@ class Manager(metaclass=Singleton):
                 {
                     "executable": _program.get("executable"),
                     "arguments": _program.get("arguments"),
+                    "arguments_enabled": _program.get("arguments_enabled", True),
+                    "environment": _program.get("environment"),
                     "name": _program.get("name"),
                     "path": _program.get("path"),
                     "icon": "com.usebottles.bottles-program",
@@ -1139,15 +1307,23 @@ class Manager(metaclass=Singleton):
                     "post_script": _program.get("post_script"),
                     "post_script_args": _program.get("post_script_args"),
                     "folder": _program.get("folder", program_folder),
+                    "d7vk": _program.get("d7vk"),
                     "dxvk": _program.get("dxvk"),
                     "vkd3d": _program.get("vkd3d"),
                     "dxvk_nvapi": _program.get("dxvk_nvapi"),
                     "gamescope": _program.get("gamescope"),
+                    "discrete_gpu": _program.get("discrete_gpu"),
+                    "fsr": _program.get("fsr"),
+                    "gamemode": _program.get("gamemode"),
+                    "latencyflex": _program.get("latencyflex"),
+                    "sync": _program.get("sync"),
                     "pulseaudio_latency": _program.get("pulseaudio_latency"),
                     "virtual_desktop": _program.get("virtual_desktop"),
                     "winebridge": _program.get("winebridge"),
-                    "path_override": _program.get("path_override"),
-                    "windows_path": _program.get("windows_path"),
+                    "hide_console": _program.get("hide_console"),
+                    "autostart": _program.get("autostart", False),
+                    "file_extensions": _program.get("file_extensions", []),
+                    "automatic_backup": _program.get("automatic_backup"),
                     "removed": _program.get("removed"),
                     "id": _program.get("id"),
                 }
@@ -1209,10 +1385,21 @@ class Manager(metaclass=Singleton):
         if self.settings.get_boolean(
             "epic-games"
         ) and EpicGamesStoreManager.is_epic_supported(config):
-            programs_names = [p.get("name", "") for p in installed_programs]
+            programs_names = {p.get("name", "") for p in installed_programs}
+            program_launches = {
+                (
+                    p.get("path"),
+                    p.get("arguments") if p.get("arguments_enabled", True) else None,
+                )
+                for p in installed_programs
+            }
             for app in EpicGamesStoreManager.get_installed_games(config):
-                if app["name"] not in programs_names:
-                    installed_programs.append(app)
+                launch = (app.get("path"), app.get("arguments"))
+                if app["name"] in programs_names or launch in program_launches:
+                    continue
+                installed_programs.append(app)
+                programs_names.add(app["name"])
+                program_launches.add(launch)
 
         if self.settings.get_boolean(
             "ubisoft-connect"
@@ -1269,6 +1456,8 @@ class Manager(metaclass=Singleton):
                 return
 
             config = config_load.data
+            session_arguments = config.session_arguments
+            run_in_terminal = config.run_in_terminal
 
             # Clear Run Executable parameters on new session start
             if config.session_arguments:
@@ -1323,6 +1512,27 @@ class Manager(metaclass=Singleton):
                     value=sample.Parameters[key],
                     scope="Parameters",
                 )
+
+            system_runners = [
+                runner for runner in self.runners_available if runner.startswith("sys-")
+            ]
+            if (
+                config.Environment != "Steam"
+                and config.Runner.startswith("sys-")
+                and len(system_runners) == 1
+                and config.Runner != system_runners[0]
+            ):
+                logging.info(
+                    f"System Wine changed from {config.Runner} to {system_runners[0]}."
+                )
+                config.Runner = system_runners[0]
+                persisted_config = config.copy()
+                persisted_config.session_arguments = session_arguments
+                persisted_config.run_in_terminal = run_in_terminal
+                persisted_config.dump(_config)
+
+            if not self.reconcile_d7vk(config):
+                logging.warning(f"Could not reconcile D7VK for bottle {_name}.")
             self.local_bottles[config.Name] = config
 
             try:
@@ -1475,6 +1685,7 @@ class Manager(metaclass=Singleton):
 
         component_keys = {
             "Runner",
+            "D7VK",
             "DXVK",
             "VKD3D",
             "NVAPI",
@@ -1506,103 +1717,46 @@ class Manager(metaclass=Singleton):
         """Create a bottle from a config object."""
         logging.info(f"Creating new {config.Name} bottle from config…")
 
+        config = deepcopy(config)
         sample = BottleConfig()
         for key in sample.keys():
-            """
-            If the key is not in the configuration sample, set it to the
-            default value.
-            """
             if key not in config.keys():
-                self.update_config(config=config, key=key, value=sample[key])
+                config[key] = sample[key]
 
         if config.Runner not in self.runners_available:
-            """
-            If the runner is not in the list of available runners, set it
-            to latest Soda. If there is no Soda, set it to the
-            first one.
-            """
             config.Runner = self.get_latest_runner()
 
         if config.DXVK not in self.dxvk_available:
-            """
-            If the DXVK is not in the list of available DXVKs, set it to
-            highest version which is the first in the list.
-            """
             config.DXVK = self.dxvk_available[0] if self.dxvk_available else ""
 
+        if config.D7VK not in self.d7vk_available:
+            config.D7VK = self.d7vk_available[0] if self.d7vk_available else ""
+
         if config.VKD3D not in self.vkd3d_available:
-            """
-            If the VKD3D is not in the list of available VKD3Ds, set it to
-            highest version which is the first in the list.
-            """
             config.VKD3D = self.vkd3d_available[0] if self.vkd3d_available else ""
 
         if config.NVAPI not in self.nvapi_available:
-            """
-            If the NVAPI is not in the list of available NVAPIs, set it to
-            highest version which is the first in the list.
-            """
             config.NVAPI = self.nvapi_available[0] if self.nvapi_available else ""
 
-        # create the bottle path
-        bottle_path = os.path.join(Paths.bottles, config.Name)
-
-        if not os.path.exists(bottle_path):
-            """
-            If the bottle does not exist, create it, else
-            append a random number to the name.
-            """
-            os.makedirs(bottle_path)
-        else:
-            rnd = random.randint(100, 200)
-            bottle_path = f"{bottle_path}__{rnd}"
-            config.Name = f"{config.Name}__{rnd}"
-            config.Path = f"{config.Path}__{rnd}"
-            os.makedirs(bottle_path)
-
-        # Pre-create drive_c directory and set the case-fold flag
-        bottle_drive_c = os.path.join(bottle_path, "drive_c")
-        os.makedirs(bottle_drive_c)
-        FileUtils.chattr_f(bottle_drive_c)
-
-        # write the bottle config file
-        saved = config.dump(os.path.join(bottle_path, "bottle.yml"))
-        if not saved.status:
+        result = self.create_bottle(
+            name=config.Name,
+            environment=config.Environment or "Custom",
+            runner=config.Runner,
+            d7vk=config.D7VK if config.Parameters.d7vk else False,
+            dxvk=config.DXVK,
+            vkd3d=config.VKD3D,
+            nvapi=config.NVAPI,
+            latencyflex=config.LatencyFleX,
+            versioning=config.Versioning,
+            sandbox=config.Parameters.sandbox,
+            arch=config.Arch,
+            configuration=config,
+        )
+        if not result.ok:
             return False
 
-        if config.Parameters.dxvk:
-            """
-            If DXVK is enabled, execute the installation script.
-            """
-            self.install_dll_component(config, "dxvk")
-
-        if config.Parameters.dxvk_nvapi:
-            """
-            If NVAPI is enabled, execute the substitution of DLLs.
-            """
-            self.install_dll_component(config, "nvapi")
-
-        if config.Parameters.vkd3d:
-            """
-            If the VKD3D parameter is set to True, install it
-            in the new bottle.
-            """
-            self.install_dll_component(config, "vkd3d")
-
-        for dependency in config.Installed_Dependencies:
-            """
-            Install each declared dependency in the new bottle.
-            """
-            if dependency in self.supported_dependencies.keys():
-                dep = [dependency, self.supported_dependencies[dependency]]
-                res = self.dependency_manager.install(config, dep)
-                if not res.ok:
-                    logging.error(
-                        _("Failed to install dependency: %s") % dependency,
-                        jn=True,
-                    )
-                    return False
-        logging.info(f"New bottle from config created: {config.Path}")
+        restored = result.data["config"]
+        logging.info(f"New bottle from config created: {restored.Path}")
         self.update_bottles(silent=True)
         return True
 
@@ -1612,6 +1766,7 @@ class Manager(metaclass=Singleton):
         environment: str,
         path: str = "",
         runner: str = False,
+        d7vk: bool = False,
         dxvk: bool = False,
         vkd3d: bool = False,
         nvapi: bool = False,
@@ -1622,11 +1777,14 @@ class Manager(metaclass=Singleton):
         arch: str = "win64",
         custom_environment: Optional[str] = None,
         cancel_event: Optional[Event] = None,
+        configuration: Optional[BottleConfig] = None,
     ) -> Result[dict]:
         """
         Create a new bottle from the given arguments.
         TODO: will be replaced by the BottleBuilder class.
         """
+
+        d7vk_requested = bool(d7vk)
 
         def log_update(message):
             if fn_logger:
@@ -1681,23 +1839,27 @@ class Manager(metaclass=Singleton):
             ]:
                 logging.error("Missing essential components. Installing…")
                 log_update(_("Missing essential components. Installing…"))
-                self.check_runners()
+                if len(self.runners_available) == 0:
+                    self.check_runners()
+                if len(self.dxvk_available) == 0:
+                    self.check_dxvk()
+                if len(self.vkd3d_available) == 0:
+                    self.check_vkd3d()
                 self.organize_components()
                 check_attempts += 1
                 return components_check()
 
             needs_install = False
-            if len(self.dxvk_available) == 0:
-                self.check_dxvk()
-                needs_install = True
-            if len(self.vkd3d_available) == 0:
-                self.check_vkd3d()
-                needs_install = True
             if len(self.nvapi_available) == 0:
                 self.check_nvapi()
                 needs_install = True
             if len(self.latencyflex_available) == 0:
                 self.check_latencyflex()
+                needs_install = True
+            if d7vk and d7vk not in self.d7vk_available:
+                result = self.component_manager.install("d7vk", d7vk)
+                if not result.ok:
+                    return False
                 needs_install = True
 
             if needs_install:
@@ -1722,6 +1884,10 @@ class Manager(metaclass=Singleton):
             # if no dxvk is specified, use the first one from available
             dxvk = self.dxvk_available[0] if self.dxvk_available else ""
         dxvk_name = dxvk
+
+        if not d7vk:
+            d7vk = self.d7vk_available[0] if self.d7vk_available else ""
+        d7vk_name = d7vk
 
         if not vkd3d:
             # if no vkd3d is specified, use the first one from available
@@ -1748,7 +1914,10 @@ class Manager(metaclass=Singleton):
         )
 
         # get bottle path
-        if path == "":
+        uses_default_path = not path or os.path.realpath(path) == os.path.realpath(
+            Paths.bottles
+        )
+        if uses_default_path:
             # if no path is specified, use the name as path
             bottle_custom_path = False
             bottle_complete_path = os.path.join(Paths.bottles, bottle_name_path)
@@ -1771,8 +1940,10 @@ class Manager(metaclass=Singleton):
             using the name and a random number.
             """
             rnd = random.randint(100, 200)
+            bottle_name = f"{bottle_name}__{rnd}"
             bottle_name_path = f"{bottle_name_path}__{rnd}"
             bottle_complete_path = f"{bottle_complete_path}__{rnd}"
+            cleanup_config.Name = bottle_name
 
             if bottle_custom_path:
                 cleanup_config.Path = bottle_complete_path
@@ -1783,6 +1954,15 @@ class Manager(metaclass=Singleton):
         reg_files = [
             os.path.join(bottle_complete_path, "system.reg"),
             os.path.join(bottle_complete_path, "user.reg"),
+        ]
+        prefix_files = reg_files + [
+            os.path.join(
+                bottle_complete_path,
+                "drive_c",
+                "windows",
+                "system32",
+                "kernel32.dll",
+            )
         ]
 
         # create the bottle directory
@@ -1825,10 +2005,13 @@ class Manager(metaclass=Singleton):
         # generate bottle configuration
         logging.info("Generating bottle configuration…")
         log_update(_("Generating bottle configuration…"))
-        config = BottleConfig()
+        config = (
+            deepcopy(configuration) if configuration is not None else BottleConfig()
+        )
         config.Name = bottle_name
         config.Arch = arch
         config.Runner = runner_name
+        config.D7VK = d7vk_name
         config.DXVK = dxvk_name
         config.VKD3D = vkd3d_name
         config.NVAPI = nvapi_name
@@ -1840,12 +2023,14 @@ class Manager(metaclass=Singleton):
         config.Environment = environment.capitalize()
         config.Creation_Date = str(datetime.now())
         config.Update_Date = str(datetime.now())
+        config.Parameters.sandbox = sandbox
         if versioning:
             config.Versioning = True
-        config.Limit_System_Environment = True
-        config.Inherited_Environment_Variables = (
-            Samples.default_inherited_environment.copy()
-        )
+        if configuration is None:
+            config.Limit_System_Environment = True
+            config.Inherited_Environment_Variables = (
+                Samples.default_inherited_environment.copy()
+            )
 
         cleanup_config = config
 
@@ -1854,17 +2039,43 @@ class Manager(metaclass=Singleton):
             return cancel_result
 
         # get template
-        template = TemplateManager.get_env_template(environment)
+        template = (
+            None
+            if configuration is not None
+            else TemplateManager.get_env_template(environment)
+        )
         template_updated = False
         if template:
             log_update(_("Template found, applying…"))
-            TemplateManager.unpack_template(template, config)
-            config.Installed_Dependencies = template["config"]["Installed_Dependencies"]
-            config.Uninstallers = template["config"]["Uninstallers"]
+            if TemplateManager.unpack_template(template, config):
+                config.Installed_Dependencies = template["config"][
+                    "Installed_Dependencies"
+                ]
+                config.Uninstallers = template["config"]["Uninstallers"]
+            else:
+                template = None
+                try:
+                    shutil.rmtree(bottle_complete_path)
+                    os.makedirs(bottle_drive_c)
+                    FileUtils.chattr_f(bottle_drive_c)
+                except OSError:
+                    logging.error(
+                        f"Failed to restore bottle directory: {bottle_complete_path}",
+                        jn=True,
+                    )
+                    log_update(_("Failed to create bottle directory."))
+                    return Result(False)
 
         cancel_result = check_cancel()
         if cancel_result is not None:
             return cancel_result
+
+        if not WineUtils.ensure_user_profile_alias(bottle_complete_path):
+            logging.warning(
+                "Could not create a shared Wine and Proton user profile, "
+                "continuing with the existing profiles."
+            )
+            log_update(_("Could not share the user profile, continuing…"))
 
         # initialize wineprefix
         reg = Reg(config)
@@ -1875,50 +2086,37 @@ class Manager(metaclass=Singleton):
         # execute wineboot on the bottle path
         log_update(_("The Wine config is being updated…"))
         wineboot.init()
+        if not FileUtils.wait_for_files(prefix_files, timeout=5):
+            logging.error("Wine prefix initialization failed.", jn=True)
+            message = _("Failed to initialize the Wine prefix.")
+            log_update(message)
+            return Result(False, data={"config": config}, message=message)
         log_update(_("Wine config updated!"))
 
         cancel_result = check_cancel()
         if cancel_result is not None:
             return cancel_result
 
-        userdir = f"{bottle_complete_path}/drive_c/users"
-        if os.path.exists(userdir):
-            # userdir may not exists when unpacking a template, safely
-            # ignore as it will be created on first winebot.
-            links = []
-            for user in os.listdir(userdir):
-                _user_dir = os.path.join(userdir, user)
-
-                if os.path.isdir(_user_dir):
-                    for _dir in os.listdir(_user_dir):
-                        _dir_path = os.path.join(_user_dir, _dir)
-                        if os.path.islink(_dir_path):
-                            links.append(_dir_path)
-
-                    _documents_dir = os.path.join(_user_dir, "Documents")
-                    if os.path.isdir(_documents_dir):
-                        for _dir in os.listdir(_documents_dir):
-                            _dir_path = os.path.join(_documents_dir, _dir)
-                            if os.path.islink(_dir_path):
-                                links.append(_dir_path)
-
-                    _win_dir = os.path.join(
-                        _user_dir, "AppData", "Roaming", "Microsoft", "Windows"
+        if not WineUtils.unlink_user_profile_links(bottle_complete_path):
+            logging.error("Could not sandbox the bottle user directory.", jn=True)
+            message = _("Failed to sandbox the bottle user directory.")
+            log_update(message)
+            created_paths = [bottle_complete_path]
+            if bottle_custom_path:
+                created_paths.append(os.path.join(Paths.bottles, bottle_name_path))
+            for created_path in created_paths:
+                try:
+                    shutil.rmtree(created_path)
+                except OSError:
+                    logging.error(
+                        f"Failed to remove unsafe bottle directory: {created_path}",
+                        jn=True,
                     )
-                    if os.path.isdir(_win_dir):
-                        for _dir in os.listdir(_win_dir):
-                            _dir_path = os.path.join(_win_dir, _dir)
-                            if os.path.islink(_dir_path):
-                                links.append(_dir_path)
+            return Result(False, data={"config": config}, message=message)
 
-            for link in links:
-                with contextlib.suppress(IOError, OSError):
-                    os.unlink(link)
-                    os.makedirs(link)
-
-            cancel_result = check_cancel()
-            if cancel_result is not None:
-                return cancel_result
+        cancel_result = check_cancel()
+        if cancel_result is not None:
+            return cancel_result
 
         # wait for registry files to be created
         FileUtils.wait_for_files(reg_files)
@@ -1935,9 +2133,9 @@ class Manager(metaclass=Singleton):
 
             logging.info("Setting Windows version…")
             log_update(_("Setting Windows version…"))
-            if (
+            if config.Windows != "win10" or (
                 "soda" not in runner_name.lower() and "caffe" not in runner_name.lower()
-            ):  # Caffe/Soda came with win10 by default
+            ):
                 try:
                     rk.lg_set_windows(config.Windows)
                 except ValueError as e:
@@ -1982,6 +2180,21 @@ class Manager(metaclass=Singleton):
                     data="",
                 )
 
+        if configuration is not None:
+            parameters = config.Parameters
+            rk.toggle_virtual_desktop(
+                parameters.virtual_desktop,
+                parameters.virtual_desktop_res,
+            )
+            rk.toggle_wayland_driver(parameters.wayland)
+            rk.set_renderer(parameters.renderer)
+            rk.set_dpi(parameters.custom_dpi)
+            rk.set_grab_fullscreen(parameters.fullscreen_capture)
+            rk.set_take_focus(parameters.take_focus)
+            rk.set_decorated(parameters.decorated)
+            rk.set_mouse_warp(int(parameters.mouse_warp))
+            wineboot.update()
+
         # apply environment configuration
         logging.info(f"Applying environment: [{environment}]…")
         log_update(_("Applying environment: {0}…").format(environment))
@@ -1991,7 +2204,12 @@ class Manager(metaclass=Singleton):
         if cancel_result is not None:
             return cancel_result
 
-        if environment.lower() not in ["custom"]:
+        if configuration is not None:
+            env = {
+                "Parameters": {},
+                "Installed_Dependencies": config.Installed_Dependencies,
+            }
+        elif environment.lower() not in ["custom"]:
             env = Samples.environments[environment.lower()]
         elif custom_environment:
             try:
@@ -2097,6 +2315,26 @@ class Manager(metaclass=Singleton):
                         return Result(False)
                     template_updated = True
 
+        if d7vk_requested:
+            config.Parameters.d7vk = True
+
+        template_has_d7vk = bool(
+            template
+            and template["config"].get("Parameters", {}).get("d7vk")
+            and template["config"].get("D7VK") == d7vk_name
+        )
+        if config.Parameters.d7vk and not template_has_d7vk:
+            cancel_result = check_cancel()
+            if cancel_result is not None:
+                return cancel_result
+
+            logging.info("Installing D7VK...")
+            log_update(_("Installing D7VK..."))
+            result = self.install_dll_component(config, "d7vk", version=d7vk_name)
+            if not result.ok:
+                return result
+            template_updated = True
+
         # save bottle config
         cancel_result = check_cancel()
         if cancel_result is not None:
@@ -2132,8 +2370,11 @@ class Manager(metaclass=Singleton):
         if cancel_result is not None:
             return cancel_result
 
+        if self.settings.get_boolean("disable-home-drive"):
+            Drives(config).remove_drive("Z")
+
         # caching template
-        if not template or template_updated:
+        if configuration is None and (not template or template_updated):
             logging.info("Caching template…")
             log_update(_("Caching template…"))
             TemplateManager.new(environment, config)
@@ -2164,6 +2405,7 @@ class Manager(metaclass=Singleton):
 
     # Config version key for each DLL component that supports upgrades.
     __dll_component_keys = {
+        "d7vk": "D7VK",
         "dxvk": "DXVK",
         "vkd3d": "VKD3D",
         "nvapi": "NVAPI",
@@ -2179,6 +2421,9 @@ class Manager(metaclass=Singleton):
         """
         updates = []
 
+        if not self.settings.get_boolean("show-component-updates"):
+            return updates
+
         if config.Environment == "Steam":
             return updates
 
@@ -2187,6 +2432,12 @@ class Manager(metaclass=Singleton):
             updates.append(runner_update)
 
         component_meta = {
+            "d7vk": {
+                "title": _("D7VK"),
+                "enabled": config.Parameters.d7vk,
+                "current": config.D7VK,
+                "supported": self.supported_d7vk,
+            },
             "dxvk": {
                 "title": _("DXVK"),
                 "enabled": config.Parameters.dxvk,
@@ -2293,6 +2544,7 @@ class Manager(metaclass=Singleton):
             (self.supported_wine_runners, "runner"),
             (self.supported_proton_runners, "runner:proton"),
         ):
+            catalog = self.__filter_update_catalog(catalog)
             if not catalog:
                 continue
             same_family = [
@@ -2325,8 +2577,17 @@ class Manager(metaclass=Singleton):
         family = normalized[: match.start()] + normalized[match.end() :]
         return family, version
 
-    @staticmethod
-    def __get_latest_supported(supported_dict: dict) -> Optional[str]:
+    def __filter_update_catalog(self, catalog: dict) -> dict:
+        if self.settings.get_boolean("release-candidate"):
+            return catalog
+        return {
+            name: component
+            for name, component in catalog.items()
+            if component.get("Channel") not in ("rc", "unstable")
+        }
+
+    def __get_latest_supported(self, supported_dict: dict) -> Optional[str]:
+        supported_dict = self.__filter_update_catalog(supported_dict)
         if not supported_dict:
             return None
         keys = list(supported_dict.keys())
@@ -2350,6 +2611,7 @@ class Manager(metaclass=Singleton):
 
     def __ensure_component_available(self, component: str, version: str) -> Result:
         availability_attrs = {
+            "d7vk": "d7vk_available",
             "dxvk": "dxvk_available",
             "vkd3d": "vkd3d_available",
             "nvapi": "nvapi_available",
@@ -2366,6 +2628,9 @@ class Manager(metaclass=Singleton):
         ensure = self.__ensure_component_available(component, version)
         if not ensure.ok:
             return ensure
+
+        if component == "d7vk":
+            return self.set_d7vk(config, True, version)
 
         remove_res = self.install_dll_component(
             config=config, component=component, remove=True
@@ -2387,6 +2652,82 @@ class Manager(metaclass=Singleton):
             return install_res
 
         return Result(True, data={"config": updated_config})
+
+    def set_d7vk(
+        self, config: BottleConfig, enabled: bool, version: str | None = None
+    ) -> Result:
+        previous = deepcopy(config)
+
+        if not enabled:
+            result = self.install_dll_component(config, "d7vk", remove=True)
+            if not result.ok:
+                return self.__rollback_d7vk(previous, result)
+            persisted = self.__persist_d7vk_config(config, False, config.D7VK)
+            if persisted.ok:
+                return persisted
+            return self.__rollback_d7vk(previous, persisted)
+
+        selected = version or config.D7VK
+        if not selected:
+            selected = self.d7vk_available[0] if self.d7vk_available else ""
+        if not selected:
+            return Result(False, message=_("No D7VK version available."))
+
+        result = self.install_dll_component(config, "d7vk", version=selected)
+        if not result.ok:
+            return self.__rollback_d7vk(previous, result)
+
+        persisted = self.__persist_d7vk_config(config, True, selected)
+        if persisted.ok:
+            return persisted
+        return self.__rollback_d7vk(previous, persisted)
+
+    def __persist_d7vk_config(
+        self, config: BottleConfig, enabled: bool, version: str
+    ) -> Result:
+        candidate = deepcopy(config)
+        candidate.D7VK = version
+        candidate.Parameters.d7vk = enabled
+        candidate.Update_Date = str(datetime.now().astimezone().replace(tzinfo=None))
+
+        bottle_path = ManagerUtils.get_bottle_path(candidate)
+        saved = candidate.dump(os.path.join(bottle_path, "bottle.yml"))
+        if not saved.ok:
+            return Result(False, message=saved.message)
+
+        config.D7VK = candidate.D7VK
+        config.Parameters.d7vk = candidate.Parameters.d7vk
+        config.Update_Date = candidate.Update_Date
+        if candidate.Name in self.local_bottles:
+            self.local_bottles[candidate.Name] = config
+        if config.Environment == "Steam":
+            self.steam_manager.update_bottle(config)
+        RegistryRuleManager.apply_rules(config, trigger="components")
+        return Result(True, data={"config": config})
+
+    def __rollback_d7vk(self, previous: BottleConfig, failure: Result) -> Result:
+        if not self.reconcile_d7vk(previous):
+            return Result(
+                False,
+                message=_("Failed to save and roll back the D7VK configuration."),
+            )
+        return failure
+
+    def reconcile_d7vk(self, config: BottleConfig) -> bool:
+        if not config.Parameters.d7vk and not D7VKComponent.has_managed_install(config):
+            return True
+
+        component = D7VKComponent(config.D7VK or "d7vk")
+        if config.Parameters.d7vk:
+            if not config.D7VK or not component.checked_dlls:
+                return False
+            if component.is_installed(config):
+                return True
+            return component.install(config)
+
+        if component.has_managed_install(config):
+            return component.uninstall(config)
+        return True
 
     def __update_runner_component(
         self, config: BottleConfig, runner: str, component_type: str
@@ -2412,11 +2753,13 @@ class Manager(metaclass=Singleton):
         TODO: will be replaced by the BottlesManager class.
         """
         logging.info("Stopping bottle…")
-        wineboot = WineBoot(config)
         wineserver = WineServer(config)
 
-        wineboot.kill(True)
-        wineserver.wait()
+        if config.Parameters.sandbox:
+            wineserver.force_kill()
+        else:
+            WineBoot(config).kill(True)
+            wineserver.wait()
 
         if not config.Path:
             logging.error("Empty path found. Disasters unavoidable.")
@@ -2431,10 +2774,7 @@ class Manager(metaclass=Singleton):
 
         logging.info("Removing library entries associated with this bottle…")
         library_manager = LibraryManager()
-        entries = library_manager.get_library().copy()
-        for _uuid, entry in entries.items():
-            if entry.get("bottle").get("name") == config.Name:
-                library_manager.remove_from_library(_uuid)
+        library_manager.remove_bottle_entries(config.Name)
 
         if config.Custom_Path:
             logging.info("Removing placeholder…")
@@ -2448,7 +2788,10 @@ class Manager(metaclass=Singleton):
         path = ManagerUtils.get_bottle_path(config)
         subprocess.run(["rm", "-rf", path], stdout=subprocess.DEVNULL)
 
-        self.update_bottles(silent=True)
+        # The UI invokes delete_bottle in a worker thread. Refresh only the
+        # backend state here; its RunAsync callback rebuilds the GTK list on
+        # the main loop.
+        self.check_bottles(silent=True)
 
         logging.info(f"Deleted the bottle in: {path}")
         return True
@@ -2497,8 +2840,8 @@ class Manager(metaclass=Singleton):
         if exclude is None:
             exclude = []
 
-        # dxvk, vkd3d and nvapi require Vulkan to be present on the host.
-        if not remove and component in ("dxvk", "vkd3d", "nvapi"):
+        # D7VK, DXVK, VKD3D and NVAPI require Vulkan to be present on the host.
+        if not remove and component in ("d7vk", "dxvk", "vkd3d", "nvapi"):
             from bottles.backend.utils.vulkan import VulkanUtils
 
             if not VulkanUtils.check_support():
@@ -2512,7 +2855,18 @@ class Manager(metaclass=Singleton):
                     ),
                 )
 
-        if component == "dxvk":
+        if component == "d7vk":
+            _version = (
+                version
+                or config.D7VK
+                or (self.d7vk_available[0] if self.d7vk_available else "")
+            )
+            if remove and not _version:
+                _version = "d7vk"
+            if not _version:
+                return Result(status=False, message=_("No D7VK version available."))
+            manager = D7VKComponent(_version)
+        elif component == "dxvk":
             _version = (
                 version
                 or config.DXVK
@@ -2557,11 +2911,25 @@ class Manager(metaclass=Singleton):
                 status=False, data={"message": f"Invalid component: {component}"}
             )
 
-        if remove:
-            manager.uninstall(config, exclude)
-        else:
-            manager.install(config, overrides_only, exclude)
+        if not remove and component == "d7vk" and not manager.checked_dlls:
+            return Result(
+                status=False,
+                message=_("The selected D7VK installation is incomplete."),
+            )
 
+        if remove:
+            success = manager.uninstall(config, exclude)
+        else:
+            success = manager.install(config, overrides_only, exclude)
+
+        if not success:
+            message = (
+                _("Failed to remove {0}.") if remove else _("Failed to install {0}.")
+            )
+            return Result(
+                status=False,
+                message=message.format(component.upper()),
+            )
         return Result(status=True)
 
     def shutdown(self):

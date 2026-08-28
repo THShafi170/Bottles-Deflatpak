@@ -15,7 +15,7 @@ foreach lang : ['zh_CN', 'zh_HK', 'zh_SG', 'zh_TW']
 endforeach
 
 i18n.gettext(
-	'bottles',
+	'com.usebottles.bottles',
 	install_dir: localedir,
 	preset: 'glib',
 	args: '--from-code=UTF-8',

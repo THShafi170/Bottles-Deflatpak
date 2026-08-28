@@ -18,7 +18,7 @@ template $DetailsDependencies: Adw.Bin {
         name: "page_offline";
 
         child: Adw.StatusPage {
-          icon-name: "network-error-symbolic";
+          icon-name: "dialog-error-symbolic";
           title: _("You're offline :(");
           vexpand: true;
           hexpand: true;
@@ -86,6 +86,22 @@ Popover pop_context {
 
 Box actions {
   spacing: 6;
+
+  Button btn_select_all {
+    visible: false;
+    sensitive: false;
+    label: _("Select All");
+  }
+
+  Button btn_install_selected {
+    visible: false;
+    sensitive: false;
+    label: _("Install Selected");
+
+    styles [
+      "suggested-action",
+    ]
+  }
 
   ToggleButton btn_search {
     active: bind search_bar.search-mode-enabled no-sync-create bidirectional;

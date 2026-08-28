@@ -15,14 +15,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re
-from gettext import gettext as _
+from gettext import gettext as _, ngettext
 
 from gi.repository import Adw, GLib, GObject, Gtk, Gio
 
 from bottles.backend.logger import Logger
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.vulkan import VulkanUtils
+from bottles.frontend.utils.autostart import set_autostart_enabled
 
 logging = Logger()
 
@@ -37,11 +37,8 @@ class LaunchOptionsDialog(Adw.Window):
     # region Widgets
     entry_arguments = Gtk.Template.Child()
     switch_arguments = Gtk.Template.Child()
-    combo_path_mode = Gtk.Template.Child()
-    str_list_path_mode = Gtk.Template.Child()
-    entry_executable = Gtk.Template.Child()
-    btn_executable_reset = Gtk.Template.Child()
-    btn_executable_browse = Gtk.Template.Child()
+    switch_hide_console = Gtk.Template.Child()
+    switch_autostart = Gtk.Template.Child()
     btn_save = Gtk.Template.Child()
     btn_pre_script = Gtk.Template.Child()
     btn_pre_script_reset = Gtk.Template.Child()
@@ -54,12 +51,14 @@ class LaunchOptionsDialog(Adw.Window):
     btn_reset_defaults = Gtk.Template.Child()
     action_pre_script = Gtk.Template.Child()
     action_post_script = Gtk.Template.Child()
+    switch_d7vk = Gtk.Template.Child()
     switch_dxvk = Gtk.Template.Child()
     switch_vkd3d = Gtk.Template.Child()
     switch_nvapi = Gtk.Template.Child()
     switch_winebridge = Gtk.Template.Child()
     switch_gamescope = Gtk.Template.Child()
     switch_virt_desktop = Gtk.Template.Child()
+    action_d7vk = Gtk.Template.Child()
     action_dxvk = Gtk.Template.Child()
     action_vkd3d = Gtk.Template.Child()
     action_nvapi = Gtk.Template.Child()
@@ -67,6 +66,8 @@ class LaunchOptionsDialog(Adw.Window):
     action_gamescope = Gtk.Template.Child()
     action_cwd = Gtk.Template.Child()
     action_virt_desktop = Gtk.Template.Child()
+    action_automatic_backup = Gtk.Template.Child()
+    btn_automatic_backup = Gtk.Template.Child()
     # endregion
 
     __default_pre_script_msg = _("Choose a script which should be executed before run.")
@@ -85,6 +86,13 @@ class LaunchOptionsDialog(Adw.Window):
                 msg_no_vulkan if not vulkan_ok else self.__msg_disabled.format("DXVK")
             )
             self.switch_dxvk.set_sensitive(False)
+        if not vulkan_ok or not self.global_d7vk:
+            self.action_d7vk.set_subtitle(
+                msg_no_vulkan
+                if not vulkan_ok
+                else self.__msg_disabled.format("D7VK")
+            )
+            self.switch_d7vk.set_sensitive(False)
         if not vulkan_ok or not self.global_vkd3d:
             self.action_vkd3d.set_subtitle(
                 msg_no_vulkan if not vulkan_ok else self.__msg_disabled.format("VKD3D")
@@ -122,6 +130,8 @@ class LaunchOptionsDialog(Adw.Window):
         arguments_enabled = program.get("arguments_enabled", True)
         self.switch_arguments.set_active(arguments_enabled)
         self.entry_arguments.set_sensitive(arguments_enabled)
+        self.switch_hide_console.set_active(program.get("hide_console") is True)
+        self.switch_autostart.set_active(program.get("autostart", False))
 
         self.str_list_path_mode.splice(
             0,
@@ -141,6 +151,7 @@ class LaunchOptionsDialog(Adw.Window):
 
         # keeps track of toggled switches
         self.toggled = {}
+        self.toggled["d7vk"] = False
         self.toggled["dxvk"] = False
         self.toggled["vkd3d"] = False
         self.toggled["dxvk_nvapi"] = False
@@ -156,14 +167,14 @@ class LaunchOptionsDialog(Adw.Window):
         self.btn_post_script_reset.connect("clicked", self.__reset_post_script)
         self.btn_cwd.connect("clicked", self.__choose_cwd)
         self.btn_cwd_reset.connect("clicked", self.__reset_cwd)
-        self.btn_executable_reset.connect("clicked", self.__reset_executable)
-        self.btn_executable_browse.connect("clicked", self.__choose_executable)
+        self.btn_automatic_backup.connect("clicked", self.__show_automatic_backup)
         self.btn_reset_defaults.connect("clicked", self.__reset_defaults)
         self.entry_arguments.connect("activate", self.__save)
         self.entry_executable.connect("changed", self.__executable_changed)
         self.switch_arguments.connect("notify::active", self.__toggle_arguments)
 
         # set overrides status
+        self.global_d7vk = program_d7vk = config.Parameters.d7vk
         self.global_dxvk = program_dxvk = config.Parameters.dxvk
         self.global_vkd3d = program_vkd3d = config.Parameters.vkd3d
         self.global_nvapi = program_nvapi = config.Parameters.dxvk_nvapi
@@ -175,6 +186,9 @@ class LaunchOptionsDialog(Adw.Window):
             config.Parameters, "winebridge", True
         )
 
+        if self.program.get("d7vk") is not None:
+            program_d7vk = self.program.get("d7vk")
+            self.action_d7vk.set_subtitle(self.__msg_override)
         if self.program.get("dxvk") is not None:
             program_dxvk = self.program.get("dxvk")
             self.action_dxvk.set_subtitle(self.__msg_override)
@@ -194,6 +208,7 @@ class LaunchOptionsDialog(Adw.Window):
             program_winebridge = self.program.get("winebridge")
             self.action_winebridge.set_subtitle(self.__msg_override)
 
+        self.switch_d7vk.set_active(program_d7vk)
         self.switch_dxvk.set_active(program_dxvk)
         self.switch_vkd3d.set_active(program_vkd3d)
         self.switch_nvapi.set_active(program_nvapi)
@@ -201,6 +216,9 @@ class LaunchOptionsDialog(Adw.Window):
         self.switch_virt_desktop.set_active(program_virt_desktop)
         self.switch_winebridge.set_active(program_winebridge)
 
+        self.switch_d7vk.connect(
+            "state-set", self.__check_override, self.action_d7vk, "d7vk"
+        )
         self.switch_dxvk.connect(
             "state-set", self.__check_override, self.action_dxvk, "dxvk"
         )
@@ -245,6 +263,8 @@ class LaunchOptionsDialog(Adw.Window):
             self.action_cwd.set_subtitle(program["folder"])
             self.btn_cwd_reset.set_visible(True)
 
+        self.__update_automatic_backup()
+
         self.__set_disabled_switches()
 
     def __check_override(self, widget, state, action, name):
@@ -262,6 +282,7 @@ class LaunchOptionsDialog(Adw.Window):
             self.program[name] = program_value
 
     def __idle_save(self, *_args):
+        program_d7vk = self.switch_d7vk.get_state()
         program_dxvk = self.switch_dxvk.get_state()
         program_vkd3d = self.switch_vkd3d.get_state()
         program_nvapi = self.switch_nvapi.get_state()
@@ -269,6 +290,7 @@ class LaunchOptionsDialog(Adw.Window):
         program_virt_desktop = self.switch_virt_desktop.get_state()
         program_winebridge = self.switch_winebridge.get_state()
 
+        self.__set_override("d7vk", program_d7vk, self.global_d7vk)
         self.__set_override("dxvk", program_dxvk, self.global_dxvk)
         self.__set_override("vkd3d", program_vkd3d, self.global_vkd3d)
         self.__set_override("dxvk_nvapi", program_nvapi, self.global_nvapi)
@@ -279,6 +301,11 @@ class LaunchOptionsDialog(Adw.Window):
         self.__set_override("winebridge", program_winebridge, self.global_winebridge)
         self.program["arguments"] = self.entry_arguments.get_text()
         self.program["arguments_enabled"] = self.switch_arguments.get_active()
+        if self.switch_hide_console.get_active():
+            self.program["hide_console"] = True
+        else:
+            self.program.pop("hide_console", None)
+        self.program["autostart"] = self.switch_autostart.get_active()
 
         self.program["path_mode"] = self.combo_path_mode.get_selected()
 
@@ -317,7 +344,34 @@ class LaunchOptionsDialog(Adw.Window):
         return
 
     def __save(self, *_args):
-        GLib.idle_add(self.__idle_save)
+        if not self.btn_save.get_sensitive():
+            return
+
+        current_id = self.program.get("id")
+        other_autostart = any(
+            config.Name != self.config.Name or program.get("id") != current_id
+            for config, program in ManagerUtils.get_autostart_programs(
+                self.manager.local_bottles.values()
+            )
+        )
+        before = bool(self.program.get("autostart")) or other_autostart
+        after = self.switch_autostart.get_active() or other_autostart
+        if before == after:
+            GLib.idle_add(self.__idle_save)
+            return
+
+        self.btn_save.set_sensitive(False)
+
+        def sync_finished(success):
+            self.btn_save.set_sensitive(True)
+            if success:
+                GLib.idle_add(self.__idle_save)
+                return
+            self.window.show_toast(
+                _("Bottles could not update the login startup setting.")
+            )
+
+        set_autostart_enabled(self.window, after, sync_finished)
 
     def __toggle_arguments(self, *_args):
         self.entry_arguments.set_sensitive(self.switch_arguments.get_active())
@@ -441,56 +495,44 @@ class LaunchOptionsDialog(Adw.Window):
         self.action_cwd.set_subtitle(self.__default_cwd_msg)
         self.btn_cwd_reset.set_visible(False)
 
-    def __executable_changed(self, *_args):
-        text = self.entry_executable.get_text().strip()
-        self.btn_executable_reset.set_visible(text != "")
-
-        is_windows = bool(self.__path_re.match(text))
-        is_unix = text.startswith("/")
-        is_valid = is_windows or is_unix or text == ""
-
-        if is_valid or text == "":
-            self.entry_executable.remove_css_class("error")
-            self.btn_save.set_sensitive(True)
-        else:
-            self.entry_executable.add_css_class("error")
-            self.btn_save.set_sensitive(False)
-
-    def __reset_executable(self, *_args):
-        self.entry_executable.set_text(self.program.get("path", ""))
-        self.btn_executable_reset.set_visible(False)
-
-    def __choose_executable(self, *_args):
-        def on_response(_dialog, response):
-            if response == Gtk.ResponseType.ACCEPT:
-                path = _dialog.get_file().get_path()
-                self.entry_executable.set_text(path)
-            _dialog.destroy()
-
-        dialog = Gtk.FileChooserNative.new(
-            title=_("Select Executable"),
-            action=Gtk.FileChooserAction.OPEN,
-            parent=self,
-            accept_label=_("Select"),
+    def __update_automatic_backup(self):
+        settings = self.program.get("automatic_backup")
+        if not isinstance(settings, dict) or not settings.get("enabled"):
+            self.action_automatic_backup.set_subtitle(_("Disabled"))
+            return
+        paths = settings.get("paths")
+        count = len(paths) if isinstance(paths, list) else 0
+        self.action_automatic_backup.set_subtitle(
+            ngettext(
+                "{0} selected path",
+                "{0} selected paths",
+                count,
+            ).format(count)
         )
-        dialog.set_modal(True)
-        dialog.set_current_folder(
-            Gio.File.new_for_path(ManagerUtils.get_bottle_path(self.config))
-        )
-        dialog.connect("response", on_response)
-        dialog.show()
+
+    def __show_automatic_backup(self, *_args):
+        from bottles.frontend.windows.programbackups import ProgramBackupsDialog
+
+        def save(settings):
+            self.program["automatic_backup"] = settings
+            self.__update_automatic_backup()
+
+        ProgramBackupsDialog(
+            self,
+            self.config,
+            self.program,
+            save,
+        ).present()
 
     def __reset_defaults(self, *_args):
-        self.entry_executable.set_text("")
-        self.entry_executable.remove_css_class("error")
-        self.btn_save.set_sensitive(True)
-        self.btn_executable_reset.set_visible(False)
+        self.switch_d7vk.set_active(self.global_d7vk)
         self.switch_dxvk.set_active(self.global_dxvk)
         self.switch_vkd3d.set_active(self.global_vkd3d)
         self.switch_nvapi.set_active(self.global_nvapi)
         self.switch_gamescope.set_active(self.global_gamescope)
         self.switch_virt_desktop.set_active(self.global_virt_desktop)
         self.switch_winebridge.set_active(self.global_winebridge)
+        self.action_d7vk.set_subtitle("")
         self.action_dxvk.set_subtitle("")
         self.action_vkd3d.set_subtitle("")
         self.action_nvapi.set_subtitle("")

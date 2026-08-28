@@ -21,7 +21,10 @@ import os
 import shutil
 import time
 from array import array
+from concurrent.futures import CancelledError
 from pathlib import Path
+from threading import Event
+from typing import Optional
 
 
 class FileUtils:
@@ -71,13 +74,23 @@ class FileUtils:
 
         return "%.1f%s%s" % (size, "Yi", "B")
 
-    def get_path_size(self, path: str, human: bool = True) -> str | float:
+    def get_path_size(
+        self,
+        path: str,
+        human: bool = True,
+        cancel_event: Optional[Event] = None,
+    ) -> str | float:
         """
         Returns the size of a given path. If human is True, returns as a
         human-readable size.
         """
         p = Path(path)
-        size = sum(f.stat().st_size for f in p.glob("**/*") if f.is_file())
+        size = 0
+        for file in p.glob("**/*"):
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError
+            if file.is_file():
+                size += file.stat().st_size
 
         if human:
             return self.get_human_size(size)
@@ -103,14 +116,15 @@ class FileUtils:
         }
 
     @staticmethod
-    def wait_for_files(files: list, timeout: int = 0.5) -> bool:
-        """Wait for a file to be created or modified."""
-        for file in files:
-            if not os.path.isfile(file):
-                return False
+    def wait_for_files(files: list, timeout: float = 0.5) -> bool:
+        """Wait for all files to exist."""
+        deadline = time.monotonic() + max(timeout, 0)
 
-            while not os.path.exists(file):
-                time.sleep(timeout)
+        while not all(os.path.isfile(file) for file in files):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.1, remaining))
 
         return True
 

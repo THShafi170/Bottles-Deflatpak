@@ -24,6 +24,13 @@ from typing import List, Optional
 from bottles.backend.globals import sandbox_available
 
 
+FLATPAK_INFO = "/.flatpak-info"
+FLATPAK_SHARE_INPUT = 1 << 5
+FLATPAK_SHARE_USB = 1 << 6
+FLATPAK_SHARE_ALL_DEVICES = 1 << 9
+FLATPAK_SHARE_DEVICES_VERSION = (1, 17, 1)
+
+
 class SandboxManager:
     """
     Native bubblewrap sandbox manager for Bottles-Deflatpak.
@@ -54,6 +61,9 @@ class SandboxManager:
         share_display: bool = True,
         share_sound: bool = True,
         share_gpu: bool = True,
+        share_input: bool = False,
+        share_usb: bool = False,
+        share_hidraw: bool = False,
     ):
         self.envs = envs or {}
         self.chdir = chdir

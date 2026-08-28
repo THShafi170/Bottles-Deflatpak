@@ -16,10 +16,12 @@
 #
 
 from datetime import datetime
-from gettext import gettext as _, ngettext
+from gettext import gettext as _
+from gettext import ngettext
 
 from gi.repository import Adw, GLib, Gtk
 
+from bottles.backend.globals import is_cpak
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
 from bottles.backend.state import EventManager, Events, SignalManager, Signals
@@ -28,6 +30,31 @@ from bottles.backend.wine.executor import WineExecutor
 from bottles.frontend.params import APP_ID
 from bottles.frontend.utils.filters import add_all_filters, add_executable_filters
 from bottles.frontend.utils.sandbox_guard import guard_sandbox_launch
+from bottles.frontend.utils.umu import UmuFrontendProvider
+from bottles.frontend.widgets.umu import UmuPrefixRow
+
+
+def _bottle_order_id(config: BottleConfig) -> str:
+    group = "steam" if config.Environment == "Steam" else "bottle"
+    return f"{group}:{config.Path}"
+
+
+def _ordered_bottles(configs, configured_order):
+    positions = {bottle_id: index for index, bottle_id in enumerate(configured_order)}
+    fallback = len(positions)
+    return sorted(
+        configs, key=lambda config: positions.get(_bottle_order_id(config), fallback)
+    )
+
+
+def _replace_group_order(configured_order, previous_order, new_order):
+    replacements = iter(new_order)
+    previous = set(previous_order)
+    result = [
+        next(replacements) if item in previous else item for item in configured_order
+    ]
+    result.extend(replacements)
+    return result
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/bottle-row.ui")
@@ -38,17 +65,23 @@ class BottlesBottleRow(Adw.ActionRow):
 
     # region Widgets
     button_run = Gtk.Template.Child()
+    button_order = Gtk.Template.Child()
+    button_move_top = Gtk.Template.Child()
+    button_move_up = Gtk.Template.Child()
+    button_move_down = Gtk.Template.Child()
+    button_move_bottom = Gtk.Template.Child()
     wrap_box = Gtk.Template.Child()
 
     # endregion
 
-    def __init__(self, window, config: BottleConfig, **kwargs):
+    def __init__(self, window, config: BottleConfig, reorder_callback=None, **kwargs):
         super().__init__(**kwargs)
 
         # common variables and references
         self.window = window
         self.manager = window.manager
         self.config = config
+        self.reorder_callback = reorder_callback
 
         # Format update date
         update_date = _("N/A")
@@ -70,6 +103,10 @@ class BottlesBottleRow(Adw.ActionRow):
         # connect signals
         self.connect("activated", self.show_details)
         self.button_run.connect("clicked", self.run_executable)
+        self.button_move_top.connect("clicked", self.__reorder, "top")
+        self.button_move_up.connect("clicked", self.__reorder, "up")
+        self.button_move_down.connect("clicked", self.__reorder, "down")
+        self.button_move_bottom.connect("clicked", self.__reorder, "bottom")
 
         # populate widgets
         self.set_title(self.config.Name)
@@ -81,8 +118,20 @@ class BottlesBottleRow(Adw.ActionRow):
         # Set tooltip text
         self.button_run.set_tooltip_text(_(f"Run executable in “{self.config.Name}”"))
 
+    def __reorder(self, _button, position):
+        self.reorder_callback(self, position)
+
+    def set_reorder_state(self, can_move_up, can_move_down, visible):
+        self.button_order.set_visible(visible)
+        self.button_move_top.set_sensitive(can_move_up)
+        self.button_move_up.set_sensitive(can_move_up)
+        self.button_move_down.set_sensitive(can_move_down)
+        self.button_move_bottom.set_sensitive(can_move_down)
+
     def run_executable(self, *_args):
         """Display file dialog for executable"""
+        if not is_cpak() and not Xdp.Portal.running_under_sandbox():
+            return
 
         def set_path(_dialog, response):
             if response != Gtk.ResponseType.ACCEPT:
@@ -134,8 +183,10 @@ class BottleView(Adw.Bin):
 
     # region Widgets
     list_bottles = Gtk.Template.Child()
+    list_umu = Gtk.Template.Child()
     list_steam = Gtk.Template.Child()
     group_bottles = Gtk.Template.Child()
+    group_umu = Gtk.Template.Child()
     group_steam = Gtk.Template.Child()
     pref_page = Gtk.Template.Child()
     bottle_status = Gtk.Template.Child()
@@ -153,6 +204,7 @@ class BottleView(Adw.Bin):
         # common variables and references
         self.window = window
         self.arg_bottle = arg_bottle
+        self.umu_provider = UmuFrontendProvider.from_backend(window.manager)
 
         # connect signals
         self.btn_create.connect("clicked", self.window.show_add_view)
@@ -175,14 +227,26 @@ class BottleView(Adw.Bin):
         """
         terms = widget.get_text()
         self.list_bottles.set_filter_func(self.__filter_bottles, terms)
+        self.list_umu.set_filter_func(self.__filter_bottles, terms)
         self.list_steam.set_filter_func(self.__filter_bottles, terms)
+        self.__update_empty_state(terms)
 
     @staticmethod
     def __filter_bottles(row, terms=None):
         text = row.get_title().lower()
         return terms.lower() in text
 
-    def update_bottles_list(self, *args) -> None:
+    def __update_empty_state(self, terms):
+        has_bottles = bool(self.__bottles)
+        has_matches = any(
+            self.__filter_bottles(row, terms) for row in self.__bottles.values()
+        )
+        show_umu_actions = self.umu_provider.available and not terms
+        self.pref_page.set_visible(has_matches or show_umu_actions)
+        self.bottle_status.set_visible(not has_bottles and not show_umu_actions)
+        self.no_bottles_found.set_visible(bool(terms) and not has_matches)
+
+    def update_bottles_list(self, *args, refresh_updates=True) -> None:
         self.__bottles = {}
         while self.list_bottles.get_first_child():
             self.list_bottles.remove(self.list_bottles.get_first_child())
@@ -190,14 +254,16 @@ class BottleView(Adw.Bin):
         while self.list_steam.get_first_child():
             self.list_steam.remove(self.list_steam.get_first_child())
 
+        while self.list_umu.get_first_child():
+            self.list_umu.remove(self.list_umu.get_first_child())
+
         local_bottles = self.window.manager.local_bottles
-        is_empty_local_bottles = len(local_bottles) == 0
 
-        self.pref_page.set_visible(not is_empty_local_bottles)
-        self.bottle_status.set_visible(is_empty_local_bottles)
+        configured_order = self.window.settings.get_strv("bottle-order")
+        configs = _ordered_bottles(list(local_bottles.values()), configured_order)
 
-        for name, config in local_bottles.items():
-            _entry = BottlesBottleRow(self.window, config)
+        for config in configs:
+            _entry = BottlesBottleRow(self.window, config, self.__reorder_bottle)
             self.__bottles[config.Path] = _entry
 
             if config.Environment != "Steam":
@@ -205,14 +271,102 @@ class BottleView(Adw.Bin):
             else:
                 self.list_steam.append(_entry)
 
-            if self.list_steam.get_first_child() is None:
-                self.group_steam.set_visible(False)
-                self.group_bottles.set_title("")
-            else:
-                self.group_steam.set_visible(True)
-                self.group_bottles.set_title(_("Your Bottles"))
+        for entry in self.umu_provider.list_prefixes():
+            callback = (
+                self.window.show_umu_detected_prefix
+                if entry.get("detected")
+                else self.window.show_umu_game_settings
+            )
+            row = UmuPrefixRow(entry, callback)
+            self.__bottles[entry["id"]] = row
+            self.list_umu.append(row)
 
-        self.__update_banner_state(local_bottles)
+        has_umu_prefixes = self.list_umu.get_first_child() is not None
+        if self.umu_provider.available and not has_umu_prefixes:
+            self.list_umu.append(self.__build_umu_empty_row())
+
+        has_local_bottles = self.list_bottles.get_first_child() is not None
+        has_steam_prefixes = self.list_steam.get_first_child() is not None
+        self.group_bottles.set_visible(has_local_bottles)
+        self.group_umu.set_visible(self.umu_provider.available)
+        self.group_steam.set_visible(has_steam_prefixes)
+        self.group_bottles.set_title(
+            _("Your Bottles") if has_umu_prefixes or has_steam_prefixes else ""
+        )
+
+        self.__update_empty_state(self.entry_search.get_text())
+        self.__update_reorder_states(configs)
+
+        if refresh_updates:
+            self.update_component_updates_banner()
+
+    def __build_umu_empty_row(self):
+        row = Adw.ActionRow(
+            title=_("No UMU Prefixes Yet"),
+            subtitle=_("Install a Windows game to create one."),
+        )
+        actions = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+
+        install = Gtk.Button()
+        install.set_child(
+            Adw.ButtonContent(
+                icon_name="system-software-install-symbolic",
+                label=_("Install Game"),
+            )
+        )
+        install.add_css_class("suggested-action")
+        install.connect("clicked", self.window.show_umu_search)
+        actions.append(install)
+
+        row.add_suffix(actions)
+        return row
+
+    def __reorder_bottle(self, row, position):
+        configured_order = self.window.settings.get_strv("bottle-order")
+        configs = _ordered_bottles(
+            list(self.window.manager.local_bottles.values()), configured_order
+        )
+        group = [
+            config
+            for config in configs
+            if (config.Environment == "Steam") == (row.config.Environment == "Steam")
+        ]
+        index = group.index(row.config)
+        destinations = {
+            "top": 0,
+            "up": max(0, index - 1),
+            "down": min(len(group) - 1, index + 1),
+            "bottom": len(group) - 1,
+        }
+        destination = destinations[position]
+        if destination == index:
+            return
+
+        previous_order = [_bottle_order_id(config) for config in group]
+        group.insert(destination, group.pop(index))
+        new_order = [_bottle_order_id(config) for config in group]
+        self.window.settings.set_strv(
+            "bottle-order",
+            _replace_group_order(configured_order, previous_order, new_order),
+        )
+        self.update_bottles_list(refresh_updates=False)
+
+    def __update_reorder_states(self, configs):
+        for steam_group in (False, True):
+            group = [
+                config
+                for config in configs
+                if (config.Environment == "Steam") == steam_group
+            ]
+            for index, config in enumerate(group):
+                self.__bottles[config.Path].set_reorder_state(
+                    can_move_up=index > 0,
+                    can_move_down=index < len(group) - 1,
+                    visible=len(group) > 1,
+                )
+
+    def update_component_updates_banner(self) -> None:
+        self.__update_banner_state(self.window.manager.local_bottles)
 
     def __update_banner_state(self, local_bottles) -> None:
         """Reveal the home banner when some bottles can update their components.

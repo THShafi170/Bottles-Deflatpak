@@ -20,10 +20,13 @@ import os
 import shlex
 import shutil
 import uuid
+import zlib
 from datetime import datetime
 from functools import lru_cache
 from glob import glob
+from io import BytesIO
 from pathlib import Path
+from struct import error as StructError
 from typing import Dict, Optional
 
 from bottles.backend.globals import Paths
@@ -39,6 +42,11 @@ from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.wine.winecommand import WineCommand
 
 logging = Logger()
+
+STEAM_COMPATIBILITY_TOOL_PATHS = (
+    "/app/share/steam/compatibilitytools.d",
+    "/usr/share/steam/compatibilitytools.d",
+)
 
 
 class SteamManager:
@@ -65,29 +73,36 @@ class SteamManager:
             self.localconfig = self.__get_local_config()
             self.library_folders = self.__get_library_folders()
 
-    def __find_steam_path(self) -> str | None:
+    def __get_steam_paths(self) -> list[str]:
         if self.is_windows and self.config:
-            paths = [
+            return [
                 os.path.join(
                     ManagerUtils.get_bottle_path(self.config),
                     "drive_c/Program Files (x86)/Steam",
                 )
             ]
-        else:
-            paths = [
-                os.path.join(Path.home(), ".local/share/Steam"),
-                os.path.join(Path.home(), ".steam/debian-installation"),
-                os.path.join(Path.home(), ".steam/steam"),
-                os.path.join(Path.home(), ".steam"),
-                os.path.join(
-                    Path.home(), ".var/app/com.valvesoftware.Steam/data/Steam"
-                ),
-            ]
 
-        for path in paths:
-            if os.path.isdir(path):
-                return path
-        return None
+        return [
+            os.path.join(Path.home(), ".var/app/com.valvesoftware.Steam/data/Steam"),
+            os.path.join(Path.home(), ".local/share/Steam"),
+            os.path.join(Path.home(), ".steam/debian-installation"),
+            os.path.join(Path.home(), ".steam/root"),
+            os.path.join(Path.home(), ".steam/steam"),
+            os.path.join(Path.home(), ".steam"),
+        ]
+
+    def __find_steam_path(self) -> str | None:
+        def steam_data_score(path: str) -> int:
+            return sum(
+                os.path.isdir(os.path.join(path, scope))
+                for scope in ("steamapps", "userdata")
+            )
+
+        return max(
+            (path for path in self.__get_steam_paths() if os.path.isdir(path)),
+            key=steam_data_score,
+            default=None,
+        )
 
     def __get_scoped_path(self, scope: str = "steamapps"):
         """scopes: steamapps, userdata"""
@@ -140,11 +155,7 @@ class SteamManager:
             return None
 
         for _, folder in _library_folders["libraryfolders"].items():
-            if (
-                not isinstance(folder, dict)
-                or not folder.get("path")
-                or not folder.get("apps")
-            ):
+            if not isinstance(folder, dict) or not folder.get("path"):
                 continue
 
             library_folders.append(folder)
@@ -159,7 +170,12 @@ class SteamManager:
         # This will always be a list because of the check before
         # pylint: disable=E1133
         for folder in self.library_folders:
-            if appid in folder["apps"].keys():
+            if appid in folder.get("apps", {}):
+                return folder["path"]
+
+        for folder in self.library_folders:
+            compatdata = os.path.join(folder["path"], "steamapps", "compatdata", appid)
+            if os.path.isdir(compatdata):
                 return folder["path"]
         return None
 
@@ -219,6 +235,32 @@ class SteamManager:
 
             return proton_path
 
+    def list_compatibility_tools(self) -> Dict[str, str]:
+        """Return Proton runners installed in Steam's compatibility tools path."""
+        tools = {}
+        tools_paths = [
+            os.path.join(steam_path, "compatibilitytools.d")
+            for steam_path in self.__get_steam_paths()
+        ]
+        if not self.is_windows:
+            tools_paths.extend(STEAM_COMPATIBILITY_TOOL_PATHS)
+
+        for tools_path in tools_paths:
+            for path in glob(os.path.join(tools_path, "*/")):
+                try:
+                    if not SteamUtils.is_proton(path):
+                        continue
+                except (OSError, SyntaxError, TypeError, ValueError) as error:
+                    logging.warning(
+                        f"Could not inspect Steam compatibility tool {path}: {error}"
+                    )
+                    continue
+
+                path = os.path.normpath(path)
+                tools.setdefault(os.path.basename(path), path)
+
+        return tools
+
     def list_apps_ids(self) -> dict:
         """List all apps in Steam"""
         apps = (
@@ -234,6 +276,83 @@ class SteamManager:
         else:
             apps = {}
         return apps
+
+    @staticmethod
+    def _get_shortcut_value(shortcut: dict, key: str, default=None):
+        for shortcut_key, value in shortcut.items():
+            if shortcut_key.casefold() == key.casefold():
+                return value
+        return default
+
+    @staticmethod
+    def _set_shortcut_value(shortcut: dict, key: str, value) -> None:
+        for shortcut_key in shortcut:
+            if shortcut_key.casefold() == key.casefold():
+                shortcut[shortcut_key] = value
+                return
+        shortcut[key] = value
+
+    @classmethod
+    def _get_shortcut_appid(cls, shortcut: dict) -> int | None:
+        appid = cls._get_shortcut_value(shortcut, "appid")
+        if isinstance(appid, int):
+            return appid & 0xFFFFFFFF
+
+        executable = cls._get_shortcut_value(shortcut, "exe")
+        app_name = cls._get_shortcut_value(shortcut, "appname")
+        if not isinstance(executable, str) or not isinstance(app_name, str):
+            return None
+
+        checksum = zlib.crc32(f"{executable}{app_name}".encode())
+        return checksum | 0x80000000
+
+    def list_shortcuts(self) -> dict:
+        shortcuts = {}
+        if self.userdata_path is None:
+            return shortcuts
+
+        paths = sorted(glob(os.path.join(self.userdata_path, "*/config/shortcuts.vdf")))
+        for shortcuts_path in paths:
+            try:
+                with open(shortcuts_path, "rb") as shortcuts_file:
+                    stream = BytesIO(shortcuts_file.read())
+                root = vdf.binary_load(stream, raise_on_remaining=False)
+                trailing_data = stream.read()
+            except (
+                KeyError,
+                OSError,
+                StructError,
+                SyntaxError,
+                TypeError,
+                UnicodeError,
+                ValueError,
+            ) as exc:
+                logging.warning(f"Could not parse {shortcuts_path}: {exc}")
+                continue
+
+            entries = self._get_shortcut_value(root, "shortcuts", {})
+            if not isinstance(entries, dict):
+                continue
+
+            for shortcut in entries.values():
+                if not isinstance(shortcut, dict):
+                    continue
+
+                appid = self._get_shortcut_appid(shortcut)
+                if appid is None:
+                    continue
+
+                shortcuts.setdefault(
+                    str(appid),
+                    {
+                        "config": shortcut,
+                        "path": shortcuts_path,
+                        "root": root,
+                        "trailing_data": trailing_data,
+                    },
+                )
+
+        return shortcuts
 
     def get_installed_apps_as_programs(self) -> list:
         """This is a Steam for Windows only function"""
@@ -273,13 +392,26 @@ class SteamManager:
         return apps
 
     def list_prefixes(self) -> Dict[str, BottleConfig]:
-        apps = self.list_apps_ids()
+        apps = dict(self.list_apps_ids())
+        shortcuts = self.list_shortcuts()
         prefixes = {}
 
-        if len(apps) == 0:
+        for folder in self.library_folders or []:
+            library_apps = folder.get("apps", {})
+            if not isinstance(library_apps, dict):
+                continue
+            for appid in library_apps:
+                apps.setdefault(str(appid), {})
+
+        if len(apps) == 0 and len(shortcuts) == 0:
             return {}
 
-        for appid, appdata in apps.items():
+        appids = dict.fromkeys([*apps, *shortcuts])
+        for appid in appids:
+            shortcut = shortcuts.get(appid)
+            appdata = apps.get(appid)
+            if appdata is None and shortcut is not None:
+                appdata = shortcut["config"]
             _library_path = self.get_appid_library_path(appid)
             if _library_path is None:
                 continue
@@ -298,17 +430,17 @@ class SteamManager:
                 "%Y-%m-%d %H:%M:%S.%f"
             )
 
-            if not isinstance(_acf, dict):
+            if not isinstance(_acf, dict) and shortcut is None:
                 # WORKAROUND: for corrupted acf files, this is not at our fault
                 continue
 
-            if _acf is None or not _acf.get("AppState"):
+            if isinstance(_acf, dict) and not _acf.get("AppState"):
                 logging.warning(
                     f"A Steam prefix was found, but there is no ACF for it: {_dir_name}, skipping…"
                 )
                 continue
 
-            if SteamUtils.is_proton(
+            if isinstance(_acf, dict) and SteamUtils.is_proton(
                 os.path.join(
                     _library_path,
                     "steamapps/common",
@@ -340,7 +472,19 @@ class SteamManager:
             else:
                 _conf = BottleConfig()
 
-            _conf.Name = _acf["AppState"].get("name", "Unknown")
+            if isinstance(_acf, dict):
+                app_name = _acf["AppState"].get("name", "Unknown")
+                last_updated = int(_acf["AppState"].get("LastUpdated", 0))
+            else:
+                shortcut_config = shortcut["config"]
+                app_name = self._get_shortcut_value(
+                    shortcut_config, "AppName", "Unknown"
+                )
+                last_updated = int(
+                    self._get_shortcut_value(shortcut_config, "LastPlayTime", 0)
+                )
+
+            _conf.Name = app_name
             _conf.Environment = "Steam"
             _conf.CompatData = _dir_name
             _conf.Path = os.path.join(_path, "pfx")
@@ -348,9 +492,9 @@ class SteamManager:
             _conf.RunnerPath = _runner_path
             _conf.WorkingDir = os.path.join(_conf.get("Path", ""), "drive_c")
             _conf.Creation_Date = _creation_date
-            _conf.Update_Date = datetime.fromtimestamp(
-                int(_acf["AppState"].get("LastUpdated", 0))
-            ).strftime("%Y-%m-%d %H:%M:%S.%f")
+            _conf.Update_Date = datetime.fromtimestamp(last_updated).strftime(
+                "%Y-%m-%d %H:%M:%S.%f"
+            )
 
             # Launch options
             _conf.Parameters.mangohud = "mangohud" in _launch_options.get("command", "")
@@ -367,7 +511,19 @@ class SteamManager:
         prefixes = self.list_prefixes()
 
         with contextlib.suppress(FileNotFoundError):
-            shutil.rmtree(Paths.steam)  # generate new configs at start
+            for prefix in os.listdir(Paths.steam):
+                path = os.path.join(Paths.steam, prefix)
+                if (
+                    prefix in prefixes
+                    and os.path.isdir(path)
+                    and not os.path.islink(path)
+                ):
+                    continue
+
+                if os.path.isdir(path) and not os.path.islink(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
 
         for _, conf in prefixes.items():
             _bottle = os.path.join(Paths.steam, conf.CompatData)
@@ -378,10 +534,6 @@ class SteamManager:
 
     def get_app_config(self, prefix: str) -> dict:
         _fail_msg = f"Fail to get app config from Steam for: {prefix}"
-
-        if len(self.localconfig) == 0:
-            logging.warning(_fail_msg)
-            return {}
 
         apps = (
             self.localconfig.get("UserLocalConfigStore", {})
@@ -396,17 +548,54 @@ class SteamManager:
         else:
             apps = {}
 
-        if len(apps) == 0 or prefix not in apps:
-            logging.warning(_fail_msg)
-            return {}
+        if prefix in apps:
+            return apps[prefix]
 
-        return apps[prefix]
+        shortcut = self.list_shortcuts().get(prefix)
+        if shortcut is not None:
+            return shortcut["config"]
+
+        logging.warning(_fail_msg)
+        return {}
+
+    def _save_launch_options(self, prefix: str, launch_options: str) -> bool:
+        shortcut = self.list_shortcuts().get(prefix)
+        if shortcut is not None:
+            self._set_shortcut_value(
+                shortcut["config"], "LaunchOptions", launch_options
+            )
+            now = datetime.now().astimezone().strftime("%Y-%m-%d_%H-%M-%S")
+            shutil.copy(shortcut["path"], f"{shortcut['path']}.bck.{now}")
+            with open(shortcut["path"], "wb") as shortcuts_file:
+                shortcuts_file.write(
+                    vdf.binary_dumps(shortcut["root"]) + shortcut["trailing_data"]
+                )
+            logging.info("Steam shortcut config saved")
+            return True
+
+        if len(self.localconfig) == 0:
+            return False
+
+        try:
+            self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
+                "apps"
+            ][prefix]["LaunchOptions"] = launch_options
+        except (KeyError, TypeError):
+            try:
+                self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
+                    "Apps"
+                ][prefix]["LaunchOptions"] = launch_options
+            except (KeyError, TypeError):
+                return False
+
+        self.save_local_config(self.localconfig)
+        return True
 
     def get_launch_options(self, prefix: str, app_conf: Optional[dict] = None) -> {}:
         if app_conf is None:
             app_conf = self.get_app_config(prefix)
 
-        launch_options = app_conf.get("LaunchOptions", "")
+        launch_options = self._get_shortcut_value(app_conf, "LaunchOptions", "")
         _fail_msg = f"Fail to get launch options from Steam for: {prefix}"
         res = {"command": "", "args": "", "env_vars": {}, "env_params": {}}
 
@@ -430,12 +619,14 @@ class SteamManager:
 
     # noinspection PyTypeChecker
     def set_launch_options(self, prefix: str, options: dict):
-        original_launch_options = self.get_launch_options(prefix)
         _fail_msg = f"Fail to set launch options for: {prefix}"
+        app_config = self.get_app_config(prefix)
 
-        if 0 in [len(self.localconfig), len(original_launch_options)]:
+        if len(app_config) == 0:
             logging.warning(_fail_msg)
             return
+
+        original_launch_options = self.get_launch_options(prefix, app_config)
 
         command = options.get("command", "")
         env_vars = options.get("env_vars", {})
@@ -451,26 +642,20 @@ class SteamManager:
             launch_options += f"{e}={v} "
         launch_options += f"{command} %command% {original_launch_options['args']}"
 
-        try:
-            self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
-                "apps"
-            ][prefix]["LaunchOptions"] = launch_options
-        except (KeyError, TypeError):
-            self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
-                "Apps"
-            ][prefix]["LaunchOptions"] = launch_options
-
-        self.save_local_config(self.localconfig)
+        if not self._save_launch_options(prefix, launch_options):
+            logging.warning(_fail_msg)
 
     # noinspection PyTypeChecker
     def del_launch_option(self, prefix: str, key_type: str, key: str):
-        original_launch_options = self.get_launch_options(prefix)
         key_types = ["env_vars", "command"]
         _fail_msg = f"Fail to delete a launch option for: {prefix}"
+        app_config = self.get_app_config(prefix)
 
-        if 0 in [len(self.localconfig), len(original_launch_options)]:
+        if len(app_config) == 0:
             logging.warning(_fail_msg)
             return
+
+        original_launch_options = self.get_launch_options(prefix, app_config)
 
         if key_type not in key_types:
             logging.warning(_fail_msg + f"\nKey type: {key_type} is not valid")
@@ -491,16 +676,8 @@ class SteamManager:
             launch_options += f"{e}={v} "
 
         launch_options += f"{original_launch_options['command']} %command% {original_launch_options['args']}"
-        try:
-            self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
-                "apps"
-            ][prefix]["LaunchOptions"] = launch_options
-        except (KeyError, TypeError):
-            self.localconfig["UserLocalConfigStore"]["Software"]["Valve"]["Steam"][
-                "Apps"
-            ][prefix]["LaunchOptions"] = launch_options
-
-        self.save_local_config(self.localconfig)
+        if not self._save_launch_options(prefix, launch_options):
+            logging.warning(_fail_msg)
 
     def update_bottle(self, config: BottleConfig) -> BottleConfig:
         pfx = config.CompatData
@@ -531,10 +708,32 @@ class SteamManager:
         SignalManager.send(Signals.GShowUri, Result(data=uri))
 
     def add_shortcut(self, program_name: str, program_path: str):
-        logging.info(f"Adding shortcut for {program_name}")
-        cmd = "bottles-cli"
-        args = "run -b '{0}' -p '{1}'"
+        if "FLATPAK_ID" in os.environ:
+            cmd = "flatpak"
+            args = f"run --command=bottles-cli {os.environ['FLATPAK_ID']} run -b {{0}} -p {{1}}"
+        else:
+            cmd = "bottles-cli"
+            args = "run -b {0} -p {1}"
 
+        return self.__add_command_shortcut(
+            program_name,
+            cmd,
+            args.format(
+                shlex.quote(self.config.Name), shlex.quote(program_name)
+            ),
+            ManagerUtils.get_bottle_path(self.config),
+            ManagerUtils.extract_icon(self.config, program_name, program_path),
+        )
+
+    def __add_command_shortcut(
+        self,
+        program_name: str,
+        command: str,
+        arguments: str,
+        start_dir: str,
+        icon: str,
+    ):
+        logging.info(f"Adding shortcut for {program_name}")
         if self.userdata_path is None:
             logging.warning("Userdata path is not set")
             return Result(False)
@@ -542,11 +741,11 @@ class SteamManager:
         confs = glob(os.path.join(self.userdata_path, "*/config/"))
         shortcut = {
             "AppName": program_name,
-            "Exe": cmd,
-            "StartDir": ManagerUtils.get_bottle_path(self.config),
-            "icon": ManagerUtils.extract_icon(self.config, program_name, program_path),
+            "Exe": command,
+            "StartDir": start_dir,
+            "icon": icon,
             "ShortcutPath": "",
-            "LaunchOptions": args.format(self.config.Name, program_name),
+            "LaunchOptions": arguments,
             "IsHidden": 0,
             "AllowDesktopConfig": 1,
             "AllowOverlay": 1,
@@ -577,3 +776,22 @@ class SteamManager:
 
         logging.info(f"Added shortcut for {program_name}")
         return Result(True)
+
+    def add_umu_shortcut(self, game):
+        program = {
+            "name": game.name,
+            "executable": game.executable.name,
+            "umu_game": str(game.id),
+        }
+        config = {"Name": f"UMU-{game.id}"}
+        command = ManagerUtils.get_desktop_entry_exec(
+            config, program, for_host=True
+        )
+        executable, *arguments = shlex.split(command)
+        return self.__add_command_shortcut(
+            game.name,
+            executable,
+            shlex.join(arguments),
+            str(game.executable.parent),
+            "com.usebottles.bottles",
+        )

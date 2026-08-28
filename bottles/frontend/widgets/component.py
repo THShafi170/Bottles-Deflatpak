@@ -73,10 +73,25 @@ class ComponentEntry(Adw.ActionRow):
 
         if component[1].get("Installed"):
             self.btn_browse.set_visible(True)
-            if not self.manager.component_manager.is_in_use(
+            if (
+                self.component_type in ["runner", "runner:proton"]
+                and self.name in self.manager.external_runners
+            ):
+                self.set_subtitle(_("Discovered in Steam"))
+            elif not self.manager.component_manager.is_in_use(
                 self.component_type, self.name
             ):
                 self.btn_remove.set_visible(True)
+        elif not self.manager.utils_conn.status and not component[1].get(
+            "Cached", False
+        ):
+            self.btn_err.set_visible(True)
+            self.btn_err.set_sensitive(False)
+            self.btn_err.set_tooltip_text(
+                _(
+                    "This component is not installable offline because its files are not cached."
+                )
+            )
         else:
             self.btn_download.set_visible(True)
             self.btn_browse.set_visible(False)
@@ -311,9 +326,13 @@ class ComponentEntry(Adw.ActionRow):
 
 
 class ComponentExpander(Adw.ExpanderRow):
-    def __init__(self, title, subtitle=None, **kwargs):
+    def __init__(self, title, subtitle=None, icon_name=None, **kwargs):
         super().__init__(**kwargs)
 
         self.set_title(title)
         if subtitle:
             self.set_subtitle(subtitle)
+        if icon_name:
+            icon = Gtk.Image(icon_name=icon_name)
+            icon.set_pixel_size(32)
+            self.add_prefix(icon)

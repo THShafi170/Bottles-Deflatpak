@@ -19,6 +19,7 @@ import os
 import shlex
 import subprocess
 
+from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
 
 logging = Logger()
@@ -36,6 +37,13 @@ class TerminalUtils:
         "debug": "#ff9800 #2e2c2b",
         "easter": "#0bff00 #2b2e2c",
     }
+    gpu_environment = (
+        "DRI_PRIME",
+        "__NV_PRIME_RENDER_OFFLOAD",
+        "__GLX_VENDOR_LIBRARY_NAME",
+        "__VK_LAYER_NV_optimus",
+        "VK_ICD_FILENAMES",
+    )
 
     terminals = [
         # Third party
@@ -73,6 +81,8 @@ class TerminalUtils:
     def execute(self, command, env=None, colors="default", cwd=None):
         if env is None:
             env = os.environ.copy()
+        else:
+            env = env.copy()
 
         if not self.check_support():
             logging.warning("Terminal not supported.")

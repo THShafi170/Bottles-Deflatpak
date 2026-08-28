@@ -29,6 +29,7 @@ import patoolib  # type: ignore [import-untyped]
 from bottles.backend.cabextract import CabExtract
 from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
+from bottles.backend.managers.component import is_cached_file
 from bottles.backend.managers.registry_rule import RegistryRuleManager
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.enum import Arch
@@ -49,8 +50,13 @@ logging = Logger()
 class DependencyManager:
     def __init__(self, manager, offline: bool = False):
         self.__manager = manager
-        self.__repo = manager.repository_manager.get_repo("dependencies", offline)
-        self.__utils_conn = manager.utils_conn
+        self.__repo = manager.repository_manager.get_repo(
+            "dependencies",
+            offline,
+            callback_in_main_loop=not manager.is_cli,
+        )
+        self.__offline = offline
+        self.__checksum_cache = {}
 
     @lru_cache
     def get_dependency(self, name: str, plain: bool = False) -> str | dict | bool:
@@ -63,17 +69,164 @@ class DependencyManager:
         and return these as a dictionary. It also returns an empty dictionary
         if there are no dependencies or fails to fetch them.
         """
-        if not self.__utils_conn.check_connection():
-            return {}
-
         catalog = {}
         index = self.__repo.catalog
+        if not isinstance(index, dict):
+            return catalog
 
         for dependency in index.items():
+            if not isinstance(dependency[0], str) or not dependency[0]:
+                continue
+            if not isinstance(dependency[1], dict):
+                continue
+            category = dependency[1].get("Category")
+            description = dependency[1].get("Description")
+            arch = dependency[1].get("Arch", "win64_win32")
+            if (
+                not isinstance(category, str)
+                or not category
+                or not isinstance(description, str)
+                or not (
+                    isinstance(arch, str)
+                    or isinstance(arch, list)
+                    and all(isinstance(item, str) for item in arch)
+                )
+            ):
+                continue
             catalog[dependency[0]] = dependency[1]
 
         catalog = dict(sorted(catalog.items()))
+        if getattr(self, "_DependencyManager__offline", False):
+            for name, dependency in catalog.items():
+                dependency["Cached"] = {
+                    Arch.WIN32: self.is_dependency_cached(name, Arch.WIN32),
+                    Arch.WIN64: self.is_dependency_cached(name, Arch.WIN64),
+                }
         return catalog
+
+    def is_dependency_cached(
+        self,
+        name: str,
+        arch: Optional[str] = None,
+        installed: Optional[list] = None,
+        checked: Optional[set] = None,
+        resolved: Optional[set] = None,
+    ) -> bool:
+        if installed is None:
+            installed = []
+        if checked is None:
+            checked = set()
+        if resolved is None:
+            resolved = set()
+        if name in installed or name in resolved:
+            return True
+        if name in checked:
+            return False
+        checked.add(name)
+
+        manifest = self.get_dependency(name)
+        if not isinstance(manifest, dict):
+            checked.discard(name)
+            return False
+
+        dependencies = manifest.get("Dependencies", [])
+        steps = manifest.get("Steps")
+        if not isinstance(dependencies, list) or not isinstance(steps, list):
+            checked.discard(name)
+            return False
+
+        for dependency in dependencies:
+            if not isinstance(dependency, str):
+                checked.discard(name)
+                return False
+            if not self.is_dependency_cached(
+                dependency,
+                arch=arch,
+                installed=installed,
+                checked=checked,
+                resolved=resolved,
+            ):
+                checked.discard(name)
+                return False
+
+        for step in steps:
+            if (
+                not isinstance(step, dict)
+                or not isinstance(step.get("action"), str)
+                or not isinstance(step.get("file_checksum", ""), str)
+            ):
+                checked.discard(name)
+                return False
+            step_arch = step.get("for", "win64_win32")
+            if not (
+                isinstance(step_arch, str)
+                or isinstance(step_arch, list)
+                and all(isinstance(item, str) for item in step_arch)
+            ):
+                checked.discard(name)
+                return False
+            if arch and arch not in step_arch:
+                continue
+
+            url = step.get("url")
+            if not url:
+                continue
+            if not isinstance(url, str):
+                checked.discard(name)
+                return False
+            if url.startswith("temp/"):
+                continue
+
+            file = step.get("rename") or step.get("file_name")
+            if not file or not is_cached_file(
+                file,
+                step.get("file_checksum", ""),
+                getattr(self, "_DependencyManager__checksum_cache", None),
+            ):
+                checked.discard(name)
+                return False
+
+        checked.discard(name)
+        resolved.add(name)
+        return True
+
+    def __dependency_has_cycle(
+        self,
+        name: str,
+        installed: Optional[list] = None,
+        visiting: Optional[set] = None,
+        resolved: Optional[set] = None,
+    ) -> bool:
+        if installed is None:
+            installed = []
+        if name in installed:
+            return False
+        if visiting is None:
+            visiting = set()
+        if resolved is None:
+            resolved = set()
+        if name in visiting:
+            return True
+        if name in resolved:
+            return False
+
+        manifest = self.get_dependency(name)
+        if not isinstance(manifest, dict):
+            return False
+        dependencies = manifest.get("Dependencies", [])
+        if not isinstance(dependencies, list):
+            return False
+
+        visiting.add(name)
+        for dependency in dependencies:
+            if isinstance(dependency, str) and self.__dependency_has_cycle(
+                dependency, installed, visiting, resolved
+            ):
+                visiting.discard(name)
+                return True
+        visiting.discard(name)
+        resolved.add(name)
+        return False
 
     @staticmethod
     def __notify_progress(
@@ -128,7 +281,9 @@ class DependencyManager:
         file_name = step.get("rename") or step.get("file_name")
 
         descriptions = {
-            "download_archive": _("Downloading {0}…").format(file_name or _("archive")),
+            "download_archive": _("Downloading {0}...").format(
+                file_name or _("archive")
+            ),
             "install_exe": _("Running {0}…").format(file_name or _("installer")),
             "install_msi": _("Running {0}…").format(file_name or _("installer")),
             "install_cab_fonts": _("Installing fonts…"),
@@ -152,7 +307,7 @@ class DependencyManager:
         }
 
         return descriptions.get(
-            action, _("Running {0}…").format(action.replace("_", " "))
+            action, _("Running {0}...").format(action.replace("_", " "))
         )
 
     def install(
@@ -168,6 +323,56 @@ class DependencyManager:
         """
         uninstaller = True
         installed_new = False
+        manifest = self.get_dependency(dependency[0])
+        if not isinstance(manifest, dict):
+            return Result(
+                status=False, message=f"Cannot find manifest for {dependency[0]}."
+            )
+
+        dependencies = manifest.get("Dependencies", [])
+        steps = manifest.get("Steps")
+        if (
+            not isinstance(dependencies, list)
+            or not all(isinstance(name, str) for name in dependencies)
+            or not isinstance(steps, list)
+            or not all(
+                isinstance(step, dict)
+                and isinstance(step.get("action"), str)
+                and (
+                    isinstance(step.get("for", "win64_win32"), str)
+                    or isinstance(step.get("for"), list)
+                    and all(isinstance(item, str) for item in step["for"])
+                )
+                and isinstance(step.get("url", ""), str)
+                and isinstance(step.get("file_name", ""), str)
+                and isinstance(step.get("rename", ""), str)
+                and isinstance(step.get("file_checksum", ""), str)
+                for step in steps
+            )
+        ):
+            return Result(
+                status=False, message=f"Invalid manifest for {dependency[0]}."
+            )
+
+        if self.__dependency_has_cycle(
+            dependency[0], installed=config.Installed_Dependencies
+        ):
+            return Result(
+                status=False,
+                message=f"Cyclic dependency chain for {dependency[0]}.",
+            )
+
+        if getattr(
+            self, "_DependencyManager__offline", False
+        ) and not self.is_dependency_cached(
+            dependency[0],
+            arch=config.Arch,
+            installed=config.Installed_Dependencies,
+        ):
+            return Result(
+                status=False,
+                message=f"Files for {dependency[0]} are not available in offline mode.",
+            )
 
         if config.Parameters.versioning_automatic:
             """
@@ -182,28 +387,18 @@ class DependencyManager:
         task_id = TaskManager.add(Task(title=dependency[0]))
         task = TaskManager.get(task_id)
 
-        self.__notify_progress(progress_cb, _("Preparing installation…"), task=task)
+        self.__notify_progress(progress_cb, _("Preparing installation..."), task=task)
 
         logging.info(
             "Installing dependency [%s] in bottle [%s]." % (dependency[0], config.Name),
         )
-        manifest = self.get_dependency(dependency[0])
-        if not manifest:
-            """
-            If the manifest is not found, return a Result
-            object with the error.
-            """
-            TaskManager.remove(task_id)
-            return Result(
-                status=False, message=f"Cannot find manifest for {dependency[0]}."
-            )
 
-        if manifest.get("Dependencies"):
+        if dependencies:
             """
             If the manifest has dependencies, we need to install them
             before installing the current one.
             """
-            for _ext_dep in manifest.get("Dependencies"):
+            for _ext_dep in dependencies:
                 if _ext_dep in config.Installed_Dependencies:
                     continue
                 if _ext_dep in self.__manager.supported_dependencies:
@@ -220,9 +415,10 @@ class DependencyManager:
                         progress_progress_cb=progress_progress_cb,
                     )
                     if not _res.status:
+                        TaskManager.remove(task_id)
                         return _res
 
-        for step in manifest.get("Steps"):
+        for step in steps:
             """
             Here we execute all steps in the manifest.
             Steps are the actions performed to install the dependency.
@@ -274,11 +470,11 @@ class DependencyManager:
             """
             uninstaller = manifest.get("Uninstaller")
 
-        if dependency[0] not in config.Installed_Dependencies:
-            self.__manager.update_config(
-                config, dependency[0], uninstaller, "Uninstallers"
-            )
-            installed_new = True
+        if not isinstance(uninstaller, str) or not uninstaller:
+            uninstaller = "NO_UNINSTALLER"
+        self.__manager.update_config(
+            config, dependency[0], uninstaller, "Uninstallers"
+        )
 
         # Remove entry from task manager
         TaskManager.remove(task_id)
@@ -289,10 +485,11 @@ class DependencyManager:
         if installed_new:
             RegistryRuleManager.apply_rules(config, trigger="dependencies")
         self.__notify_progress_fraction(progress_progress_cb, None)
-        self.__notify_progress(progress_cb, _("Finalizing installation…"), task=task)
-        if not uninstaller:
-            return Result(status=True, data={"uninstaller": False})
-        return Result(status=True, data={"uninstaller": True})
+        self.__notify_progress(progress_cb, _("Finalizing installation..."), task=task)
+        return Result(
+            status=True,
+            data={"uninstaller": uninstaller != "NO_UNINSTALLER"},
+        )
 
     def __perform_steps(
         self,
@@ -433,7 +630,7 @@ class DependencyManager:
             task=task,
         )
 
-        return download
+        return download.ok
 
     def __step_install_exe_msi(
         self,
@@ -461,7 +658,7 @@ class DependencyManager:
         if step.get("rename"):
             file = step.get("rename")
 
-        if download:
+        if download.ok:
             if step.get("url").startswith("temp/"):
                 _file = step.get("url").replace("temp/", f"{Paths.temp}/")
                 file = f"{_file}/{file}"
@@ -522,7 +719,7 @@ class DependencyManager:
                 task=task,
             )
 
-            if download:
+            if download.ok:
                 if step.get("rename"):
                     file = step.get("rename")
                 else:
@@ -592,10 +789,12 @@ class DependencyManager:
                 logging.error(f"Cannot find extracted file: {_file_name_path}")
                 return False
 
-            if os.path.exists(os.path.join(dest, rename)):
-                os.remove(os.path.join(dest, rename))
+            rename_path = os.path.join(dest, rename)
+            if os.path.normpath(_file_name_path) != os.path.normpath(rename_path):
+                if os.path.exists(rename_path):
+                    os.remove(rename_path)
 
-            shutil.move(_file_name_path, os.path.join(dest, rename))
+                shutil.move(_file_name_path, rename_path)
 
         if not res:
             return False
@@ -618,7 +817,7 @@ class DependencyManager:
             task=task,
         )
 
-        if not download:
+        if not download.ok:
             return False
 
         if step.get("rename"):

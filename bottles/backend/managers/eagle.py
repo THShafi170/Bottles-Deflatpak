@@ -18,6 +18,7 @@ import os
 import time
 import shutil
 import uuid
+import hashlib
 import datetime
 from glob import glob
 import pefile
@@ -26,8 +27,10 @@ import yara
 import struct
 import json
 import subprocess
+from gettext import gettext as _
 
-from bottles.backend.globals import Paths, ntsync_available
+from bottles.backend.globals import Paths
+from bottles.backend.managers.intel import EagleIntel
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
 from bottles.backend.state import SignalManager, Signals
@@ -371,6 +374,163 @@ class EagleManager:
 
         return findings
 
+    def _intel_lookup(self, executable_path: str, pe, product_name: str) -> dict | None:
+        intel = EagleIntel()
+        if not intel.available:
+            return None
+
+        try:
+            sha256 = ""
+            imphash = ""
+            if intel.has_artifacts:
+                try:
+                    digest = hashlib.sha256()
+                    with open(executable_path, "rb") as file:
+                        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                    sha256 = digest.hexdigest()
+                except OSError:
+                    pass
+
+                if pe is not None:
+                    try:
+                        imphash = pe.get_imphash()
+                    except Exception:
+                        pass
+
+            basename = os.path.basename(executable_path)
+            hit = intel.lookup(
+                sha256=sha256,
+                imphash=imphash,
+                steam_appid=EagleIntel.find_steam_appid(executable_path),
+                product_name=product_name,
+                names=[basename.rsplit(".", 1)[0]],
+            )
+            if hit is None:
+                self._send_step(_("No community intelligence match"))
+                return None
+
+            plan = intel.plan(hit)
+            if plan["source"] == "winetricks":
+                self._send_step(
+                    _("Known application ({match}): {name}").format(
+                        match=plan["match"], name=plan["name"]
+                    )
+                )
+            else:
+                self._send_step(
+                    _(
+                        "Community match ({match}): {name}, tier {tier}, "
+                        "{reports} reports"
+                    ).format(
+                        match=plan["match"],
+                        name=plan["name"],
+                        tier=plan["tier"],
+                        reports=plan["reports"],
+                    )
+                )
+            return plan
+        except Exception as e:
+            logging.warning(f"[EagleIntel] Analysis lookup failed: {e}")
+            return None
+        finally:
+            intel.close()
+
+    @staticmethod
+    def _merge_intel_suggestions(suggestions: list, intel_plan: dict | None) -> None:
+        if not intel_plan:
+            return
+
+        suggestions_by_key = {
+            suggestion["key"]: suggestion for suggestion in suggestions
+        }
+        for key, info in intel_plan["parameters"].items():
+            evidence = _("{reason} (x{evidence})").format(
+                reason=info["reason"], evidence=info["evidence"]
+            )
+            if key in suggestions_by_key:
+                suggestion = suggestions_by_key[key]
+                if suggestion["value"] == info["value"]:
+                    suggestion["label"] += f" [{evidence}]"
+                else:
+                    suggestion["label"] = evidence
+                suggestion["value"] = info["value"]
+                suggestion["apply"] = False
+                continue
+
+            suggestion = {
+                "key": key,
+                "value": info["value"],
+                "label": evidence,
+                "apply": False,
+            }
+            suggestions.append(suggestion)
+            suggestions_by_key[key] = suggestion
+
+        for dependency in intel_plan["dependencies"]:
+            key = f"dep_{dependency['name']}"
+            if key in suggestions_by_key:
+                continue
+            suggestion = {
+                "key": key,
+                "value": False,
+                "label": _("{name} ({reason}, x{evidence})").format(
+                    name=dependency["name"],
+                    reason=dependency["reason"],
+                    evidence=dependency["evidence"],
+                ),
+            }
+            suggestions.append(suggestion)
+            suggestions_by_key[key] = suggestion
+
+        for name, info in intel_plan["env"].items():
+            suggestions.append(
+                {
+                    "key": f"intel_env:{name}",
+                    "value": info["value"],
+                    "label": _(
+                        "Set {name}={value} (community evidence x{evidence})"
+                    ).format(
+                        name=name,
+                        value=info["value"],
+                        evidence=info["evidence"],
+                    ),
+                    "apply": False,
+                }
+            )
+
+        for name, info in intel_plan["dll_overrides"].items():
+            suggestions.append(
+                {
+                    "key": f"intel_dll:{name}",
+                    "value": info["value"],
+                    "label": _(
+                        "Override {name}={value} (community evidence x{evidence})"
+                    ).format(
+                        name=name,
+                        value=info["value"],
+                        evidence=info["evidence"],
+                    ),
+                    "apply": False,
+                }
+            )
+
+        for argument in intel_plan["args"]:
+            suggestions.append(
+                {
+                    "key": f"intel_arg:{argument['value']}",
+                    "value": argument["value"],
+                    "label": _(
+                        "Add launch argument {argument} "
+                        "(community evidence x{evidence})"
+                    ).format(
+                        argument=argument["value"],
+                        evidence=argument["evidence"],
+                    ),
+                    "apply": False,
+                }
+            )
+
     def _extract_asar(self, asar_path: str) -> tuple:
         """Extract ASAR archive using pure Python."""
         extract_dir = os.path.join(Paths.temp, f"eagle_asar_{uuid.uuid4().hex[:8]}")
@@ -568,17 +728,26 @@ class EagleManager:
                         )
                         self._scan_yara(ef, insights, source=fname)
 
+                self._send_step(_("Querying community intelligence..."))
+                product_name = basename.rsplit(".", 1)[0]
+                intel_plan = self._intel_lookup(
+                    executable_path, None, product_name
+                )
+                suggestions = []
+                self._merge_intel_suggestions(suggestions, intel_plan)
+                
                 results = {
                     "name": basename,
-                    "product_name": basename.rsplit(".", 1)[0],
+                    "product_name": product_name,
                     "publisher": "Unknown",
                     "arch": "Unknown",
                     "min_os": "Unknown",
                     "admin": False,
                     "frameworks": [],
-                    "suggestions": [],
+                    "suggestions": suggestions,
                     "details": insights,
                     "metadata": metadata,
+                    "intel": intel_plan,
                 }
                 self._send_step("MSI analysis complete.")
                 SignalManager.send(
@@ -1002,6 +1171,9 @@ class EagleManager:
                         "Deep scan failed, continuing with surface analysis"
                     )
 
+            self._send_step(_("Querying community intelligence..."))
+            intel_plan = self._intel_lookup(executable_path, pe, product_name)
+
             self._send_step("Generating optimisation suggestions...")
             suggestions = []
 
@@ -1240,6 +1412,8 @@ class EagleManager:
                     }
                 )
 
+            self._merge_intel_suggestions(suggestions, intel_plan)
+
             frameworks = []
             for cat, items in insights.items():
                 for item in items:
@@ -1260,6 +1434,7 @@ class EagleManager:
                 "messages": messages,
                 "details": insights,
                 "metadata": metadata,
+                "intel": intel_plan,
             }
 
             self._send_step("Analysis complete.")

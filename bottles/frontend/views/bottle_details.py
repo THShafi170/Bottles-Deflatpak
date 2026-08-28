@@ -46,7 +46,11 @@ from bottles.backend.wine.wineboot import WineBoot
 from bottles.backend.wine.winecfg import WineCfg
 from bottles.backend.wine.winedbg import WineDbg
 from bottles.backend.wine.wineserver import WineServer
-from bottles.frontend.utils.common import open_doc_url
+from bottles.frontend.utils.common import (
+    format_runner_name,
+    get_runner_icon_name,
+    open_doc_url,
+)
 from bottles.frontend.utils.filters import add_all_filters, add_executable_filters
 from bottles.frontend.utils.gtk import GtkUtils
 from bottles.frontend.utils.playtime import PlaytimeService
@@ -63,6 +67,7 @@ class BottleView(Adw.PreferencesPage):
 
     # region Widgets
     label_runner = Gtk.Template.Child()
+    img_runner = Gtk.Template.Child()
     label_state = Gtk.Template.Child()
     label_environment = Gtk.Template.Child()
     label_arch = Gtk.Template.Child()
@@ -118,6 +123,15 @@ class BottleView(Adw.PreferencesPage):
     target = Gtk.DropTarget(formats=content, actions=Gdk.DragAction.COPY)
 
     style_provider = Gtk.CssProvider()
+
+    def set_runner_identity(self, runner: str):
+        self.label_runner.set_text(format_runner_name(runner))
+        icon_name = get_runner_icon_name(runner)
+        self.img_runner.set_visible(icon_name is not None)
+        if icon_name:
+            self.img_runner.set_from_resource(
+                f"/com/usebottles/bottles/icons/scalable/apps/{icon_name}.svg"
+            )
 
     def __init__(self, details, config, **kwargs):
         super().__init__(**kwargs)
@@ -210,7 +224,7 @@ class BottleView(Adw.PreferencesPage):
         ):
 
             def callback(a, b):
-                self.update_programs()
+                self.update_programs(force_update=True)
 
             def proceed(sandbox_override, exec_path):
                 executor = WineExecutor(
@@ -252,11 +266,7 @@ class BottleView(Adw.PreferencesPage):
 
         # set name and runner
         self.label_name.set_text(self.config.Name)
-
-        _runner = self.config.Runner
-        if _runner.startswith("/"):
-            _runner = f"{os.path.basename(_runner.strip('/'))} (Steam)"
-        self.label_runner.set_text(_runner)
+        self.set_runner_identity(self.config.Runner)
 
         # set environment
         self.label_environment.set_text(_(self.config.Environment))
@@ -268,14 +278,16 @@ class BottleView(Adw.PreferencesPage):
 
         self.__set_steam_rules()
 
-        # check for old versioning system enabled
-        if config.Versioning:
-            self.__upgrade_versioning()
-
-        if (
+        missing_runner = (
             config.Runner not in self.manager.runners_available
             and not self.config.Environment == "Steam"
-        ):
+        )
+
+        # check for old versioning system enabled
+        if self.manager.versioning_manager.needs_migration(config):
+            on_close = self.__alert_missing_runner if missing_runner else None
+            self.__upgrade_versioning(on_close)
+        elif missing_runner:
             self.__alert_missing_runner()
 
         # update programs list
@@ -332,7 +344,10 @@ class BottleView(Adw.PreferencesPage):
         dialog.show()
 
     def update_programs(
-        self, config: Optional[BottleConfig] = None, force_add: dict = None
+        self,
+        config: Optional[BottleConfig] = None,
+        force_add: dict = None,
+        force_update: bool = False,
     ):
         """
         This function update the programs lists.
@@ -374,12 +389,23 @@ class BottleView(Adw.PreferencesPage):
 
         def process_programs():
             wineserver_status = WineServer(self.config).is_alive()
-            programs = self.manager.get_programs(self.config)
+            programs = self.manager.get_programs(
+                self.config, force_update=force_update
+            )
             programs = sorted(programs, key=lambda p: p.get("name", "").lower())
             handled = 0
 
             if self.config.Environment == "Steam":
-                GLib.idle_add(new_program, {"name": self.config.Name}, None, True)
+                GLib.idle_add(
+                    new_program,
+                    {
+                        "name": self.config.Name,
+                        "id": f"steam:{self.config.CompatData}",
+                        "steam": True,
+                    },
+                    None,
+                    True,
+                )
                 handled += 1
 
             for program in programs:
@@ -417,7 +443,7 @@ class BottleView(Adw.PreferencesPage):
         self.update_programs(config=self.config)
 
     def __scan_programs(self, widget=False):
-        self.update_programs(config=self.config)
+        self.update_programs(config=self.config, force_update=True)
 
     def empty_list(self):
         """
@@ -516,6 +542,11 @@ class BottleView(Adw.PreferencesPage):
         for row in self.__update_rows:
             self.group_updates.remove(row)
         self.__update_rows = []
+
+        show_updates = self.manager.settings.get_boolean("show-component-updates")
+        self.group_updates.set_visible(show_updates)
+        if not show_updates:
+            return
 
         updates = self.manager.get_component_updates(self.config)
         self.row_no_updates.set_visible(len(updates) == 0)
@@ -617,7 +648,7 @@ class BottleView(Adw.PreferencesPage):
                 exec_path = dialog.get_file().get_path()
 
                 def callback(a, b):
-                    self.update_programs()
+                    self.update_programs(force_update=True)
 
                 def proceed(sandbox_override, run_path):
                     self.window.show_toast(
@@ -702,6 +733,11 @@ class BottleView(Adw.PreferencesPage):
 
         @GtkUtils.run_in_main_loop
         def finish(result, error=False):
+            if result.message == "cancelled":
+                self.window.show_toast(
+                    _('Backup cancelled for "{0}"').format(self.config.Name)
+                )
+                return
             if result.ok:
                 self.window.show_toast(
                     _('Backup created for "{0}"').format(self.config.Name)
@@ -715,7 +751,13 @@ class BottleView(Adw.PreferencesPage):
             if response != Gtk.ResponseType.ACCEPT:
                 return
 
-            path = dialog.get_file().get_path()
+            selected_file = _dialog.get_file()
+            if selected_file is None:
+                return
+
+            path = selected_file.get_path()
+            if path is None:
+                return
 
             RunAsync(
                 task_func=BackupManager.export_backup,
@@ -745,12 +787,19 @@ class BottleView(Adw.PreferencesPage):
         new_window = DuplicateDialog(self)
         new_window.present()
 
-    def __upgrade_versioning(self):
+    def __upgrade_versioning(self, on_close=None):
         """
         This function pop up the upgrade versioning dialog, so the user can
         upgrade the versioning system from old Bottles built-in to FVS.
         """
+
+        def handle_close(_dialog):
+            GLib.idle_add(on_close)
+            return False
+
         new_window = UpgradeVersioningDialog(self)
+        if on_close:
+            new_window.connect("close-request", handle_close)
         new_window.present()
 
     def __confirm_delete(self, widget):
@@ -761,20 +810,26 @@ class BottleView(Adw.PreferencesPage):
         """
 
         def handle_response(_widget, response_id):
-            if response_id == "ok":
+            _widget.destroy()
 
-                def _on_deleted(_result=False, _error=False):
-                    # refresh on the main loop so the list (and its empty state
-                    # when the last bottle is gone) repaints correctly
-                    self.window.page_list.update_bottles_list()
+            if response_id != "ok":
+                return
 
+            def _on_deleted(_result=False, _error=False):
+                # refresh on the main loop so the list (and its empty state
+                # when the last bottle is gone) repaints correctly
+                self.window.page_list.update_bottles_list()
+
+            def _delete_bottle():
                 RunAsync(
                     self.manager.delete_bottle,
                     callback=_on_deleted,
                     config=self.config,
                 )
                 self.window.page_list.disable_bottle(self.config)
-            _widget.destroy()
+                return False
+
+            GLib.idle_add(_delete_bottle)
 
         dialog = Adw.MessageDialog.new(
             self.window,
@@ -890,8 +945,9 @@ the Bottles preferences or choose a new one to run applications."
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.connect("response", handle_response)
             dialog.present()
-        else:
-            RunAsync(wineboot.send_status, callback=reset, status=status)
+        elif status in (1, 2):
+            graceful_status = {1: 11, 2: 12}[status]
+            RunAsync(wineboot.send_status, callback=reset, status=graceful_status)
 
     def __set_steam_rules(self):
         status = False if self.config.Environment == "Steam" else True

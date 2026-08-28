@@ -10,6 +10,33 @@ from typing import IO, Container, Dict, ItemsView, List, Optional
 from bottles.backend.models.result import Result
 from bottles.backend.utils import yaml
 
+_LEGACY_DEFAULT_INHERITED_ENVIRONMENT = [
+    "DBUS_SESSION_BUS_ADDRESS",
+    "DISPLAY",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LC_MESSAGES",
+    "MANGOHUD_CONFIG",
+    "PATH",
+    "PULSE_SERVER",
+    "TERM",
+    "TZ",
+    "USER",
+    "WAYLAND_DISPLAY",
+    "XAUTHORITY",
+    "XDG_RUNTIME_DIR",
+]
+_LEGACY_DEFAULT_INHERITED_ENVIRONMENTS = [
+    [
+        name
+        for name in _LEGACY_DEFAULT_INHERITED_ENVIRONMENT
+        if name != "MANGOHUD_CONFIG"
+    ],
+    _LEGACY_DEFAULT_INHERITED_ENVIRONMENT,
+]
+
 # class name prefix "Bottle" is a workaround for:
 # https://github.com/python/cpython/issues/90104
 
@@ -61,16 +88,17 @@ class DictCompatMixIn:
 class BottleSandboxParams(DictCompatMixIn):
     share_net: bool = False
     share_sound: bool = False
-    share_display: bool = True
-    share_user: bool = False
-    share_host_ro: bool = True
-    share_gpu: bool = True
-    share_paths_ro: List[str] = field(default_factory=lambda: [])
-    share_paths_rw: List[str] = field(default_factory=lambda: [])
+    share_input: bool = False
+    share_usb: bool = False
+    # share_host_ro: bool = True  # TODO: implement, requires the Bottles runtime (next) for a minimal sandbox
+    # share_gpu: bool = True  # TODO: implement
+    # share_paths_ro: List[str] = field(default_factory=lambda: [])  # TODO: implement
+    # share_paths_rw: List[str] = field(default_factory=lambda: [])  # TODO: implement
 
 
 @dataclass
 class BottleParams(DictCompatMixIn):
+    d7vk: bool = False
     dxvk: bool = False
     dxvk_nvapi: bool = False
     vkd3d: bool = False
@@ -79,6 +107,10 @@ class BottleParams(DictCompatMixIn):
     mangohud_display_on_game_start: bool = True
     obsvkc: bool = False
     vkbasalt: bool = False
+    lsfg_vk: bool = False
+    lsfg_vk_multiplier: int = 2
+    lsfg_vk_flow_scale: float = 1.0
+    lsfg_vk_performance_mode: bool = False
     gamemode: bool = False
     gamescope: bool = False
     gamescope_game_width: int = 0
@@ -92,6 +124,8 @@ class BottleParams(DictCompatMixIn):
     gamescope_fullscreen: bool = True
     gamescope_custom_options: str = ""
     sync: str = "wine"
+    frame_rate_limit: int = 0
+    hidraw_devices: list[str] = field(default_factory=list)
     fsr: bool = False
     fsr_sharpening_strength: int = 8
     custom_dpi: int = 96
@@ -100,6 +134,7 @@ class BottleParams(DictCompatMixIn):
     virtual_desktop: bool = False
     virtual_desktop_res: str = "1280x720"
     wayland: bool = False
+    hdr: bool = False
     pulseaudio_latency: bool = False
     fullscreen_capture: bool = False
     take_focus: bool = False
@@ -117,9 +152,7 @@ class BottleParams(DictCompatMixIn):
     versioning_exclusion_patterns: bool = False
     vmtouch: bool = False
     vmtouch_cache_cwd: bool = False
-    use_umu: bool = False
-    use_proton_scripts: bool = False
-    proton_log: bool = False
+    adaptive_launch: bool = False
 
 
 @dataclass
@@ -129,6 +162,7 @@ class BottleConfig(DictCompatMixIn):
     Windows: str = "win10"
     Runner: str = ""  # runner name, "sys-*", or any installed runner name
     WorkingDir: str = ""
+    D7VK: str = ""
     DXVK: str = ""
     NVAPI: str = ""
     VKD3D: str = ""
@@ -257,11 +291,24 @@ class BottleConfig(DictCompatMixIn):
         if "Sandbox" not in data:
             data["Sandbox"] = {}
 
+        inherited_environment = data.get("Inherited_Environment_Variables")
+        if (
+            data.get("Limit_System_Environment")
+            and inherited_environment in _LEGACY_DEFAULT_INHERITED_ENVIRONMENTS
+        ):
+            logging.warning("Adding XMODIFIERS to inherited environment defaults")
+            data["Inherited_Environment_Variables"] = [
+                *inherited_environment,
+                "XMODIFIERS",
+            ]
+
         # migrate old fsr_level key to fsr_sharpening_strength
         if "fsr_level" in data["Parameters"]:
             data["Parameters"]["fsr_sharpening_strength"] = data["Parameters"].pop(
                 "fsr_level"
             )
+
+        data["Parameters"].pop("show_component_updates", None)
 
         # migrate typo fields
         if "DXVK_NVAPI" in data:

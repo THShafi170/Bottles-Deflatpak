@@ -18,11 +18,13 @@
 import gettext
 import locale
 import sys
-from os import path
+import webbrowser
+from os import environ, path
 
 import gi
 
 from bottles.backend.health import HealthChecker
+from bottles.backend.globals import is_official_package
 from bottles.backend.logger import Logger
 from bottles.frontend.params import (
     APP_ID,
@@ -34,14 +36,13 @@ from bottles.frontend.params import (
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("GtkSource", "5")
-try:
-    gi.require_version("Xdp", "1.0")
-except (ValueError, ImportError):
-    pass
-# ruff: noqa: E402
-from gi.repository import Adw, Gio, GLib, GObject  # type: ignore
+gi.require_version("Xdp", "1.0")
+gi.require_version("XdpGtk4", "1.0")
 
-from bottles.frontend.views.preferences import PreferencesWindow
+# ruff: noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk  # type: ignore
+
+from bottles.frontend.utils.gtk import FontScaleManager
 from bottles.frontend.windows.window import BottlesWindow
 
 logging = Logger()
@@ -71,10 +72,10 @@ locale_dir = path.join(share_dir, "locale")
 if not path.exists(locale_dir):  # development
     locale_dir = path.join(base_dir, "build", "mo")
 
-locale.bindtextdomain("bottles", locale_dir)
-locale.textdomain("bottles")
-gettext.bindtextdomain("bottles", locale_dir)
-gettext.textdomain("bottles")
+locale.bindtextdomain("com.usebottles.bottles", locale_dir)
+locale.textdomain("com.usebottles.bottles")
+gettext.bindtextdomain("com.usebottles.bottles", locale_dir)
+gettext.textdomain("com.usebottles.bottles")
 _ = gettext.gettext
 
 
@@ -94,7 +95,14 @@ class Bottles(Adw.Application):
         super().__init__(
             application_id=APP_ID,
             resource_base_path="/com/usebottles/bottles",
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+            flags=(
+                Gio.ApplicationFlags.HANDLES_COMMAND_LINE
+                | (
+                    Gio.ApplicationFlags.NON_UNIQUE
+                    if environ.get("CPAK_CONTAINER_ID")
+                    else 0
+                )
+            ),
             register_session=True,
         )
         self.__create_action("quit", self.__quit, ["<primary>q", "<primary>w"])
@@ -290,6 +298,12 @@ class Bottles(Adw.Application):
         See: __register_actions()
         """
         Adw.Application.do_startup(self)
+        display = Gdk.Display.get_default()
+        if display is not None:
+            Gtk.IconTheme.get_for_display(display).add_resource_path(
+                "/com/usebottles/bottles/icons"
+            )
+        self._font_scale_manager = FontScaleManager(Gio.Settings.new(APP_ID))
 
         # log the same environment summary shown in the GUI debug info, so a
         # terminal run is enough to see what the user is running on
@@ -358,8 +372,7 @@ class Bottles(Adw.Application):
         self.win.manager.update_bottles()
 
     def __show_preferences(self, *args):
-        preferences_window = PreferencesWindow(self.win)
-        preferences_window.present()
+        self.win.show_prefs_view()
 
     def __new_bottle(self, *args):
         self.win.show_add_view()
@@ -408,10 +421,32 @@ class Bottles(Adw.Application):
             "/com/usebottles/bottles/appdata",
             f"{APP_MAJOR_VERSION}.{APP_MINOR_VERSION}",
         )
+        version = f"{APP_MAJOR_VERSION}.{APP_MINOR_VERSION}"
+        if is_official_package():
+            about_dialog.set_version(f"{version} ({_('Official Package')})")
+        else:
+            about_dialog.set_version(f"{version} ({_('Unofficial Package')})")
+            about_dialog.set_comments(_("Might not work as expected."))
         about_dialog.set_developers(developers)
         about_dialog.set_translator_credits(_("translator_credits"))
         about_dialog.set_artists(artists)
         about_dialog.set_debug_info(HealthChecker().get_results(plain=True))
+        about_dialog.add_link(_("Support Bottles"), "https://usebottles.com/funding")
+        about_dialog.add_legal_section(
+            _("Eagle Intelligence Data"),
+            _("Data derived from ProtonDB and winetricks"),
+            Gtk.License.CUSTOM,
+            _(
+                "ProtonDB community reports: ODbL 1.0, contents DbCL 1.0.\n"
+                "winetricks data: LGPL-2.1-or-later."
+            ),
+        )
+        about_dialog.add_legal_section(
+            _("lsfg-vk"),
+            _("Vulkan frame generation layer"),
+            Gtk.License.CUSTOM,
+            _("lsfg-vk 1.x: MIT.\nlsfg-vk 2.x: GPL-3.0-or-later."),
+        )
         about_dialog.set_copyright(
             _("Copyright © 2017 {developer_name}").format(
                 developer_name=about_dialog.get_developer_name()
@@ -421,6 +456,7 @@ class Bottles(Adw.Application):
             _("Third-Party Libraries and Special Thanks"),
             [
                 "DXVK https://github.com/doitsujin/dxvk",
+                "D7VK https://github.com/WinterSnowfall/d7vk",
                 "VKD3D https://github.com/HansKristian-Work/vkd3d-proton",
                 "DXVK-NVAPI https://github.com/jp7677/dxvk-nvapi",
                 "LatencyFleX https://github.com/ishitatsuyuki/LatencyFleX",
@@ -430,6 +466,7 @@ class Bottles(Adw.Application):
                 "vkbasalt-cli https://gitlab.com/TheEvilSkeleton/vkbasalt-cli",
                 "GameMode https://github.com/FeralInteractive/gamemode",
                 "Gamescope https://github.com/Plagman/gamescope",
+                "lsfg-vk https://github.com/PancakeTAS/lsfg-vk",
                 "OBS Vulkan/OpenGL capture https://github.com/nowrep/obs-vkcapture",
                 "Wine-TKG https://github.com/Frogging-Family/wine-tkg-git",
                 "Proton https://github.com/ValveSoftware/proton",
@@ -441,6 +478,8 @@ class Bottles(Adw.Application):
                 "vmtouch https://github.com/hoytech/vmtouch",
                 "FVS https://github.com/mirkobrombin/FVS",
                 "pathvalidate https://github.com/thombashi/pathvalidate",
+                "protondb-data https://github.com/bdefore/protondb-data",
+                "winetricks https://github.com/Winetricks/winetricks",
             ],
         )
         about_dialog.add_acknowledgement_section(

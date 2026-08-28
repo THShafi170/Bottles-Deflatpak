@@ -5,6 +5,7 @@ bottles_sources = [
   '__init__.py',
   'display.py',
   'gpu.py',
+  'hidraw.py',
   'manager.py',
   'vulkan.py',
   'terminal.py',
@@ -24,8 +25,8 @@ bottles_sources = [
   'connection.py',
   'gsettings_stub.py',
   'json.py',
-  'singleton.py',
-  'umu.py'
+  'lsfgvk.py',
+  'singleton.py'
 ]
 
 install_data(bottles_sources, install_dir: utilsdir)

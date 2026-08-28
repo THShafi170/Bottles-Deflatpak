@@ -15,7 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from gettext import gettext as _
+from gettext import gettext as _, ngettext
+from typing import ClassVar
 
 from gi.repository import Adw, GLib, Gtk
 
@@ -35,12 +36,14 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
     status_progress = Gtk.Template.Child()
     progress_bar = Gtk.Template.Child()
     label_progress = Gtk.Template.Child()
+    switch_remove_old = Gtk.Template.Child()
 
     # endregion
 
     # Preferred display order for the component checklist.
-    __component_order = [
+    __component_order: ClassVar[list[str]] = [
         "runner",
+        "d7vk",
         "dxvk",
         "vkd3d",
         "nvapi",
@@ -136,13 +139,34 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
         self.set_can_close(False)
         self.stack.set_visible_child_name("page_progress")
 
-        RunAsync(self.__run_updates, callback=self.__on_finished, jobs=jobs)
+        RunAsync(
+            self.__run_updates,
+            callback=self.__on_finished,
+            jobs=jobs,
+            remove_old=self.switch_remove_old.get_active(),
+        )
 
-    def __run_updates(self, jobs) -> dict:
+    @staticmethod
+    def __cleanup_target(update: dict):
+        component = update["id"]
+        if component == "runner":
+            component_type = update["component_type"]
+        elif component in {"d7vk", "dxvk", "vkd3d", "nvapi", "latencyflex"}:
+            component_type = component
+        else:
+            return None
+
+        current = update.get("current")
+        if not current or current == update.get("latest"):
+            return None
+        return component_type, current
+
+    def __run_updates(self, jobs, remove_old=False) -> dict:
         """Worker thread: apply the updates and report progress on the main loop."""
         ok = 0
         failed = 0
         step = 0
+        cleanup_targets = set()
 
         for _path, config, updates in jobs:
             # apply the runner first, so the DLL overrides get re-initialized
@@ -155,6 +179,8 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
                 result = self.manager.apply_component_update(config, update)
                 if result and getattr(result, "ok", False):
                     ok += 1
+                    if remove_old and (target := self.__cleanup_target(update)):
+                        cleanup_targets.add(target)
                     data = getattr(result, "data", None)
                     if isinstance(data, dict) and data.get("config"):
                         # carry the updated config forward so the next update
@@ -163,7 +189,15 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
                 else:
                     failed += 1
 
-        return {"ok": ok, "failed": failed}
+        removed = 0
+        for component_type, component_name in sorted(cleanup_targets):
+            result = self.manager.component_manager.uninstall(
+                component_type, component_name
+            )
+            if result and getattr(result, "ok", False):
+                removed += 1
+
+        return {"ok": ok, "failed": failed, "removed": removed}
 
     def __set_progress(self, step: int, bottle_name: str, component_title: str) -> bool:
         if self.__total:
@@ -174,6 +208,7 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
     def __on_finished(self, result, error=False) -> None:
         ok = result.get("ok", 0) if isinstance(result, dict) else 0
         failed = result.get("failed", 0) if isinstance(result, dict) else 0
+        removed = result.get("removed", 0) if isinstance(result, dict) else 0
 
         # reload bottles from disk and refresh the list (and the home banner)
         self.manager.check_bottles()
@@ -181,6 +216,12 @@ class BottlesBulkUpdateDialog(Adw.Dialog):
 
         if failed:
             message = _("Updated {0} components, {1} failed.").format(ok, failed)
+        elif removed:
+            message = ngettext(
+                "Updated {0} components and removed {1} old version.",
+                "Updated {0} components and removed {1} old versions.",
+                removed,
+            ).format(ok, removed)
         else:
             message = _("Updated {0} components.").format(ok)
         self.window.show_toast(message)

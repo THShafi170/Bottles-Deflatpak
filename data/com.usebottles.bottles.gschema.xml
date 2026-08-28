@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<schemalist gettext-domain="bottles">
+<schemalist gettext-domain="com.usebottles.bottles">
 	<schema id="@APP_ID@" path="/com/usebottles/bottles/">
 
     <key type="b" name="dark-theme">
       <default>false</default>
       <summary>Dark theme</summary>
       <description>Force the use of dark theme.</description>
+    </key>
+    <key type="s" name="ui-language">
+      <default>'system'</default>
+      <summary>Application language</summary>
+      <description>Choose the language used by the Bottles interface.</description>
     </key>
     <key type="b" name="force-offline">
       <default>false</default>
@@ -16,6 +21,17 @@
       <default>false</default>
       <summary>Toggle update date in list</summary>
       <description>Toggle the update date in list of bottles.</description>
+    </key>
+    <key type="as" name="bottle-order">
+      <default>[]</default>
+      <summary>Bottle order</summary>
+      <description>Store the custom order of bottles in the list.</description>
+    </key>
+    <key type="d" name="font-scale">
+      <range min="1.0" max="2.0"/>
+      <default>1.0</default>
+      <summary>Application font scale</summary>
+      <description>Scale Bottles text relative to the system font size.</description>
     </key>
     <key type="b" name="steam-programs">
       <default>true</default>
@@ -46,6 +62,11 @@
       <default>true</default>
       <summary>Notifications</summary>
       <description>Show notifications.</description>
+    </key>
+    <key type="b" name="show-component-updates">
+      <default>true</default>
+      <summary>Component update suggestions</summary>
+      <description>Show runner and component update suggestions for bottles.</description>
     </key>
     <key type="b" name="eagle-security-scan">
       <default>true</default>
@@ -92,7 +113,16 @@
       <summary>Wine audio driver</summary>
       <description>Select which Wine audio driver should be enforced for all bottles. Use "default" to leave the driver unchanged.</description>
     </key>
-
+    <key type="b" name="disable-home-drive">
+      <default>false</default>
+      <summary>Disable the default Z: drive</summary>
+      <description>Do not expose the filesystem as the Z: drive in new bottles.</description>
+    </key>
+    <key type="b" name="show-sandbox-warning">
+      <default>true</default>
+      <summary>Show sandbox warning</summary>
+      <description>Toggle sandbox warning.</description>
+    </key>
     <key type="b" name="playtime-enabled">
       <default>true</default>
       <summary>Enable playtime tracking</summary>
@@ -107,6 +137,35 @@
       <default>50</default>
       <summary>Eagle deep scan limit</summary>
       <description>Maximum number of binaries to scan when analysing installers. Higher values provide more thorough analysis but take longer.</description>
+    </key>
+    <key type="b" name="show-funding">
+      <default>true</default>
+      <summary>Show funding dialog</summary>
+      <description>Toggle the funding dialog.</description>
+    </key>
+    <key type="s" name="umu-launcher-path">
+      <default>''</default>
+      <summary>UMU launcher path</summary>
+      <description>Use this UMU launcher instead of the system or bundled copy.</description>
+    </key>
+    <key type="s" name="umu-data-path">
+      <default>''</default>
+      <summary>UMU managed data path</summary>
+      <description>Store Bottles-managed UMU game definitions and prefixes in this directory.</description>
+    </key>
+    <key type="s" name="umu-proton">
+      <default>'ProtoSoda'</default>
+      <summary>Default UMU Proton selection</summary>
+      <description>Proton selection used for new UMU games.</description>
+    </key>
+    <key type="s" name="umu-dependency-tool">
+      <choices>
+        <choice value="bottles"/>
+        <choice value="winetricks"/>
+      </choices>
+      <default>'bottles'</default>
+      <summary>Default UMU dependency installer</summary>
+      <description>Choose the dependency source used for new UMU games.</description>
     </key>
 	</schema>
 </schemalist>

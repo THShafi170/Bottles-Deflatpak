@@ -68,7 +68,7 @@
       <caption>Installers Page</caption>
     </screenshot>
   </screenshots>
-  <translation type="gettext">@APP_ID@</translation>
+  <translation type="gettext">com.usebottles.bottles</translation>
   <content_rating type="oars-1.1"/>
   <url type="homepage">https://usebottles.com</url>
   <url type="bugtracker">https://github.com/THShafi170/Bottles-Deflatpak/issues</url>
@@ -86,6 +86,178 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="66.9" date="2026-08-26">
+      <description translate="no">
+        <ul>
+          <li>Fixed the Stop action for games launched from the Library</li>
+          <li>Fixed opening custom bottle folders</li>
+          <li>Fixed steamuser profile aliases when the home directory is a symbolic link</li>
+          <li>Added dconf and xz to the cpak runtime</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.8" date="2026-08-22">
+      <description translate="no">
+        <ul>
+          <li>Improved Library cards and added desktop and Steam shortcuts for UMU games</li>
+          <li>Fixed Preferences windows accumulating and slowing down the application</li>
+          <li>Fixed D7VK selections appearing to reset until Bottles was restarted</li>
+          <li>Fixed dependency downloads from servers that reject HEAD requests</li>
+          <li>Accepted managed Proton runners during the first-run setup</li>
+          <li>Delayed UMU directory creation until UMU is used</li>
+          <li>Removed unused Library covers after their final entry is deleted</li>
+          <li>Fixed shutdown and reboot actions, cursor sizing and platform-specific runner visibility</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.7" date="2026-08-16">
+      <description translate="no">
+        <ul>
+          <li>Fixed duplicate bottles overwriting existing copies or leaving partial data after errors</li>
+          <li>Fixed the bottle list not refreshing after deletion</li>
+          <li>Fixed repository timeouts on networks with broken IPv6 resolution</li>
+          <li>Fixed UMU runtime access in the Flathub package</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.6" date="2026-08-14">
+      <description translate="no">
+        <ul>
+          <li>Fixed deleting bottles that use a dedicated sandbox</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.5" date="2026-08-13">
+      <description translate="no">
+        <ul>
+          <li>Made dependency rows select entries for batch installation</li>
+          <li>Fixed detection of Proton runners whose catalog names include the architecture</li>
+          <li>Clarified the Steam Runtime recommendation for external Proton runners</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.4" date="2026-08-13">
+      <description translate="no">
+        <ul>
+          <li>Fixed dependency installation after case-insensitive DLL replacement</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.3" date="2026-08-13">
+      <description translate="no">
+        <ul>
+          <li>Fixed launching external executables when the Z: drive is disabled</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.2" date="2026-08-13">
+      <description translate="no">
+        <ul>
+          <li>Fixed Steam Runtime arguments and Scout runtime launches</li>
+          <li>Fixed mixed Library entries and case-insensitive DLL duplicates</li>
+          <li>Fixed NVK detection when the preferred ICD is unavailable</li>
+          <li>Fixed launching external executables with Wine</li>
+          <li>Prevented installer and crash report network requests from blocking the interface</li>
+          <li>Improved funding controls and kept dialogs attached to the main window</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.1" date="2026-08-12">
+      <description translate="no">
+        <ul>
+          <li>Fixed Flatpak runner paths when launching applications through Steam Runtime</li>
+          <li>Fixed selecting an existing executable for custom UMU prefixes</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.0" date="2026-08-11">
+      <description translate="no">
+        <ul>
+          <li>Integrated UMU with Library-managed games, prefixes, per-game Proton settings, dependencies and command line support</li>
+          <li>Added ProtoSoda as the default UMU runner with the Soda compatibility work in a Proton environment</li>
+          <li>Added Adaptive Launch profiling for bottles using Soda 11.0-5 or newer</li>
+          <li>Added an experimental official cpak package built from the Bottles source tree and release tags</li>
+          <li>Added official runner logos and bundled the symbolic icons required by the interface</li>
+          <li>Improved runner and graphics component updates with a shared bulk update flow</li>
+          <li>Added Steam Linux Runtime 4 support for Proton 11 and synchronized its VKD3D utilities</li>
+          <li>Fixed bottle creation and preferences failing with incomplete templates, multiple profiles or unavailable GameMode</li>
+          <li>Fixed dependency reinstall and limited uninstall to recipes that provide a real uninstaller</li>
+          <li>Fixed custom bottle creation when selecting the configured default directory</li>
+          <li>Fixed GameMode, MangoHud and other host wrappers used with Steam Runtime</li>
+          <li>Fixed program icons, Library covers, cabinet wildcards, SOCKS proxies and cover picker paths</li>
+          <li>Fixed Flatpak add-on commands, NVK detection and onboarding without an installed Wine runner</li>
+        </ul>
+      </description>
+    </release>
+    <release version="65.4" date="2026-08-06">
+      <description translate="no">
+        <ul>
+          <li>Fixed bottle creation failing when the template carried separate user profiles</li>
+        </ul>
+      </description>
+    </release>
+    <release version="65.3" date="2026-08-06">
+      <description translate="no">
+        <ul>
+          <li>Fixed bottle creation when DXVK or a runner has not been downloaded yet</li>
+          <li>Fixed the dependencies list freezing the interface and failing to list installed dependencies</li>
+          <li>Fixed bottle pages turning blank after a cancelled back gesture</li>
+          <li>Fixed the bottle deletion dialog closing while the view was already changing</li>
+        </ul>
+      </description>
+    </release>
+    <release version="65.2" date="2026-08-05">
+      <description translate="no">
+        <ul>
+          <li>Added Steam Linux Runtime 4 support for Proton 11 and newer runners</li>
+          <li>Fixed programs being launched as Steam applications when using Proton based runners</li>
+        </ul>
+      </description>
+    </release>
+    <release version="65.1" date="2026-08-04">
+      <description translate="no">
+        <ul>
+          <li>Fixed bottle preferences failing to initialize when GameMode is unavailable</li>
+        </ul>
+      </description>
+    </release>
+    <release version="65.0" date="2026-08-04">
+      <description translate="no">
+        <ul>
+          <li>Added Eagle Intelligence with credited and licensed compatibility data from ProtonDB and winetricks</li>
+          <li>Added community-backed environment variables, DLL overrides, launch arguments, compatibility ratings and configurable recommendations to Eagle results</li>
+          <li>Added D7VK as a managed component for Direct3D 3, 5, 6 and 7 applications</li>
+          <li>Added automatic backups for selected program files and folders after the program closes</li>
+          <li>Added a per-bottle frame rate limiter for DXVK and VKD3D applications</li>
+          <li>Added HOTAS and HIDRAW device selection with runner compatibility warnings</li>
+          <li>Added input and USB device sharing controls to dedicated sandboxes</li>
+          <li>Added lsfg-vk frame generation with private handling for the user-provided Lossless Scaling DLL</li>
+          <li>Added sandbox configuration during bottle creation</li>
+          <li>Added application language and text scaling controls</li>
+          <li>Added Steam games to the library and discovery for Steam Proton runners and shortcut prefixes</li>
+          <li>Added custom library covers, bottle ordering, file associations and program launch at login</li>
+          <li>Added selected dependency installation and CLI bottle setup</li>
+          <li>Added controls to hide console windows and component update suggestions</li>
+          <li>Added support for configuring the default Z drive</li>
+          <li>Added NTSync runner detection and HDR launch configuration</li>
+          <li>Fixed startup failures caused by lowercase or unsupported LOG_LEVEL values</li>
+          <li>Fixed hidden files being omitted from bottle duplicates</li>
+          <li>Fixed missing paths breaking bottle versioning and restoration</li>
+          <li>Fixed malformed environment variables and unavailable process environments causing crashes</li>
+          <li>Fixed bottle creation failures caused by invalid recipes, templates and Windows version changes</li>
+          <li>Fixed desktop entries after program renames, removals and Flatpak launches</li>
+          <li>Fixed drive mappings, external prefix imports and shared Wine user profiles</li>
+          <li>Fixed Steam game discovery, runtime selection and shortcut launch options</li>
+          <li>Fixed document portal paths for shortcuts, custom bottle directories and folder access</li>
+          <li>Fixed cached component installation and repository failover when offline</li>
+          <li>Fixed application installers not refreshing the programs list after completion</li>
+          <li>Fixed Wine Mono prompts during wineboot and incompatible system Wine detection</li>
+          <li>Fixed MangoHud configuration inheritance and NVK Vulkan driver detection</li>
+          <li>Fixed imported bottle configuration, library icons and renamed Epic games</li>
+          <li>Updated issue reporting checks and documentation for stable Flatpak builds</li>
+        </ul>
+      </description>
+    </release>
     <release version="64.1" date="2026-05-30">
       <description translate="no">
         <ul>

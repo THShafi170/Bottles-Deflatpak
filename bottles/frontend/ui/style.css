@@ -35,6 +35,11 @@
   margin: 0 2px;
 }
 
+.tag-umu {
+  background-color: #6138a8;
+  color: #fff;
+}
+
 .tag-img {
   padding: 4px 10px;
 }
@@ -136,12 +141,35 @@ entry.heading_1 {
 /* Library */
 .library-entry {
   border: 1px solid alpha(currentColor, .07);
-  border-radius: 4px;
+  border-radius: 12px;
   background-color: alpha(currentColor, .04);
+  box-shadow: none;
+}
+
+.library-entry:hover {
+  border-color: alpha(@accent_color, .8);
+  box-shadow: none;
+}
+
+.library-entry-launch {
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.library-entry-launch:hover,
+.library-entry-launch:active {
+  background: transparent;
+  box-shadow: none;
 }
 
 .library-entry-details {
   border-top: 1px solid alpha(currentColor, .07);
+}
+
+.library-add-cover {
+  padding: 0;
 }
 
 .library-content-btn {
@@ -174,9 +202,21 @@ progressbar.installer {
   line-height: 2.0;
 }
 
+levelbar.intel-score trough {
+  min-height: 8px;
+}
+
+levelbar.intel-score block.filled {
+  background-color: @success_bg_color;
+}
+
 /* Donate button */
 .donate {
   color: #c91c6a;
+}
+
+.donate.supporter {
+  background-color: alpha(#c91c6a, 0.14);
 }
 
 /* Playtime graph bars */

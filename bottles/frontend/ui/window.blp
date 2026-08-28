@@ -8,7 +8,7 @@ template $BottlesWindow: Adw.ApplicationWindow {
   Adw.ToastOverlay toasts {
     Adw.Leaflet main_leaf {
       can-unfold: false;
-      can-navigate-back: false;
+      can-navigate-back: true;
 
       Box {
         orientation: vertical;
@@ -47,15 +47,15 @@ template $BottlesWindow: Adw.ApplicationWindow {
 
           [end]
           Button btn_donate {
-            tooltip-text: _("Donate");
-            label: _("Donate");
+            tooltip-text: _("Support Bottles");
+            icon-name: "heart-symbolic";
           }
 
           [end]
           Button btn_noconnection {
             visible: false;
             tooltip-text: _("You don\'t seem connected to the internet. Without it you will not be able to download essential components. Click this icon when you have reestablished the connection.");
-            icon-name: "network-error-symbolic";
+            icon-name: "dialog-error-symbolic";
           }
         }
 

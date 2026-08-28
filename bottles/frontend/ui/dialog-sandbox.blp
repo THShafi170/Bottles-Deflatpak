@@ -44,49 +44,30 @@ template $SandboxDialog: Adw.Window {
           }
         }
 
-        Adw.ActionRow {
-          title: _("Share Display");
-          subtitle: _("Expose X11 and Wayland display sockets");
-          activatable-widget: switch_display;
+        Adw.ActionRow row_input {
+          title: _("Share Input Devices");
+          subtitle: _("Programs in this bottle can read controllers and global keystrokes while enabled.");
+          activatable-widget: switch_input;
 
-          Switch switch_display {
+          Switch switch_input {
             valign: center;
           }
         }
 
-        Adw.ActionRow {
-          title: _("Share Network");
-          subtitle: _("Allow internet and local network access");
-          activatable-widget: switch_net;
+        Adw.ActionRow row_usb {
+          title: _("Share USB Devices");
+          subtitle: _("Programs in this bottle can access raw USB devices permitted by the host while enabled.");
+          activatable-widget: switch_usb;
 
-          Switch switch_net {
+          Switch switch_usb {
             valign: center;
           }
         }
       }
 
-      Adw.PreferencesGroup {
-        title: _("Filesystem Access");
-
-        Adw.ActionRow {
-          title: _("Share Home Directory");
-          subtitle: _("Allow read-write access to your home directory (~)");
-          activatable-widget: switch_user;
-
-          Switch switch_user {
-            valign: center;
-          }
-        }
-
-        Adw.ActionRow {
-          title: _("Share Host System Files");
-          subtitle: _("Bind system configuration (/etc) read-only");
-          activatable-widget: switch_host_ro;
-
-          Switch switch_host_ro {
-            valign: center;
-          }
-        }
+      Adw.PreferencesGroup group_hidraw {
+        title: _("Flight Controllers (HIDRAW)");
+        description: _("Use raw HID access only for the selected vendor and product IDs.");
       }
     }
   }

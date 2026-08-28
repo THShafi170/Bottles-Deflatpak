@@ -21,9 +21,11 @@
 import argparse
 import os
 import signal
+import subprocess
 import sys
 import uuid
 import warnings
+from pathlib import Path
 
 import gi
 
@@ -48,6 +50,12 @@ from bottles.backend.managers.registry_rule import RegistryRuleManager
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.registry_rule import RegistryRule
 from bottles.backend.runner import Runner
+from bottles.backend.state import EventManager, Events
+from bottles.backend.umu import (
+    DEFAULT_PROTON_VALUE,
+    UMU_STORE_IDS,
+    UmuRepositoryError,
+)
 from bottles.backend.utils import json, yaml
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.wine.cmd import CMD
@@ -64,6 +72,7 @@ from bottles.backend.wine.wineboot import WineBoot
 from bottles.backend.wine.wineserver import WineServer
 from bottles.backend.wine.winecommand import WineCommand
 from bottles.backend.wine.winepath import WinePath
+from bottles.frontend.cli.utils import serialize_arguments
 from bottles.frontend.params import APP_ID
 
 
@@ -113,6 +122,9 @@ class CLI:
         add_parser.add_argument("-n", "--name", help="Program name", required=True)
         add_parser.add_argument("-p", "--path", help="Program path", required=True)
         add_parser.add_argument("-l", "--launch-options", help="Program launch options")
+        add_parser.add_argument(
+            "--no-d7vk", action="store_true", help="Disable D7VK for the program"
+        )
         add_parser.add_argument(
             "--no-dxvk", action="store_true", help="Disable DXVK for the program"
         )
@@ -208,6 +220,9 @@ class CLI:
             "--runner", help="Change Runner (e.g. '--runner caffe-7.2')"
         )
         edit_parser.add_argument(
+            "--d7vk", help="Change D7VK or disable it (e.g. '--d7vk d7vk-v2.0')"
+        )
+        edit_parser.add_argument(
             "--dxvk", help="Change DXVK (e.g. '--dxvk dxvk-1.9.0')"
         )
         edit_parser.add_argument(
@@ -233,6 +248,7 @@ class CLI:
         )
         new_parser.add_argument("--arch", help="Architecture (win32|win64)")
         new_parser.add_argument("--runner", help="Name of the runner to be used")
+        new_parser.add_argument("--d7vk", help="Name of the d7vk to be used")
         new_parser.add_argument("--dxvk", help="Name of the dxvk to be used")
         new_parser.add_argument("--vkd3d", help="Name of the vkd3d to be used")
         new_parser.add_argument("--nvapi", help="Name of the dxvk-nvapi to be used")
@@ -244,6 +260,7 @@ class CLI:
         run_parser.add_argument("-b", "--bottle", help="Bottle name", required=True)
         run_parser.add_argument("-e", "--executable", help="Path to the executable")
         run_parser.add_argument("-p", "--program", help="Program to run")
+        run_parser.add_argument("--program-id", help="Stored program identifier")
         run_parser.add_argument(
             "--args-replace",
             action="store_false",
@@ -255,6 +272,10 @@ class CLI:
             nargs="*",
             action="extend",
             help="Arguments to pass to the executable",
+        )
+
+        subparsers.add_parser(
+            "autostart", help="Run programs configured to start at login"
         )
 
         stop_parser = subparsers.add_parser(
@@ -278,6 +299,18 @@ class CLI:
         shell_parser.add_argument(
             "-i", "--input", help="Command to execute", required=True
         )
+
+        umu_parser = subparsers.add_parser("umu", help="Manage UMU games")
+        umu_parser.add_argument(
+            "action",
+            choices=["list", "status", "add", "install", "run", "set-executable"],
+        )
+        umu_parser.add_argument("--game", help="UMU game id or exact name")
+        umu_parser.add_argument("--name", help="Game name")
+        umu_parser.add_argument("--executable", help="Windows executable or installer")
+        umu_parser.add_argument("--game-id", default="umu-default")
+        umu_parser.add_argument("--store", choices=UMU_STORE_IDS, default="none")
+        umu_parser.add_argument("--proton", help="Proton version or path")
 
         self.__process_args()
 
@@ -333,6 +366,9 @@ class CLI:
         elif self.args.command == "run":
             self.run_program()
 
+        elif self.args.command == "autostart":
+            self.autostart_programs()
+
         # SHELL parser
         elif self.args.command == "shell":
             self.run_shell()
@@ -344,8 +380,133 @@ class CLI:
         elif self.args.command == "standalone":
             self.generate_standalone()
 
+        elif self.args.command == "umu":
+            self.manage_umu()
+
         else:
             self.parser.print_help()
+
+    def manage_umu(self):
+        manager = Manager(g_settings=self.settings, is_cli=True)
+        manager.check_app_dirs()
+        manager.organize_components()
+        EventManager.wait(Events.ComponentsOrganizing)
+        repository = manager.umu_repository
+        action = self.args.action
+
+        if action == "list":
+            games = repository.list_games()
+            if self.args.json:
+                sys.stdout.write(json.dumps([game.to_dict() for game in games]) + "\n")
+                return
+            for game in games:
+                sys.stdout.write(f"{game.id}  {game.state:10}  {game.name}\n")
+            return
+
+        def find_game():
+            if not self.args.game:
+                self.parser.error("--game is required for this UMU action")
+            matches = [
+                game
+                for game in repository.list_games()
+                if str(game.id) == self.args.game or game.name == self.args.game
+            ]
+            if len(matches) != 1:
+                sys.stderr.write(f"UMU game not found or ambiguous: {self.args.game}\n")
+                raise SystemExit(1)
+            return matches[0]
+
+        if action in ("add", "install"):
+            if not self.args.name or not self.args.executable:
+                self.parser.error("--name and --executable are required")
+            executable = Path(self.args.executable).expanduser().resolve()
+            if not executable.is_file():
+                sys.stderr.write(f"Executable not found: {executable}\n")
+                raise SystemExit(1)
+            proton = self.args.proton or self.settings.get_string("umu-proton")
+            proton = proton or DEFAULT_PROTON_VALUE
+            try:
+                proton = manager.umu_proton_catalog.pin_value(proton)
+            except ValueError as error:
+                sys.stderr.write(f"{error}\n")
+                raise SystemExit(1) from error
+            game = repository.new_game(
+                self.args.name,
+                executable,
+                proton=proton,
+                game_id=self.args.game_id,
+                store=self.args.store,
+            )
+            extra = {
+                **game.extra,
+                "dependency_tool": self.settings.get_string("umu-dependency-tool"),
+                "source_mode": "installer" if action == "install" else "portable",
+            }
+            if action == "install":
+                extra["installer"] = str(executable)
+            try:
+                game = repository.update(
+                    game,
+                    state="installing" if action == "install" else "ready",
+                    extra=extra,
+                )
+            except UmuRepositoryError as error:
+                sys.stderr.write(f"{error}\n")
+                raise SystemExit(1) from error
+            sys.stdout.write(f"{game.id}\n")
+            if action == "add":
+                return
+        else:
+            game = find_game()
+
+        if action == "status":
+            executor = manager.get_umu_executor(for_launch=False)
+            status = {
+                "id": str(game.id),
+                "name": game.name,
+                "state": game.state,
+                "running": bool(executor and executor.is_running(game)),
+                "prefix": str(repository.prefix_path(game)),
+                "executable": str(game.executable),
+            }
+            if self.args.json:
+                sys.stdout.write(json.dumps(status) + "\n")
+            else:
+                for key, value in status.items():
+                    sys.stdout.write(f"{key}: {value}\n")
+            return
+
+        if action == "set-executable":
+            if not self.args.executable:
+                self.parser.error("--executable is required")
+            executable = Path(self.args.executable).expanduser().resolve()
+            if not executable.is_file():
+                sys.stderr.write(f"Executable not found: {executable}\n")
+                raise SystemExit(1)
+            try:
+                repository.update(game, executable=executable, state="ready")
+            except UmuRepositoryError as error:
+                sys.stderr.write(f"{error}\n")
+                raise SystemExit(1) from error
+            return
+
+        executor = manager.get_umu_executor()
+        if executor is None:
+            sys.stderr.write((manager.umu_error or "UMU is not available") + "\n")
+            raise SystemExit(1)
+        if action == "run" and game.state != "ready":
+            sys.stderr.write("The UMU game is not ready to run\n")
+            raise SystemExit(1)
+
+        executor.run(game)
+        return_code = executor.wait(game)
+        if action == "install":
+            game = repository.update(
+                game,
+                state="draft" if return_code == 0 else "failed",
+            )
+            sys.stdout.write(f"state: {game.state}\n")
+        raise SystemExit(return_code)
 
     # region INFO
     def show_info(self):
@@ -388,7 +549,9 @@ class CLI:
 
     def list_components(self, c_filter=None):
         mng = Manager(g_settings=self.settings, is_cli=True)
+        mng.check_app_dirs()
         mng.check_runners(False)
+        mng.check_d7vk(False)
         mng.check_dxvk(False)
         mng.check_vkd3d(False)
         mng.check_nvapi(False)
@@ -396,6 +559,7 @@ class CLI:
 
         components = {
             "runners": mng.runners_available,
+            "d7vk": mng.d7vk_available,
             "dxvk": mng.dxvk_available,
             "vkd3d": mng.vkd3d_available,
             "nvapi": mng.nvapi_available,
@@ -479,6 +643,7 @@ class CLI:
         _name = self.args.name
         _path = self.args.path
         _launch_options = self.args.launch_options
+        _no_d7vk = self.args.no_d7vk
         _no_dxvk = self.args.no_dxvk
         _no_vkd3d = self.args.no_vkd3d
         _no_dxvk_nvapi = self.args.no_dxvk_nvapi
@@ -522,6 +687,8 @@ class CLI:
                 not _no_dxvk_nvapi if _no_dxvk_nvapi else bottle.Parameters.dxvk_nvapi
             ),
         }
+        if _no_d7vk:
+            _program["d7vk"] = False
         mng.update_config(bottle, _uuid, _program, scope="External_Programs")
         sys.stdout.write(f"'{_name}' added to '{bottle.Name}'!")
 
@@ -641,6 +808,7 @@ class CLI:
         _env_var = self.args.env_var
         _win = self.args.win
         _runner = self.args.runner
+        _d7vk = self.args.d7vk
         _dxvk = self.args.dxvk
         _vkd3d = self.args.vkd3d
         _nvapi = self.args.nvapi
@@ -660,6 +828,9 @@ class CLI:
             _params = _params.split(",")
             _params = [p.split(":") for p in _params]
             for k, v in _params:
+                if k == "d7vk":
+                    sys.stderr.write("Use --d7vk to change D7VK\n")
+                    sys.exit(1)
                 if k not in valid_parameters:
                     sys.stderr.write(f"Invalid parameter {k}\n")
                     exit(1)
@@ -685,6 +856,19 @@ class CLI:
 
         if _runner is not None:
             Runner.runner_update(bottle, mng, _runner)
+
+        if _d7vk is not None:
+            if _d7vk.lower() == "disabled":
+                result = mng.set_d7vk(bottle, False)
+            else:
+                mng.check_d7vk(False)
+                if _d7vk not in mng.d7vk_available:
+                    sys.stderr.write(f"D7VK version {_d7vk} not available\n")
+                    sys.exit(1)
+                result = mng.set_d7vk(bottle, True, _d7vk)
+            if not result.ok:
+                sys.stderr.write(f"Failed to change D7VK: {result.message}\n")
+                sys.exit(1)
 
         if _dxvk is not None:
             mng.check_dxvk(False)
@@ -735,17 +919,26 @@ class CLI:
         _custom_environment = self.args.custom_environment
         _arch = "win64" if self.args.arch is None else self.args.arch
         _runner = self.args.runner
+        _d7vk = self.args.d7vk
         _dxvk = self.args.dxvk
         _vkd3d = self.args.vkd3d
         _nvapi = self.args.nvapi
         _latencyflex = self.args.latencyflex
         mng = Manager(g_settings=self.settings, is_cli=True)
-        mng.checks()
+        mng.checks(install_latest=False, first_run=True)
+        for event in (
+            Events.ComponentsOrganizing,
+            Events.DependenciesOrganizing,
+            Events.InstallersOrganizing,
+        ):
+            EventManager.wait(event)
+        mng.checks(install_latest=True, first_run=False)
 
-        mng.create_bottle(
+        result = mng.create_bottle(
             name=_name,
             environment=_environment,
             runner=_runner,
+            d7vk=_d7vk,
             dxvk=_dxvk,
             vkd3d=_vkd3d,
             nvapi=_nvapi,
@@ -753,15 +946,37 @@ class CLI:
             arch=_arch,
             custom_environment=_custom_environment,
         )
+        if not result.ok:
+            sys.stderr.write((result.message or "Bottle creation failed") + "\n")
+            exit(1)
 
     # endregion
 
     # region RUN
+    def autostart_programs(self):
+        mng = Manager(g_settings=self.settings, is_cli=True)
+        mng.check_bottles()
+
+        for config, program in ManagerUtils.get_autostart_programs(
+            mng.local_bottles.values()
+        ):
+            subprocess.Popen(
+                [
+                    "bottles-cli",
+                    "run",
+                    "-b",
+                    config.Name,
+                    "--program-id",
+                    str(program["id"]),
+                ],
+                start_new_session=True,
+            )
+
     def run_program(self):
         _bottle = self.args.bottle
         _program = self.args.program
+        _program_id = self.args.program_id
         _keep = self.args.keep_args
-        _args = " ".join(self.args.args)
         _executable = self.args.executable
 
         mng = Manager(g_settings=self.settings, is_cli=True)
@@ -782,16 +997,29 @@ class CLI:
         bottle = mng.local_bottles[_bottle]
         programs = mng.get_programs(bottle)
 
-        if _program is not None:
+        _args = serialize_arguments(self.args.args)
+
+        if _program is not None or _program_id is not None:
             if _executable is not None:
-                sys.stderr.write("Cannot specify both --program and --executable\n")
+                sys.stderr.write(
+                    "Cannot specify --executable with --program or --program-id\n"
+                )
+                exit(1)
+            if _program is not None and _program_id is not None:
+                sys.stderr.write("Cannot specify both --program and --program-id\n")
                 exit(1)
 
-            if _program not in [p["name"] for p in programs]:
-                sys.stderr.write(f"Program {_program} not found\n")
+            if _program_id is not None:
+                matches = [p for p in programs if p.get("id") == _program_id]
+                identifier = _program_id
+            else:
+                matches = [p for p in programs if p["name"] == _program]
+                identifier = _program
+            if not matches:
+                sys.stderr.write(f"Program {identifier} not found\n")
                 exit(1)
 
-            program = [p for p in programs if p["name"] == _program][0]
+            program = matches[0]
             _executable = program.get("path", "")
             _program_args = program.get("arguments")
             if not program.get("arguments_enabled", True):

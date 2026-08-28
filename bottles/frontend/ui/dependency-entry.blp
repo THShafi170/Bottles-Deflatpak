@@ -28,6 +28,7 @@ Popover pop_actions {
 
     $GtkModelButton btn_remove {
       text: _("Uninstall");
+      visible: false;
     }
 
     Separator {}
@@ -40,8 +41,14 @@ Popover pop_actions {
 
 template $DependencyEntry: Adw.ActionRow {
   title: _("Dependency name");
-  activatable-widget: btn_install;
+  activatable-widget: check_select;
   subtitle: _("Dependency description");
+
+  [prefix]
+  CheckButton check_select {
+    visible: false;
+    valign: center;
+  }
 
   Box box_actions {
     spacing: 6;

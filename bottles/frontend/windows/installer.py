@@ -130,23 +130,32 @@ class InstallerDialog(Adw.Window):
         self.btn_close.connect("clicked", self.__close)
 
     def __set_icon(self):
-        try:
+        def fetch_icon():
             url = self.manager.installer_manager.get_icon_url(self.installer[0])
             if url is None:
+                return None
+
+            with urllib.request.urlopen(url, timeout=10) as res:
+                return res.read()
+
+        def set_icon(data, error):
+            if error is not None or data is None:
                 self.img_icon.set_visible(False)
                 self.img_icon_install.set_visible(False)
                 return
 
-            with urllib.request.urlopen(url) as res:
-                stream = Gio.MemoryInputStream.new_from_data(res.read(), None)
+            try:
+                stream = Gio.MemoryInputStream.new_from_data(data, None)
                 pixbuf = GdkPixbuf.Pixbuf.new_from_stream(stream, None)
                 self.img_icon.set_pixel_size(78)
                 self.img_icon.set_from_pixbuf(pixbuf)
                 self.img_icon_install.set_pixel_size(78)
                 self.img_icon_install.set_from_pixbuf(pixbuf)
-        except:
-            self.img_icon.set_visible(False)
-            self.img_icon_install.set_visible(False)
+            except GLib.Error:
+                self.img_icon.set_visible(False)
+                self.img_icon_install.set_visible(False)
+
+        RunAsync(fetch_icon, callback=set_icon)
 
     def __check_resources(self, *_args):
         self.__local_resources = self.manager.installer_manager.has_local_resources(
@@ -192,7 +201,7 @@ class InstallerDialog(Adw.Window):
     def __installed(self):
         self.set_deletable(False)
         self.stack.set_visible_child_name("page_installed")
-        self.window.page_details.view_bottle.update_programs()
+        self.window.page_details.view_bottle.update_programs(force_update=True)
         self.window.page_details.go_back_sidebar()
 
     def __error(self, error):

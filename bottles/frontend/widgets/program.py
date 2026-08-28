@@ -20,14 +20,13 @@ import os
 import time
 from gettext import gettext as _
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, Gdk, GLib, Gtk
 
 from bottles.backend.managers.data import DataManager, UserDataKeys
 from bottles.backend.managers.eagle import EagleManager
 from bottles.backend.managers.library import LibraryManager
 from bottles.backend.managers.steam import SteamManager
 from bottles.backend.models.result import Result
-from bottles.backend.state import SignalManager, Signals
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.threading import RunAsync
 from bottles.backend.wine.executor import WineExecutor
@@ -37,11 +36,10 @@ from bottles.backend.wine.wineserver import WineServer
 from bottles.frontend.utils.gtk import GtkUtils
 from bottles.frontend.utils.playtime import PlaytimeService
 from bottles.frontend.utils.sandbox_guard import guard_sandbox_launch
+from bottles.frontend.windows.fileassociations import FileAssociationsDialog
 from bottles.frontend.windows.launchoptions import LaunchOptionsDialog
 from bottles.frontend.windows.playtimegraph import PlaytimeGraphDialog
 from bottles.frontend.windows.rename import RenameDialog
-
-from typing import Optional
 
 
 # noinspection PyUnusedLocal
@@ -64,7 +62,9 @@ class ProgramEntry(Adw.ActionRow):
     btn_browse = Gtk.Template.Child()
     btn_add_steam = Gtk.Template.Child()
     btn_add_entry = Gtk.Template.Child()
+    btn_file_associations = Gtk.Template.Child()
     btn_add_library = Gtk.Template.Child()
+    btn_add_steam_library = Gtk.Template.Child()
     btn_launch_terminal = Gtk.Template.Child()
     pop_actions = Gtk.Template.Child()
 
@@ -81,6 +81,11 @@ class ProgramEntry(Adw.ActionRow):
         self.manager = window.manager
         self.config = config
         self.program = program
+        self.is_steam = is_steam
+        self.__desktop_entry_exists = False
+        self.__desktop_entry_query_pending = False
+        self.__program_icon_job = None
+        self.__program_icon_path = None
 
         self.set_title(GLib.markup_escape_text(self.program["name"]))
 
@@ -91,6 +96,7 @@ class ProgramEntry(Adw.ActionRow):
                 w.set_sensitive(False)
             self.btn_launch_steam.set_visible(True)
             self.btn_launch_steam.set_sensitive(True)
+            self.btn_add_steam_library.set_visible(True)
             self.set_activatable_widget(self.btn_launch_steam)
         else:
             self.executable = program.get("executable", "")
@@ -107,10 +113,54 @@ class ProgramEntry(Adw.ActionRow):
         if self.manager.steam_manager.is_steam_supported:
             self.btn_add_steam.set_visible(True)
 
+        program_icon = self.program.get("icon", "com.usebottles.bottles-program")
         library_manager = LibraryManager()
         for _uuid, entry in library_manager.get_library().items():
             if entry.get("id") == program.get("id"):
                 self.btn_add_library.set_visible(False)
+                self.btn_add_steam_library.set_visible(False)
+                program_icon = entry.get("icon") or program_icon
+
+        self.img_program = Gtk.Image()
+        self.img_program.set_pixel_size(32)
+        self.img_program.set_valign(Gtk.Align.CENTER)
+        extract_program_icon = False
+        program_name = self.program.get("name", "")
+        program_path = self.program.get("path")
+        if (
+            program_icon == "com.usebottles.bottles-program"
+            and not is_steam
+            and program_name
+            and program_path
+            and not any(separator in program_name for separator in ("/", "\\"))
+        ):
+            self.__program_icon_path = os.path.join(
+                ManagerUtils.get_bottle_path(self.config),
+                "icons",
+                f"{program_name}.png",
+            )
+            if os.path.isfile(self.__program_icon_path):
+                program_icon = self.__program_icon_path
+                self.program["icon"] = program_icon
+            else:
+                extract_program_icon = True
+        if isinstance(program_icon, str) and os.path.isfile(program_icon):
+            self.img_program.set_from_file(program_icon)
+        elif isinstance(program_icon, str) and not any(
+            separator in program_icon for separator in ("/", "\\")
+        ):
+            self.img_program.set_from_icon_name(program_icon)
+        else:
+            self.img_program.set_from_icon_name("com.usebottles.bottles-program")
+        self.add_prefix(self.img_program)
+        if extract_program_icon:
+            self.__program_icon_job = RunAsync(
+                ManagerUtils.extract_icon,
+                callback=self.__program_icon_ready,
+                config=self.config,
+                program_name=program_name,
+                program_path=program_path,
+            )
 
         external_programs = []
         for v in self.config.External_Programs.values():
@@ -128,10 +178,15 @@ class ProgramEntry(Adw.ActionRow):
         self.btn_unhide.connect("clicked", self.hide_program)
         self.btn_rename.connect("clicked", self.rename_program)
         self.btn_browse.connect("clicked", self.browse_program_folder)
-        self.btn_add_entry.connect("clicked", self.add_entry)
+        self.btn_add_entry.connect("clicked", self.manage_entry)
+        self.btn_file_associations.connect("clicked", self.show_file_associations)
         self.btn_add_library.connect("clicked", self.add_to_library)
+        self.btn_add_steam_library.connect("clicked", self.add_to_library)
         self.btn_add_steam.connect("clicked", self.add_to_steam)
         self.btn_remove.connect("clicked", self.remove_program)
+        self.pop_actions.connect(
+            "notify::visible", self.__refresh_desktop_entry_state
+        )
 
         if not program.get("removed") and not is_steam and check_boot:
             self.__is_alive()
@@ -139,6 +194,11 @@ class ProgramEntry(Adw.ActionRow):
         # Update subtitle with playtime info
         if not is_steam:
             self.__update_subtitle()
+
+    def __program_icon_ready(self, icon, error):
+        if error is None and isinstance(icon, str) and os.path.isfile(icon):
+            self.program["icon"] = icon
+            self.img_program.set_from_file(icon)
 
     def __update_subtitle(self):
         """Update the subtitle with playtime information."""
@@ -452,7 +512,7 @@ class ProgramEntry(Adw.ActionRow):
         def update(_result=False, _error=False):
             if not _error:
                 ManagerUtils.remove_desktop_entry(self.config, self.program)
-            self.update_programs()
+            self.view_bottle.update_programs(config=self.config, force_update=True)
 
         RunAsync(
             task_func=uninstaller.from_name,
@@ -483,7 +543,13 @@ class ProgramEntry(Adw.ActionRow):
         ).data["config"]
 
     def remove_program(self, _widget=None):
-        ManagerUtils.remove_desktop_entry(self.config, self.program)
+        if not ManagerUtils.remove_desktop_entry(self.config, self.program):
+            self.window.show_toast(
+                _('Could not remove the desktop entry for "{0}"').format(
+                    self.program["name"]
+                )
+            )
+            return
         self.config = self.manager.update_config(
             config=self.config,
             key=self.program["id"],
@@ -501,37 +567,15 @@ class ProgramEntry(Adw.ActionRow):
             old_name = self.program["name"]
 
             old_program = dict(self.program)
-            old_filename = ManagerUtils.get_desktop_entry_filename(
-                self.config, old_program
-            )
-            entry_dirs = [os.path.expanduser("~/.local/share/applications")]
-            _desktop_dir = GLib.get_user_special_dir(
-                GLib.UserDirectory.DIRECTORY_DESKTOP
-            )
-            if _desktop_dir:
-                entry_dirs.append(_desktop_dir)
-            had_desktop_entry = any(
-                os.path.exists(os.path.join(d, old_filename)) for d in entry_dirs
-            )
-
-            self.program["name"] = new_name
-            self.manager.update_config(
-                config=self.config,
-                key=self.program["id"],
-                value=self.program,
-                scope="External_Programs",
-            )
-
-            if had_desktop_entry:
-                ManagerUtils.remove_desktop_entry(self.config, old_program)
-                ManagerUtils.create_desktop_entry(
-                    config=self.config,
-                    program={
-                        "name": new_name,
-                        "executable": self.program["executable"],
-                        "path": self.program["path"],
-                    },
+            had_desktop_entry = ManagerUtils.has_desktop_entry(self.config, old_program)
+            if had_desktop_entry is None:
+                self.window.show_toast(
+                    _('Could not access the desktop entry for "{0}"').format(old_name)
                 )
+                return
+
+            new_program = dict(self.program)
+            new_program["name"] = new_name
 
             def async_work():
                 library_manager = LibraryManager()
@@ -554,7 +598,39 @@ class ProgramEntry(Adw.ActionRow):
                 )
                 self.update_programs()
 
-            RunAsync(async_work, callback=ui_update)
+            def apply_rename():
+                self.program = new_program
+                self.config = self.manager.update_config(
+                    config=self.config,
+                    key=self.program["id"],
+                    value=self.program,
+                    scope="External_Programs",
+                ).data["config"]
+                RunAsync(async_work, callback=ui_update)
+
+            def desktop_entry_failed():
+                self.window.show_toast(
+                    _('Could not update the desktop entry for "{0}"').format(old_name)
+                )
+
+            if not had_desktop_entry:
+                apply_rename()
+                return
+
+            def desktop_entry_created():
+                if not ManagerUtils.remove_desktop_entry(self.config, old_program):
+                    ManagerUtils.remove_desktop_entry(self.config, new_program)
+                    desktop_entry_failed()
+                    return
+                apply_rename()
+
+            ManagerUtils.create_desktop_entry(
+                config=self.config,
+                program=new_program,
+                on_created=desktop_entry_created,
+                on_failed=desktop_entry_failed,
+                on_cancelled=desktop_entry_failed,
+            )
 
         dialog = RenameDialog(self.window, on_save=func, name=self.program["name"])
         dialog.present()
@@ -566,21 +642,198 @@ class ProgramEntry(Adw.ActionRow):
         self.pop_actions.popdown()  # workaround #1640
 
     def add_entry(self, _widget):
-        ManagerUtils.create_desktop_entry(
-            config=self.config,
-            program={
-                "name": self.program["name"],
-                "executable": self.program["executable"],
-                "path": self.program["path"],
-            },
-        )
-
-        def _on_desktop_entry_created(data: Optional[Result] = None) -> None:
+        def _on_desktop_entry_created(data: Result | None = None) -> None:
+            if data and data.data and data.data.get("method") == "manual":
+                if data.status:
+                    self.__set_desktop_entry_state(True)
+                ProgramEntry.__show_desktop_entry_fallback(self, data)
+                return
+            if not data or not data.status:
+                self.window.show_toast(
+                    _('Could not create a Desktop Entry for "{0}"').format(
+                        self.program["name"]
+                    )
+                )
+                return
+            self.__set_desktop_entry_state(True)
             self.window.show_toast(
                 _('Desktop Entry created for "{0}"').format(self.program["name"])
             )
 
-        SignalManager.connect(Signals.DesktopEntryCreated, _on_desktop_entry_created)
+        ManagerUtils.create_desktop_entry(
+            config=self.config,
+            program=self.program,
+            callback=_on_desktop_entry_created,
+        )
+
+    def manage_entry(self, widget):
+        if self.__desktop_entry_exists:
+            self.remove_entry(widget)
+            return
+        self.add_entry(widget)
+
+    def remove_entry(self, _widget):
+        self.btn_add_entry.set_sensitive(False)
+        RunAsync(
+            lambda: ManagerUtils.remove_desktop_entry(self.config, self.program),
+            callback=self.__desktop_entry_removed,
+        )
+
+    def __desktop_entry_removed(self, removed, error):
+        if error is not None or not removed:
+            self.btn_add_entry.set_sensitive(True)
+            self.window.show_toast(
+                _('Could not remove the desktop entry for "{0}"').format(
+                    self.program["name"]
+                )
+            )
+            return
+
+        self.__set_desktop_entry_state(False)
+        self.window.show_toast(
+            _('Desktop Entry removed for "{0}"').format(self.program["name"])
+        )
+
+    def __desktop_entry_state_ready(self, exists, error):
+        self.__desktop_entry_query_pending = False
+        if error is not None or exists is None:
+            self.btn_add_entry.set_sensitive(True)
+            return
+        self.__set_desktop_entry_state(exists)
+
+    def __refresh_desktop_entry_state(self, popover, _property=None):
+        if (
+            self.is_steam
+            or self.__desktop_entry_query_pending
+            or not popover.get_visible()
+        ):
+            return
+        self.__desktop_entry_query_pending = True
+        self.btn_add_entry.set_sensitive(False)
+        RunAsync(
+            lambda: ManagerUtils.has_desktop_entry(self.config, self.program),
+            callback=self.__desktop_entry_state_ready,
+        )
+
+    def __set_desktop_entry_state(self, exists):
+        self.__desktop_entry_exists = exists
+        label = _("Remove Desktop Entry") if exists else _("Add Desktop Entry")
+        self.btn_add_entry.set_property("text", label)
+        self.btn_add_entry.set_sensitive(True)
+
+    def __show_desktop_entry_fallback(self, result: Result) -> None:
+        title, description, command = ProgramEntry.__desktop_entry_fallback_content(
+            result, os.environ.get("FLATPAK_ID")
+        )
+
+        dialog = Adw.MessageDialog.new(self.window, title, description)
+        if command:
+            command_box = Gtk.Box(spacing=6)
+            command_box.set_margin_top(6)
+
+            command_entry = Gtk.Entry()
+            command_entry.set_editable(False)
+            command_entry.set_hexpand(True)
+            command_entry.set_text(command)
+            command_entry.add_css_class("monospace")
+
+            copy_button = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
+            copy_button.set_tooltip_text(_("Copy command"))
+
+            def copy_command(*_args):
+                display = Gdk.Display.get_default()
+                if display:
+                    display.get_clipboard().set_content(
+                        Gdk.ContentProvider.new_for_value(command)
+                    )
+
+            copy_button.connect("clicked", copy_command)
+            command_box.append(command_entry)
+            command_box.append(copy_button)
+            dialog.set_extra_child(command_box)
+
+        dialog.add_response("close", _("_Close"))
+        dialog.present()
+
+    @staticmethod
+    def __desktop_entry_fallback_content(
+        result: Result, app_id: str | None
+    ) -> tuple[str, str, str | None]:
+        if result.status:
+            title = _("Desktop Entry Created Manually")
+            if app_id:
+                description = _(
+                    "The desktop portal was unavailable, so Bottles used its "
+                    "manual fallback. If the entry does not appear, close "
+                    "Bottles, run the command below, reopen Bottles and try again."
+                )
+            else:
+                description = _(
+                    "The desktop portal was unavailable, so Bottles used its "
+                    "manual fallback. If the entry does not appear, check the "
+                    "permissions of your desktop entry folders and try again."
+                )
+        else:
+            title = _("Desktop Entry Could Not Be Created")
+            if app_id:
+                description = _(
+                    "The desktop portal and the manual fallback both failed. "
+                    "Close Bottles, run the command below, reopen Bottles and "
+                    "try again."
+                )
+            else:
+                description = _(
+                    "The desktop portal and the manual fallback both failed. "
+                    "Check that your desktop entry folders are writable and "
+                    "try again."
+                )
+
+        command = None
+        if app_id:
+            command = (
+                "flatpak override --user "
+                "--filesystem=xdg-data/applications:create "
+                f"--filesystem=xdg-desktop:create {app_id}"
+            )
+        return title, description, command
+
+    def show_file_associations(self, _widget):
+        self.pop_actions.popdown()
+
+        def save(extensions):
+            program = dict(self.program)
+            program["file_extensions"] = extensions
+
+            def on_created():
+                self.program = program
+                self.config = self.save_program()
+                self.window.show_toast(
+                    _('File associations updated for "{0}"').format(
+                        self.program["name"]
+                    )
+                )
+
+            def on_failed():
+                self.window.show_toast(
+                    _('Could not update file associations for "{0}"').format(
+                        self.program["name"]
+                    )
+                )
+
+            ManagerUtils.create_desktop_entry(
+                config=self.config,
+                program=program,
+                on_created=on_created,
+                on_failed=on_failed,
+                on_cancelled=on_failed,
+            )
+
+        dialog = FileAssociationsDialog(
+            self.window,
+            self.program.get("file_extensions", []),
+            save,
+        )
+        dialog.present()
 
     def add_to_library(self, _widget):
         def update(_result, _error=False):
@@ -590,21 +843,36 @@ class ProgramEntry(Adw.ActionRow):
             )
 
         def add_to_library():
-            self.save_program()  # we need to store it in the bottle configuration to keep the reference
             library_manager = LibraryManager()
-            library_manager.add_to_library(
-                {
-                    "bottle": {"name": self.config.Name, "path": self.config.Path},
-                    "name": self.program["name"],
-                    "id": str(self.program["id"]),
-                    "icon": ManagerUtils.extract_icon(
-                        self.config, self.program["name"], self.program["path"]
-                    ),
-                },
-                self.config,
-            )
+            data = {
+                "bottle": {"name": self.config.Name, "path": self.config.Path},
+                "name": self.program["name"],
+                "id": str(self.program["id"]),
+            }
+
+            if self.is_steam:
+                data["bottle"]["name"] = self.config.CompatData
+                data["steam"] = True
+            else:
+                self.save_program()
+                icon_job = getattr(self, "_ProgramEntry__program_icon_job", None)
+                if icon_job is not None:
+                    icon_job.join()
+                icon = self.program.get("icon")
+                icon_path = getattr(self, "_ProgramEntry__program_icon_path", None)
+                if not (isinstance(icon, str) and os.path.isfile(icon)):
+                    if icon_path and os.path.isfile(icon_path):
+                        icon = icon_path
+                    else:
+                        icon = ManagerUtils.extract_icon(
+                            self.config, self.program["name"], self.program["path"]
+                        )
+                data["icon"] = icon
+
+            library_manager.add_to_library(data, self.config)
 
         self.btn_add_library.set_visible(False)
+        self.btn_add_steam_library.set_visible(False)
         RunAsync(add_to_library, update)
 
     def add_to_steam(self, _widget):

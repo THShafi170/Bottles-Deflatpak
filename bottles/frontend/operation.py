@@ -33,10 +33,12 @@ class TaskEntry(Adw.ActionRow):
 
     # endregion
 
-    def __init__(self, window, title, cancellable=True, **kwargs):
+    def __init__(self, window, task_id, title, cancellable=True, **kwargs):
         super().__init__(**kwargs)
 
         self.window = window
+        self.task_id = task_id
+        self.btn_cancel.connect("clicked", self.__cancel_task)
 
         if len(title) > 30:
             title = f"{title[:20]}…"
@@ -49,6 +51,10 @@ class TaskEntry(Adw.ActionRow):
     def update(self, subtitle: str):
         self.set_subtitle(subtitle)
 
+    def __cancel_task(self, _button):
+        if TaskManager.cancel(self.task_id):
+            self.btn_cancel.set_sensitive(False)
+
 
 class TaskSyncer:
     """Keep task list updated with backend TaskManager"""
@@ -58,9 +64,9 @@ class TaskSyncer:
     def __init__(self, window):
         self.window = window
 
-    def _new_widget(self, title, cancellable=True) -> TaskEntry:
+    def _new_widget(self, task_id, title, cancellable=True) -> TaskEntry:
         """create TaskEntry widget & add to task list"""
-        task_entry = TaskEntry(self.window, title, cancellable)
+        task_entry = TaskEntry(self.window, task_id, title, cancellable)
         self.window.page_details.list_tasks.append(task_entry)
         return task_entry
 
@@ -72,7 +78,11 @@ class TaskSyncer:
         """handler for Signals.TaskAdded"""
         task_id: UUID = res.data
         task = TaskManager.get(task_id)
-        self._TASK_WIDGETS[task_id] = self._new_widget(task.title, task.cancellable)
+        if task is None:
+            return
+        self._TASK_WIDGETS[task_id] = self._new_widget(
+            task_id, task.title, task.cancellable
+        )
         self._set_task_btn_visible(True)
 
     @GtkUtils.run_in_main_loop
@@ -82,7 +92,10 @@ class TaskSyncer:
         if task_id not in self._TASK_WIDGETS:
             return
 
-        self._TASK_WIDGETS[task_id].update(subtitle=TaskManager.get(task_id).subtitle)
+        task = TaskManager.get(task_id)
+        if task is None:
+            return
+        self._TASK_WIDGETS[task_id].update(subtitle=task.subtitle)
 
     @GtkUtils.run_in_main_loop
     def task_removed_handler(self, res: Result):

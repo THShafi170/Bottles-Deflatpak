@@ -17,13 +17,15 @@
 
 import contextlib
 import os
+import sys
 import shutil
+import stat
 import tarfile
+import tempfile
+import zipfile
 from functools import lru_cache
 from threading import Event
 from typing import Optional
-
-import pycurl
 
 from bottles.backend.downloader import Downloader
 from bottles.backend.globals import Paths
@@ -44,12 +46,67 @@ from bottles.backend.utils.manager import ManagerUtils
 logging = Logger()
 
 
+def find_cached_file(
+    name: str, checksum: str = "", checksum_cache: dict | None = None
+) -> Optional[str]:
+    exact_path = os.path.join(Paths.temp, name)
+    paths = [exact_path] if os.path.isfile(exact_path) else []
+    try:
+        paths.extend(
+            os.path.join(Paths.temp, entry)
+            for entry in os.listdir(Paths.temp)
+            if entry.lower() == name.lower()
+            and os.path.join(Paths.temp, entry) != exact_path
+        )
+    except FileNotFoundError:
+        return None
+
+    if checksum is None:
+        checksum = ""
+    if not isinstance(checksum, str):
+        return None
+    checksum = checksum.lower()
+    for path in paths:
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        if stat.st_size == 0:
+            continue
+        if not checksum or os.environ.get("BOTTLES_SKIP_CHECKSUM"):
+            return path
+
+        cache_key = (path, stat.st_size, stat.st_mtime_ns, checksum)
+        if checksum_cache is not None and cache_key in checksum_cache:
+            if checksum_cache[cache_key]:
+                return path
+            continue
+
+        valid = FileUtils().get_checksum(path) == checksum
+        if checksum_cache is not None:
+            checksum_cache[cache_key] = valid
+        if valid:
+            return path
+    return None
+
+
+def is_cached_file(
+    name: str, checksum: str = "", checksum_cache: dict | None = None
+) -> bool:
+    return find_cached_file(name, checksum, checksum_cache) is not None
+
+
 # noinspection PyTypeChecker
 class ComponentManager:
     def __init__(self, manager, offline: bool = False):
         self.__manager = manager
-        self.__repo = manager.repository_manager.get_repo("components", offline)
-        self.__utils_conn = manager.utils_conn
+        self.__repo = manager.repository_manager.get_repo(
+            "components",
+            offline,
+            callback_in_main_loop=not manager.is_cli,
+        )
+        self.__offline = offline
+        self.__checksum_cache = {}
 
     @lru_cache
     def get_component(self, name: str, plain: bool = False) -> dict:
@@ -60,13 +117,11 @@ class ComponentManager:
         Fetch all components from the Bottles repository, mark the installed
         ones and return a dict with the catalog.
         """
-        if not self.__utils_conn.check_connection():
-            return {}
-
         catalog = {
             "runtimes": {},
             "wine": {},
             "proton": {},
+            "d7vk": {},
             "dxvk": {},
             "vkd3d": {},
             "nvapi": {},
@@ -77,6 +132,7 @@ class ComponentManager:
             "runtimes": self.__manager.runtimes_available,
             "wine": self.__manager.runners_available,
             "proton": self.__manager.runners_available,
+            "d7vk": self.__manager.d7vk_available,
             "dxvk": self.__manager.dxvk_available,
             "vkd3d": self.__manager.vkd3d_available,
             "nvapi": self.__manager.nvapi_available,
@@ -85,6 +141,8 @@ class ComponentManager:
         }
 
         index = self.__repo.catalog
+        if not isinstance(index, dict):
+            return catalog
 
         for component in index.items():
             """
@@ -92,8 +150,20 @@ class ComponentManager:
             catalog and mark it as installed if it is.
             """
 
-            if component[1]["Category"] == "runners":
+            if (
+                not isinstance(component[0], str)
+                or not component[0]
+                or not isinstance(component[1], dict)
+                or not isinstance(component[1].get("Category"), str)
+                or not isinstance(component[1].get("Channel"), str)
+            ):
+                continue
+
+            if component[1].get("Category") == "runners":
                 if "soda" in component[0].lower() or "caffe" in component[0].lower():
+                    # Mitigation to avoid mcsoda from appearing on non MacOS systems
+                    if "mcsoda" in component[0].lower() and sys.platform != "darwin":
+                        continue
                     if not is_glibc_min_available():
                         logging.warning(
                             f"{component[0]} was found but it requires "
@@ -105,16 +175,22 @@ class ComponentManager:
                         )
                         continue
 
-                sub_category = component[1]["Sub-category"]
+                sub_category = component[1].get("Sub-category")
+                if sub_category not in ("wine", "proton"):
+                    continue
                 catalog[sub_category][component[0]] = component[1]
                 if component[0] in components_available[sub_category]:
                     catalog[sub_category][component[0]]["Installed"] = True
                 else:
                     catalog[sub_category][component[0]].pop("Installed", None)
+                    if getattr(self, "_ComponentManager__offline", False):
+                        catalog[sub_category][component[0]]["Cached"] = (
+                            self.is_component_cached(component[0])
+                        )
 
                 continue
 
-            category = component[1]["Category"]
+            category = component[1].get("Category")
             if category not in catalog:
                 continue
 
@@ -123,8 +199,32 @@ class ComponentManager:
                 catalog[category][component[0]]["Installed"] = True
             else:
                 catalog[category][component[0]].pop("Installed", None)
+                if getattr(self, "_ComponentManager__offline", False):
+                    catalog[category][component[0]]["Cached"] = (
+                        self.is_component_cached(component[0])
+                    )
 
         return catalog
+
+    def is_component_cached(self, name: str) -> bool:
+        manifest = self.get_component(name)
+        if not isinstance(manifest, dict):
+            return False
+
+        files = manifest.get("File")
+        if not isinstance(files, list) or not files or not isinstance(files[0], dict):
+            return False
+
+        file = files[0]
+        name = file.get("rename") or file.get("file_name")
+        return bool(
+            name
+            and is_cached_file(
+                name,
+                file.get("file_checksum", ""),
+                getattr(self, "_ComponentManager__checksum_cache", None),
+            )
+        )
 
     def download(
         self,
@@ -145,7 +245,7 @@ class ComponentManager:
         # is provided by the caller.
         external_task = task is not None and task.task_id is not None
         if task is None:
-            task = Task(title=file, cancellable=cancel_event is not None)
+            task = Task(title=file, cancel_event=cancel_event)
 
         if task.task_id is None:
             task_id = TaskManager.add(task)
@@ -159,6 +259,8 @@ class ComponentManager:
             The caller is explicitly requesting a component from
             the /temp directory. Nothing should be downloaded.
             """
+            if not external_task:
+                TaskManager.remove(task_id)
             return Result(True)
 
         existing_file = rename if rename else file
@@ -177,11 +279,20 @@ class ComponentManager:
                     f"File [{existing_file}] is a 0-byte empty file. Removing to force re-download."
                 )
                 os.remove(file_path)
-            else:
+            elif (
+                not checksum
+                or os.environ.get("BOTTLES_SKIP_CHECKSUM")
+                or FileUtils().get_checksum(file_path) == checksum.lower()
+            ):
                 logging.warning(
                     f"File [{existing_file}] already exists in temp, skipping."
                 )
+                if not external_task:
+                    TaskManager.remove(task_id)
                 return Result(True)
+            else:
+                logging.warning(f"File [{existing_file}] is corrupted. Removing it.")
+                os.remove(file_path)
 
         if not os.path.isfile(file_path):
             """
@@ -190,80 +301,45 @@ class ComponentManager:
             w2ksp4_en.exe). Reuse it instead of downloading it again, verifying
             the checksum first when one is provided.
             """
-            reuse = self.__find_temp_file_case_insensitive(existing_file)
-            if reuse and os.path.getsize(reuse) > 0:
-                valid = True
-                if checksum and not os.environ.get("BOTTLES_SKIP_CHECKSUM"):
-                    valid = FileUtils().get_checksum(reuse) == checksum.lower()
-                if valid:
-                    logging.info(
-                        f"Reusing already downloaded file for [{existing_file}] "
-                        f"from [{os.path.basename(reuse)}]."
-                    )
-                    shutil.copy(reuse, file_path)
-                    if not external_task:
-                        TaskManager.remove(task_id)
-                    return Result(True)
+            reuse = find_cached_file(
+                existing_file,
+                checksum,
+                getattr(self, "_ComponentManager__checksum_cache", None),
+            )
+            if reuse:
+                logging.info(
+                    f"Reusing already downloaded file for [{existing_file}] "
+                    f"from [{os.path.basename(reuse)}]."
+                )
+                shutil.copy(reuse, file_path)
+                if not external_task:
+                    TaskManager.remove(task_id)
+                return Result(True)
+
+        if getattr(self, "_ComponentManager__offline", False):
+            if not external_task:
+                TaskManager.remove(task_id)
+            return Result(False, message="File is not available in offline mode.")
 
         if not os.path.isfile(file_path):
-            """
-            As some urls can be redirect, we need to take care of this
-            and make sure to use the final url. This check should be
-            skipped for large files (e.g. runners).
-            """
-            c = pycurl.Curl()
-            _proxy = os.environ.get("http_proxy") or os.environ.get("https_proxy")
-            if _proxy:
-                c.setopt(pycurl.PROXY, _proxy)
-            try:
-                c.setopt(c.URL, download_url)  # type: ignore
-                c.setopt(c.FOLLOWLOCATION, True)  # type: ignore
-                c.setopt(c.HTTPHEADER, ["User-Agent: curl/7.79.1"])  # type: ignore
-                c.setopt(c.NOBODY, True)  # type: ignore
-                c.perform()
+            res = Downloader(
+                url=download_url,
+                file=temp_dest,
+                update_func=update_func,
+                cancel_event=cancel_event,
+            ).download()
 
-                req_code = c.getinfo(c.RESPONSE_CODE)  # type: ignore
-                download_url = c.getinfo(c.EFFECTIVE_URL)  # type: ignore
-            except pycurl.error:
-                logging.exception(f"Failed to download [{download_url}]")
+            if not res.ok:
+                if not external_task:
+                    TaskManager.remove(task_id)
+                return res
+
+            if not os.path.isfile(temp_dest):
                 if not external_task:
                     TaskManager.remove(task_id)
                 return Result(False)
-            finally:
-                c.close()
 
-            if req_code == 200:
-                """
-                If the status code is 200, the resource should be available
-                and the download should be started. Any exceptions return
-                False and the download is removed from the download manager.
-                """
-                res = Downloader(
-                    url=download_url,
-                    file=temp_dest,
-                    update_func=update_func,
-                    cancel_event=cancel_event,
-                ).download()
-
-                if not res.ok:
-                    if not external_task:
-                        TaskManager.remove(task_id)
-                    return res
-
-                if not os.path.isfile(temp_dest):
-                    """Fail if the file is not available in the /temp directory."""
-                    if not external_task:
-                        TaskManager.remove(task_id)
-                    return Result(False)
-
-                just_downloaded = True
-            else:
-                logging.warning(
-                    f"Failed to download [{download_url}] with code: {req_code} != 200"
-                )
-                if not external_task:
-                    TaskManager.remove(task_id)
-                return Result(False)
+            just_downloaded = True
 
         file_path = os.path.join(Paths.temp, existing_file)
         if rename and just_downloaded:
@@ -298,24 +374,13 @@ class ComponentManager:
         return Result(True)
 
     @staticmethod
-    def __find_temp_file_case_insensitive(name: str) -> Optional[str]:
-        """Return the path of a file in the temp directory matching the given
-        name case-insensitively, or None."""
-        target = name.lower()
-        try:
-            for entry in os.listdir(Paths.temp):
-                if entry.lower() == target:
-                    return os.path.join(Paths.temp, entry)
-        except FileNotFoundError:
-            pass
-        return None
-
-    @staticmethod
     def extract(name: str, component: str, archive: str) -> bool:
         """Extract a component from an archive."""
 
         if component in ["runner", "runner:proton"]:
             path = Paths.runners
+        elif component == "d7vk":
+            path = Paths.d7vk
         elif component == "dxvk":
             path = Paths.dxvk
         elif component == "vkd3d":
@@ -332,6 +397,14 @@ class ComponentManager:
             logging.error(f"Unknown component [{component}].")
             return False
 
+        root_dir = name
+        staging_path = None
+
+        def validate_d7vk(root: str) -> None:
+            ddraw_path = os.path.join(root, "x32", "ddraw.dll")
+            if not os.path.isfile(ddraw_path) or os.path.getsize(ddraw_path) == 0:
+                raise ValueError("D7VK archive is incomplete")
+
         try:
             """
             Try to extract the archive in the /temp directory.
@@ -339,20 +412,82 @@ class ComponentManager:
             directory and return False. The common cause of a failed
             extraction is that the archive is corrupted.
             """
-            tar = tarfile.open(f"{Paths.temp}/{archive}")
-            root_dir = tar.getnames()[0]
-            tar.extractall(path)
-            tar.close()
-        except (tarfile.TarError, IOError, EOFError):
+            archive_path = os.path.join(Paths.temp, archive)
+            is_zip = zipfile.is_zipfile(archive_path)
+            if component == "d7vk" and not is_zip:
+                raise zipfile.BadZipFile("D7VK components require ZIP archives")
+            if is_zip:
+                if not name or os.path.basename(name) != name:
+                    raise zipfile.BadZipFile("Invalid component name")
+                staging_path = tempfile.mkdtemp(prefix=f".{name}-", dir=path)
+                with zipfile.ZipFile(archive_path) as zipped:
+                    members = zipped.infolist()
+                    if not members:
+                        raise zipfile.BadZipFile("Archive is empty")
+                    extraction_path = os.path.abspath(staging_path)
+                    for member in members:
+                        member_path = member.filename
+                        parts = member_path.split("/")
+                        destination = os.path.abspath(
+                            os.path.join(staging_path, member_path)
+                        )
+                        if (
+                            not member_path
+                            or member_path.startswith("/")
+                            or ".." in parts
+                            or parts[0] != name
+                            or os.path.commonpath((extraction_path, destination))
+                            != extraction_path
+                            or stat.S_ISLNK(member.external_attr >> 16)
+                        ):
+                            raise zipfile.BadZipFile("Archive contains an invalid path")
+                    zipped.extractall(staging_path)
+
+                staged_root = os.path.join(staging_path, name)
+                if not os.path.isdir(staged_root):
+                    raise zipfile.BadZipFile("Archive root is not a directory")
+                if component == "d7vk":
+                    validate_d7vk(staged_root)
+
+                destination = os.path.join(path, name)
+                if os.path.exists(destination):
+                    raise FileExistsError("Component already exists")
+                os.replace(staged_root, destination)
+                shutil.rmtree(staging_path, ignore_errors=True)
+                staging_path = None
+            else:
+                with tarfile.open(archive_path) as tar:
+                    root_dir = tar.getnames()[0]
+                    tar.extractall(path)
+        except (
+            OSError,
+            ValueError,
+            tarfile.TarError,
+            zipfile.BadZipFile,
+            EOFError,
+            IndexError,
+        ):
             with contextlib.suppress(FileNotFoundError):
                 os.remove(os.path.join(Paths.temp, archive))
-            with contextlib.suppress(FileNotFoundError):
-                shutil.rmtree(os.path.join(path, archive[:-7]))
+            if staging_path:
+                with contextlib.suppress(FileNotFoundError):
+                    shutil.rmtree(staging_path)
+            else:
+                cleanup_path = os.path.abspath(os.path.join(path, root_dir))
+                extraction_path = os.path.abspath(path)
+                if (
+                    cleanup_path != extraction_path
+                    and os.path.commonpath((extraction_path, cleanup_path))
+                    == extraction_path
+                    and os.path.isdir(cleanup_path)
+                ):
+                    with contextlib.suppress(FileNotFoundError):
+                        shutil.rmtree(cleanup_path)
 
             logging.error("Extraction failed! Archive ends earlier than expected.")
             return False
 
-        if root_dir.endswith("x86_64"):
+        if root_dir.endswith("x86_64") and root_dir != name:
             try:
                 """
                 If the folder ends with x86_64, remove this from its name.
@@ -380,17 +515,28 @@ class ComponentManager:
         """
         manifest = self.get_component(component_name)
 
-        if not manifest:
+        if not isinstance(manifest, dict):
             return Result(False)
 
+        files = manifest.get("File")
+        if not isinstance(files, list) or not files or not isinstance(files[0], dict):
+            return Result(False, message=f"Invalid manifest for {component_name}.")
+
         logging.info(f"Installing component: [{component_name}].")
-        file = manifest["File"][0]
+        file = files[0]
+        if (
+            not isinstance(file.get("url"), str)
+            or not isinstance(file.get("file_name"), str)
+            or not isinstance(file.get("rename", ""), str)
+            or not isinstance(file.get("file_checksum", ""), str)
+        ):
+            return Result(False, message=f"Invalid manifest for {component_name}.")
 
         res = self.download(
             download_url=file["url"],
             file=file["file_name"],
-            rename=file["rename"],
-            checksum=file["file_checksum"],
+            rename=file.get("rename", ""),
+            checksum=file.get("file_checksum", ""),
             func=func,
             cancel_event=cancel_event,
         )
@@ -407,16 +553,19 @@ class ComponentManager:
                     func(status=Status.FAILED)
             return Result(False, message=res.message)
 
-        archive = manifest["File"][0]["file_name"]
+        archive = file["file_name"]
 
-        if manifest["File"][0]["rename"]:
+        if file.get("rename"):
             """
             If the component has a rename, rename the downloaded file
             to the required name.
             """
-            archive = manifest["File"][0]["rename"]
+            archive = file["rename"]
 
-        self.extract(component_name, component_type, archive)
+        if not self.extract(component_name, component_type, archive):
+            if func:
+                func(status=Status.FAILED)
+            return Result(False, message="Component extraction failed.")
 
         """
         Execute Post Install if the component has it defined
@@ -440,6 +589,9 @@ class ComponentManager:
 
         if component_type in ["runner", "runner:proton"]:
             self.__manager.check_runners()
+
+        elif component_type == "d7vk":
+            self.__manager.check_d7vk()
 
         elif component_type == "dxvk":
             self.__manager.check_dxvk()
@@ -468,6 +620,8 @@ class ComponentManager:
 
         if component_type in ["runner", "runner:proton"]:
             path = Paths.runners
+        elif component_type == "d7vk":
+            path = Paths.d7vk
         elif component_type == "dxvk":
             path = Paths.dxvk
         elif component_type == "vkd3d":
@@ -489,7 +643,17 @@ class ComponentManager:
         bottles = self.__manager.local_bottles
 
         if component_type in ["runner", "runner:proton"]:
-            return component_name in [b["Runner"] for _, b in bottles.items()]
+            used_by_bottle = component_name in [
+                b["Runner"] for _, b in bottles.items()
+            ]
+            if used_by_bottle:
+                return True
+            catalog = getattr(self.__manager, "umu_proton_catalog", None)
+            return bool(catalog and catalog.component_in_use(component_name))
+        if component_type == "d7vk":
+            return component_name in [
+                b.D7VK for b in bottles.values() if b.Parameters.d7vk
+            ]
         if component_type == "dxvk":
             return component_name in [b["DXVK"] for _, b in bottles.items()]
         if component_type == "vkd3d":
@@ -511,8 +675,20 @@ class ComponentManager:
                 },
             )
 
+        if (
+            component_type in ["runner", "runner:proton"]
+            and component_name in self.__manager.external_runners
+        ):
+            return Result(
+                False,
+                data={"message": "External runners cannot be removed from Bottles."},
+            )
+
         if component_type in ["runner", "runner:proton"]:
             path = ManagerUtils.get_runner_path(component_name)
+
+        elif component_type == "d7vk":
+            path = ManagerUtils.get_d7vk_path(component_name)
 
         elif component_type == "dxvk":
             path = ManagerUtils.get_dxvk_path(component_name)
@@ -546,6 +722,9 @@ class ComponentManager:
         """
         if component_type in ["runner", "runner:proton"]:
             self.__manager.check_runners()
+
+        elif component_type == "d7vk":
+            self.__manager.check_d7vk(False)
 
         elif component_type == "dxvk":
             self.__manager.check_dxvk()

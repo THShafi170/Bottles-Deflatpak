@@ -18,21 +18,30 @@
 import os
 import subprocess
 from gettext import gettext as _
+from gettext import ngettext
+from pathlib import Path
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
+from bottles.backend.globals import Paths
 from bottles.backend.managers.data import DataManager, UserDataKeys
 from bottles.backend.state import EventManager, Events
 from bottles.backend.utils.generic import sort_by_version
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.threading import RunAsync
+from bottles.frontend.utils.flatpak import resolve_bottles_directory
+from bottles.frontend.utils.gtk import FONT_SCALE_VALUES
+from bottles.frontend.utils.localization import (
+    UI_LANGUAGES,
+    get_ui_language_environment,
+)
+from bottles.frontend.utils.umu import UmuFrontendProvider
 from bottles.frontend.widgets.component import ComponentEntry, ComponentExpander
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/preferences.ui")
-class PreferencesWindow(Adw.PreferencesWindow):
+class PreferencesWindow(Adw.PreferencesDialog):
     __gtype_name__ = "PreferencesWindow"
-    __registry = []
 
     # region Widgets
     installers_stack = Gtk.Template.Child()
@@ -41,11 +50,18 @@ class PreferencesWindow(Adw.PreferencesWindow):
     dlls_spinner = Gtk.Template.Child()
     cache_stack = Gtk.Template.Child()
     cache_spinner = Gtk.Template.Child()
+    umu_stack = Gtk.Template.Child()
+    umu_spinner = Gtk.Template.Child()
+    status_umu_error = Gtk.Template.Child()
+    btn_umu_error_retry = Gtk.Template.Child()
 
     row_theme = Gtk.Template.Child()
     switch_theme = Gtk.Template.Child()
     switch_notifications = Gtk.Template.Child()
+    switch_component_updates = Gtk.Template.Child()
+    switch_show_funding = Gtk.Template.Child()
     switch_force_offline = Gtk.Template.Child()
+    switch_home_drive = Gtk.Template.Child()
     switch_temp = Gtk.Template.Child()
     switch_release_candidate = Gtk.Template.Child()
     switch_steam = Gtk.Template.Child()
@@ -58,6 +74,9 @@ class PreferencesWindow(Adw.PreferencesWindow):
     switch_steam_programs = Gtk.Template.Child()
     switch_epic_games = Gtk.Template.Child()
     switch_ubisoft_connect = Gtk.Template.Child()
+    combo_ui_language = Gtk.Template.Child()
+    str_list_ui_languages = Gtk.Template.Child()
+    combo_font_scale = Gtk.Template.Child()
     combo_audio_driver = Gtk.Template.Child()
     spin_eagle_limit = Gtk.Template.Child()
     list_runners = Gtk.Template.Child()
@@ -78,17 +97,33 @@ class PreferencesWindow(Adw.PreferencesWindow):
     btn_cache_clear_all = Gtk.Template.Child()
     btn_cache_clear_temp = Gtk.Template.Child()
     btn_cache_clear_templates = Gtk.Template.Child()
+    row_umu_path = Gtk.Template.Child()
+    row_umu_runtime = Gtk.Template.Child()
+    row_umu_standard = Gtk.Template.Child()
+    row_umu_launcher = Gtk.Template.Child()
+    row_umu_proton = Gtk.Template.Child()
+    label_umu_proton = Gtk.Template.Child()
+    combo_umu_dependency = Gtk.Template.Child()
+    label_umu_games = Gtk.Template.Child()
+    label_umu_source = Gtk.Template.Child()
+    label_umu_version = Gtk.Template.Child()
+    btn_umu_refresh = Gtk.Template.Child()
+    btn_umu_path = Gtk.Template.Child()
+    btn_umu_path_change = Gtk.Template.Child()
+    btn_umu_path_reset = Gtk.Template.Child()
+    btn_umu_runtime = Gtk.Template.Child()
+    btn_umu_standard = Gtk.Template.Child()
 
     # endregion
 
     def __init__(self, window, **kwargs):
         super().__init__(**kwargs)
-        self.set_transient_for(window)
 
         # common variables and references
         self.window = window
         self.settings = window.settings
         self.manager = window.manager
+        self.umu_provider = UmuFrontendProvider.from_backend(self.manager)
         self.data = DataManager()
         self.style_manager = Adw.StyleManager.get_default()
 
@@ -100,6 +135,11 @@ class PreferencesWindow(Adw.PreferencesWindow):
             "disabled",
         ]
         self.__updating_audio_driver = False
+        self.__ui_language_values = [code for code, _name in UI_LANGUAGES]
+        self.__updating_ui_language = False
+        self.__updating_font_scale = False
+        self.__updating_umu_settings = False
+        self.__umu_dependency_values = ["bottles", "winetricks"]
 
         self.current_bottles_path = self.data.get(UserDataKeys.CustomBottlesPath)
         if self.current_bottles_path:
@@ -124,6 +164,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
             row.connect("changed", self.__on_personal_repo_changed, repo_name)
 
         self.__cache_registry = []
+        self.__registry = []
 
         # bind widgets
         self.settings.bind(
@@ -134,6 +175,21 @@ class PreferencesWindow(Adw.PreferencesWindow):
             self.switch_notifications,
             "active",
             Gio.SettingsBindFlags.DEFAULT,
+        )
+        self.settings.bind(
+            "show-component-updates",
+            self.switch_component_updates,
+            "active",
+            Gio.SettingsBindFlags.DEFAULT,
+        )
+        self.settings.bind(
+            "show-funding",
+            self.switch_show_funding,
+            "active",
+            Gio.SettingsBindFlags.DEFAULT,
+        )
+        self.switch_show_funding.connect(
+            "notify::active", self.__funding_setting_changed
         )
         self.settings.bind(
             "playtime-enabled",
@@ -163,6 +219,12 @@ class PreferencesWindow(Adw.PreferencesWindow):
             self.switch_force_offline,
             "active",
             Gio.SettingsBindFlags.DEFAULT,
+        )
+        self.settings.bind(
+            "disable-home-drive",
+            self.switch_home_drive,
+            "active",
+            Gio.SettingsBindFlags.INVERT_BOOLEAN,
         )
         self.settings.bind(
             "temp", self.switch_temp, "active", Gio.SettingsBindFlags.DEFAULT
@@ -211,6 +273,22 @@ class PreferencesWindow(Adw.PreferencesWindow):
             Gio.SettingsBindFlags.DEFAULT,
         )
 
+        for index, (_code, name) in enumerate(UI_LANGUAGES):
+            self.str_list_ui_languages.append(_(name) if index == 0 else name)
+        self.__sync_ui_language_selection()
+        self.combo_ui_language.connect(
+            "notify::selected", self.__on_ui_language_selected
+        )
+        self.settings.connect(
+            "changed::ui-language", self.__on_ui_language_setting_changed
+        )
+
+        self.__sync_font_scale_selection()
+        self.combo_font_scale.connect("notify::selected", self.__on_font_scale_selected)
+        self.settings.connect(
+            "changed::font-scale", self.__on_font_scale_setting_changed
+        )
+
         self.spin_eagle_limit.set_value(self.settings.get_int("eagle-scan-limit"))
         self.spin_eagle_limit.connect("notify::value", self.__on_eagle_limit_changed)
 
@@ -240,6 +318,9 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.settings.connect("changed::dark-theme", self.__toggle_night)
         self.settings.connect("changed::release-candidate", self.__toggle_rc)
         self.settings.connect("changed::update-date", self.__toggle_update_date)
+        self.settings.connect(
+            "changed::show-component-updates", self.__toggle_component_updates
+        )
         self.btn_bottles_path.connect("clicked", self.__choose_bottles_path)
         self.btn_bottles_path_reset.connect("clicked", self.__reset_bottles_path)
         self.btn_steam_proton_doc.connect("clicked", self.__open_steam_proton_doc)
@@ -247,6 +328,17 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.btn_cache_clear_temp.connect("clicked", self.__confirm_clear_temp_cache)
         self.btn_cache_clear_templates.connect(
             "clicked", self.__confirm_clear_templates_cache
+        )
+        self.btn_umu_refresh.connect("clicked", self.__refresh_umu)
+        self.btn_umu_error_retry.connect("clicked", self.__refresh_umu)
+        self.btn_umu_path.connect("clicked", self.__open_umu_path)
+        self.btn_umu_path_change.connect("clicked", self.__choose_umu_path)
+        self.btn_umu_path_reset.connect("clicked", self.__reset_umu_path)
+        self.btn_umu_runtime.connect("clicked", self.__open_umu_runtime)
+        self.btn_umu_standard.connect("clicked", self.__open_umu_standard)
+        self.row_umu_proton.connect("activated", self.__choose_umu_proton)
+        self.combo_umu_dependency.connect(
+            "notify::selected", self.__on_umu_dependency_selected
         )
 
         if not self.manager.steam_manager.is_steam_supported:
@@ -260,6 +352,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
             self.row_theme.set_visible(True)
 
         self.populate_cache_list()
+        self.__update_umu_status()
 
     def empty_list(self):
         for w in self.__registry:
@@ -280,6 +373,10 @@ class PreferencesWindow(Adw.PreferencesWindow):
                 _("Disabled. Executables will run without being checked for threats.")
             )
 
+    def __funding_setting_changed(self, switch, _pspec):
+        if switch.get_active():
+            self.data.remove(UserDataKeys.FundingDismissed)
+
     def ui_update(self):
         # Show locally installed runners/DLLs right away so the pages never get
         # stuck on the loading spinner when the online catalog is slow or
@@ -293,10 +390,9 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
         GLib.idle_add(render)
 
-        if self.manager.utils_conn.status:
-            # then refresh once the online catalog has been organized
-            EventManager.wait(Events.ComponentsOrganizing)
-            GLib.idle_add(render)
+        # then refresh once the online or cached catalog has been organized
+        EventManager.wait(Events.ComponentsOrganizing)
+        GLib.idle_add(render)
 
     def __toggle_night(self, widget, state):
         if self.settings.get_boolean("dark-theme"):
@@ -306,6 +402,12 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def __toggle_update_date(self, widget, state):
         self.window.page_list.update_bottles_list()
+
+    def __toggle_component_updates(self, *_args):
+        if hasattr(self.window, "page_list"):
+            self.window.page_list.update_component_updates_banner()
+        if hasattr(self.window, "page_details"):
+            self.window.page_details.view_bottle.populate_updates()
 
     def __toggle_rc(self, widget, state):
         self.ui_update()
@@ -318,24 +420,191 @@ class PreferencesWindow(Adw.PreferencesWindow):
             "https://docs.usebottles.com/bottles/steam-proton-manager", None
         )
 
+    def __update_umu_status(self, refresh=False):
+        self.umu_stack.set_visible_child_name("umu_loading")
+        self.umu_spinner.start()
+        RunAsync(
+            self.umu_provider.get_status,
+            callback=self.__apply_umu_status,
+            refresh=refresh,
+        )
+
+    def __apply_umu_status(self, status, error=False):
+        self.umu_spinner.stop()
+        if error or not status:
+            self.status_umu_error.set_description(
+                str(error) if error else _("No status information was returned.")
+            )
+            self.umu_stack.set_visible_child_name("umu_error")
+            return
+        if not status["available"]:
+            self.umu_stack.set_visible_child_name("umu_unavailable")
+            return
+
+        installation = status["installation"]
+        if installation is None:
+            self.row_umu_launcher.add_css_class("error")
+            self.row_umu_launcher.set_subtitle(
+                status["error"] or _("No usable UMU launcher was found.")
+            )
+            self.label_umu_source.set_label(_("Unavailable"))
+            self.label_umu_version.set_visible(False)
+        else:
+            source_labels = {
+                "system": _("System"),
+                "bundled": _("Bundled"),
+                "explicit": _("Custom"),
+                "managed": _("Managed"),
+            }
+            self.row_umu_launcher.remove_css_class("error")
+            self.row_umu_launcher.set_subtitle(str(installation.path))
+            self.label_umu_source.set_label(
+                source_labels.get(installation.source, installation.source)
+            )
+            self.label_umu_version.set_label(installation.version)
+            self.label_umu_version.set_visible(True)
+
+        count = status["game_count"]
+        game_count = ngettext("{0} game", "{0} games", count).format(count)
+        discovered = status["discovered_count"]
+        if discovered:
+            game_count = _("{0}, {1} detected").format(game_count, discovered)
+        self.label_umu_games.set_label(game_count)
+        self.row_umu_path.set_subtitle(status["root"])
+        self.btn_umu_path.set_sensitive(bool(status["root"]))
+        self.btn_umu_path_reset.set_visible(
+            bool(self.settings.get_string("umu-data-path"))
+        )
+        self.row_umu_runtime.set_subtitle("~/.local/share/umu")
+        self.btn_umu_runtime.set_sensitive(bool(status["runtime_root"]))
+        self.row_umu_standard.set_subtitle("~/Games/umu")
+        self.btn_umu_standard.set_sensitive(bool(status["standard_prefix_root"]))
+        self.__updating_umu_settings = True
+        self.label_umu_proton.set_label(
+            self.__umu_proton_title(status["default_proton"])
+        )
+        dependency_tool = status["dependency_tool"]
+        try:
+            dependency_index = self.__umu_dependency_values.index(dependency_tool)
+        except ValueError:
+            dependency_index = 0
+        self.combo_umu_dependency.set_selected(dependency_index)
+        self.__updating_umu_settings = False
+        self.umu_stack.set_visible_child_name("umu_available")
+
+    def __refresh_umu(self, *_args):
+        self.__update_umu_status(refresh=True)
+        if hasattr(self.window, "page_list"):
+            self.window.page_list.update_bottles_list(refresh_updates=False)
+
+    def __open_umu_path(self, *_args):
+        root = str(self.umu_provider.repository.root)
+        if root:
+            ManagerUtils.open_filemanager(path_type="custom", custom_path=root)
+
+    def __open_umu_runtime(self, *_args):
+        root = str(Path.home().joinpath(".local", "share", "umu"))
+        ManagerUtils.open_filemanager(path_type="custom", custom_path=root)
+
+    def __open_umu_standard(self, *_args):
+        root = str(Path.home().joinpath("Games", "umu"))
+        ManagerUtils.open_filemanager(path_type="custom", custom_path=root)
+
+    def __choose_umu_path(self, *_args):
+        def set_path(_dialog, response):
+            if response != Gtk.ResponseType.ACCEPT:
+                return
+
+            path = resolve_bottles_directory(self.window, dialog.get_file().get_path())
+            if path is None:
+                return
+            self.__change_umu_path(path)
+
+        dialog = Gtk.FileChooserNative.new(
+            title=_("Select UMU Data Path"),
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+            parent=self.window,
+        )
+        dialog.set_modal(True)
+        dialog.connect("response", set_path)
+        dialog.show()
+
+    def __reset_umu_path(self, *_args):
+        self.__change_umu_path("")
+
+    def __change_umu_path(self, value):
+        if value == self.settings.get_string("umu-data-path"):
+            return
+
+        def apply():
+            self.settings.set_string("umu-data-path", value)
+            self.row_umu_path.set_subtitle(
+                value or str(Path(Paths.base).joinpath("umu"))
+            )
+            self.btn_umu_path_reset.set_visible(bool(value))
+            self.prompt_restart(force=True)
+
+        if not self.umu_provider.repository.list_games():
+            apply()
+            return
+
+        warning = Adw.AlertDialog.new(
+            _("Change the UMU Data Folder?"),
+            _(
+                "Existing games will not be moved. They will disappear from "
+                "Bottles until you switch back to the current folder."
+            ),
+        )
+        warning.add_response("cancel", _("Cancel"))
+        warning.add_response("change", _("Change"))
+        warning.set_response_appearance(
+            "change", Adw.ResponseAppearance.DESTRUCTIVE
+        )
+
+        def response(_dialog, response_id):
+            if response_id == "change":
+                apply()
+
+        warning.connect("response", response)
+        warning.present(self)
+
+    def __umu_proton_title(self, value):
+        for choice in self.manager.umu_proton_catalog.list_choices(
+            include_unstable=True
+        ):
+            if choice.value == value:
+                return choice.title
+        return Path(value).name or value
+
+    def __choose_umu_proton(self, *_args):
+        from bottles.frontend.windows.umu import UmuProtonDialog
+
+        UmuProtonDialog(
+            self.window,
+            self.settings.get_string("umu-proton"),
+            self.__set_umu_proton,
+        ).present(self)
+
+    def __set_umu_proton(self, value, title):
+        self.settings.set_string("umu-proton", value)
+        self.label_umu_proton.set_label(title)
+
+    def __on_umu_dependency_selected(self, combo, _pspec):
+        if self.__updating_umu_settings:
+            return
+        index = combo.get_selected()
+        if index < len(self.__umu_dependency_values):
+            self.settings.set_string(
+                "umu-dependency-tool", self.__umu_dependency_values[index]
+            )
+
     def __choose_bottles_path(self, widget):
         def set_path(_dialog, response):
             if response != Gtk.ResponseType.ACCEPT:
                 return
 
-            path = ManagerUtils.resolve_portal_path(dialog.get_file().get_path())
-
-            if path and "/run/user/" in path and "/doc/" in path:
-                # a transient document portal path cannot be used as the bottles
-                # directory: it would be lost on restart and break startup
-                self.add_toast(
-                    Adw.Toast.new(
-                        _(
-                            "That location is only available temporarily. Please "
-                            "choose a regular folder."
-                        )
-                    )
-                )
+            path = resolve_bottles_directory(self.window, dialog.get_file().get_path())
+            if path is None:
                 return
 
             self.data.set(UserDataKeys.CustomBottlesPath, path)
@@ -355,7 +624,10 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def handle_restart(self, widget, response_id):
         if response_id == "restart":
-            subprocess.Popen("sleep 1 && bottles & disown", shell=True)
+            environment = get_ui_language_environment(
+                self.settings.get_string("ui-language")
+            )
+            subprocess.Popen("sleep 1 && bottles & disown", shell=True, env=environment)
             self.window.proper_close()
         widget.destroy()
 
@@ -414,8 +686,63 @@ class PreferencesWindow(Adw.PreferencesWindow):
         else:
             self.data.remove(UserDataKeys.PersonalRepositories)
 
+    def __on_font_scale_setting_changed(self, *_args):
+        GLib.idle_add(self.__sync_font_scale_selection)
+
+    def __sync_font_scale_selection(self, *_args):
+        scale = self.settings.get_double("font-scale")
+        index = min(
+            range(len(FONT_SCALE_VALUES)),
+            key=lambda item: abs(FONT_SCALE_VALUES[item] - scale),
+        )
+
+        self.__updating_font_scale = True
+        self.combo_font_scale.set_selected(index)
+        self.__updating_font_scale = False
+
+    def __on_font_scale_selected(self, combo, _pspec):
+        if self.__updating_font_scale:
+            return
+
+        index = combo.get_selected()
+        if index < 0 or index >= len(FONT_SCALE_VALUES):
+            return
+
+        self.settings.set_double("font-scale", FONT_SCALE_VALUES[index])
+
     def __on_audio_driver_setting_changed(self, *_args):
         GLib.idle_add(self.__sync_audio_driver_selection)
+
+    def __on_ui_language_setting_changed(self, *_args):
+        GLib.idle_add(self.__sync_ui_language_selection)
+
+    def __sync_ui_language_selection(self, *_args):
+        language = self.settings.get_string("ui-language")
+        try:
+            index = self.__ui_language_values.index(language)
+        except ValueError:
+            index = 0
+
+        self.__updating_ui_language = True
+        self.combo_ui_language.set_selected(index)
+        self.__updating_ui_language = False
+
+    def __on_ui_language_selected(self, combo, _pspec):
+        if self.__updating_ui_language:
+            return
+
+        index = combo.get_selected()
+        if index < 0 or index >= len(self.__ui_language_values):
+            return
+
+        language = self.__ui_language_values[index]
+        if language == self.settings.get_string("ui-language"):
+            return
+
+        self.settings.set_string("ui-language", language)
+        self.add_toast(
+            Adw.Toast.new(_("Quit and reopen Bottles to apply the language."))
+        )
 
     def __sync_audio_driver_selection(self, *_args):
         driver = self.settings.get_string("audio-driver")
@@ -490,6 +817,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def populate_dlls_list(self):
         dll_components = [
+            ("d7vk", self.manager.supported_d7vk, "D7VK"),
             ("dxvk", self.manager.supported_dxvk, "DXVK"),
             ("vkd3d", self.manager.supported_vkd3d, "VKD3D"),
             ("nvapi", self.manager.supported_nvapi, "DXVK-NVAPI"),
@@ -565,18 +893,18 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def populate_runners_list(self):
         exp_soda = ComponentExpander(
-            "Soda", _("Based on Valve's Wine, includes Staging and Proton patches.")
+            "Soda",
+            _("Based on Valve's Wine, includes Staging and Proton patches."),
+            icon_name="soda-runner",
         )
         exp_caffe = ComponentExpander(
-            "Caffe", _("Based on Wine upstream, includes Staging and Proton patches.")
+            "Caffe",
+            _("Based on Wine upstream, includes Staging and Proton patches."),
+            icon_name="caffe-runner",
         )
         exp_wine_ge = ComponentExpander(
             "wine-GE",
-            _(
-                "Based on the most recent bleeding-edge Valve's Proton Experimental Wine, "
-                "includes Staging and custom patches. "
-                "This is meant to be used with non-steam games outside of Steam."
-            ),
+            _("Unmaintained. Wine-GE has been archived in favor of umu-launcher."),
         )
         exp_kron4ek = ComponentExpander(
             "Kron4ek",
@@ -584,17 +912,28 @@ class PreferencesWindow(Adw.PreferencesWindow):
                 "Based on Wine upstream, Staging, Staging-TkG and Proton patchset optionally available."
             ),
         )
-        exp_lutris = ComponentExpander("Lutris")
+        exp_lutris = ComponentExpander("Lutris", _("Unmaintained legacy runners."))
         exp_vaniglia = ComponentExpander(
-            "Vaniglia", _("Based on Wine upstream, includes Staging patches.")
+            "Vaniglia",
+            _("Based on Wine upstream, includes Staging patches."),
+            icon_name="vaniglia-runner",
+        )
+        exp_protosoda = ComponentExpander(
+            "ProtoSoda",
+            _("Soda adapted for Proton and UMU."),
+            icon_name="protosoda-runner",
         )
         exp_proton_ge = ComponentExpander(
             "proton-GE",
             _(
                 "Based on most recent bleeding-edge Valve's Proton Experimental, "
                 "includes Staging and custom patches. "
-                "Requires the Steam Runtime turned on."
+                "Using the Steam Runtime is recommended."
             ),
+        )
+        exp_proton_cachyos = ComponentExpander(
+            "Proton CachyOS",
+            _("CachyOS Proton builds. Using the Steam Runtime is recommended."),
         )
         exp_other_wine = ComponentExpander(_("Other Wine runners"))
         exp_other_proton = ComponentExpander(_("Other Proton runners"))
@@ -614,15 +953,17 @@ class PreferencesWindow(Adw.PreferencesWindow):
                 "offline_runners": [],
             },
             {
-                "prefix": "wine-ge",
-                "count": 0,
-                "expander": exp_wine_ge,
-                "offline_runners": [],
-            },
-            {
                 "prefix": "kron4ek",
                 "count": 0,
                 "expander": exp_kron4ek,
+                "offline_runners": [],
+            },
+        ]
+        deprecated_wine_runners = [
+            {
+                "prefix": "wine-ge",
+                "count": 0,
+                "expander": exp_wine_ge,
                 "offline_runners": [],
             },
             {
@@ -634,11 +975,23 @@ class PreferencesWindow(Adw.PreferencesWindow):
         ]
         identifiable_proton_runners = [
             {
+                "prefix": "protosoda",
+                "count": 0,
+                "expander": exp_protosoda,
+                "offline_runners": [],
+            },
+            {
+                "prefix": "proton-cachyos",
+                "count": 0,
+                "expander": exp_proton_cachyos,
+                "offline_runners": [],
+            },
+            {
                 "prefix": "ge-proton",
                 "count": 0,
                 "expander": exp_proton_ge,
                 "offline_runners": [],
-            }
+            },
         ]
         other_wine_runners = [
             {
@@ -660,7 +1013,7 @@ class PreferencesWindow(Adw.PreferencesWindow):
         self.__populate_runners_helper(
             "runner",
             self.manager.supported_wine_runners,
-            identifiable_wine_runners + other_wine_runners,
+            identifiable_wine_runners + deprecated_wine_runners + other_wine_runners,
         )
         self.__populate_runners_helper(
             "runner:proton",
@@ -669,10 +1022,13 @@ class PreferencesWindow(Adw.PreferencesWindow):
         )
 
         for runner in (
-            identifiable_wine_runners
-            + identifiable_proton_runners
+            identifiable_wine_runners[:3]
+            + identifiable_proton_runners[:1]
+            + identifiable_wine_runners[3:]
+            + identifiable_proton_runners[1:]
             + other_wine_runners
             + other_proton_runners
+            + deprecated_wine_runners
         ):
             if runner["count"] > 0:
                 self.list_runners.add(runner["expander"])

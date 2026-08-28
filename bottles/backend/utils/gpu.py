@@ -15,8 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re
-import shutil
+import os
 import subprocess
 from enum import Enum
 from functools import lru_cache
@@ -72,13 +71,18 @@ class GPUUtils:
 
     @staticmethod
     def is_nouveau():
-        try:
-            stdout = subprocess.check_output(["lsmod"], text=True)
-            if "nouveau" in stdout:
-                logging.warning("Nouveau driver detected, this may cause issues")
-                return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        if os.path.isdir("/sys/module/nouveau"):
+            return True
+        _proc = subprocess.Popen(
+            "lsmod | grep nouveau",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+        )
+        stdout, stderr = _proc.communicate()
+        if len(stdout) > 0:
+            logging.warning("Nouveau driver detected, this may cause issues")
+            return True
         return False
 
     def get_gpu(self):
@@ -112,9 +116,10 @@ class GPUUtils:
         found = []
         result = {"vendors": {}, "prime": {"integrated": None, "discrete": None}}
 
-        if self.is_nouveau():
+        nouveau_icd = self.vk.get_vk_icd("nouveau", as_string=True)
+        if self.is_nouveau() or (not gpus["nvidia"]["icd"] and nouveau_icd):
             gpus["nvidia"]["envs"] = {"DRI_PRIME": "1"}
-            gpus["nvidia"]["icd"] = ""
+            gpus["nvidia"]["icd"] = nouveau_icd
 
         try:
             stdout = subprocess.check_output(["lspci"], text=True)

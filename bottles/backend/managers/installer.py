@@ -31,6 +31,7 @@ from bottles.backend.models.result import Result
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.wine import WineUtils
 from bottles.backend.wine.executor import WineExecutor
+from bottles.backend.wine.regkeys import RegKeys
 from bottles.backend.wine.winecommand import WineCommand
 
 logging = Logger()
@@ -39,7 +40,11 @@ logging = Logger()
 class InstallerManager:
     def __init__(self, manager, offline: bool = False):
         self.__manager = manager
-        self.__repo = manager.repository_manager.get_repo("installers", offline)
+        self.__repo = manager.repository_manager.get_repo(
+            "installers",
+            offline,
+            callback_in_main_loop=not manager.is_cli,
+        )
         self.__utils_conn = manager.utils_conn
         self.__component_manager = manager.component_manager
         self.__local_resources = {}
@@ -315,6 +320,9 @@ class InstallerManager:
                     _config, "latencyflex", remove=not new_params["latencyflex"]
                 )
 
+        if "decorated" in new_params and isinstance(new_params["decorated"], bool):
+            RegKeys(config).set_decorated(new_params["decorated"])
+
         # avoid sync type change if not set to "wine"
         if "sync" in new_params and config.Parameters.sync != "wine":
             del new_params["sync"]
@@ -487,6 +495,11 @@ class InstallerManager:
         ext = config.External_Programs
 
         if duplicates:
+            for d in duplicates:
+                file_extensions = ext[d].get("file_extensions")
+                if file_extensions:
+                    _program["file_extensions"] = file_extensions
+                    break
             for d in duplicates:
                 del ext[d]
             ext[_uuid] = _program

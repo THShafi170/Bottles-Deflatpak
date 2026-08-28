@@ -43,6 +43,7 @@ class Paths:
     runners = f"{base}/runners"
     bottles = f"{base}/bottles"
     steam = f"{base}/steam"
+    d7vk = f"{base}/d7vk"
     dxvk = f"{base}/dxvk"
     vkd3d = f"{base}/vkd3d"
     nvapi = f"{base}/nvapi"
@@ -64,6 +65,31 @@ class Paths:
                 return True
         return False
 
+    @staticmethod
+    def get_lsfg_vk_version():
+        layer_dirs = [
+            path
+            for path in os.environ.get("VK_ADD_LAYER_PATH", "").split(os.pathsep)
+            if path
+        ]
+        layer_dirs += [
+            "/usr/lib/extensions/vulkan/lsfgvk/share/vulkan/implicit_layer.d",
+            f"{Paths.xdg_data_home}/vulkan/implicit_layer.d",
+            "/usr/local/share/vulkan/implicit_layer.d",
+            "/usr/share/vulkan/implicit_layer.d",
+            "/etc/vulkan/implicit_layer.d",
+        ]
+        for version, manifest in (
+            (2, "VkLayer_LSFGVK_frame_generation.json"),
+            (1, "VkLayer_LS_frame_generation.json"),
+        ):
+            if any(
+                os.path.isfile(os.path.join(layer_dir, manifest))
+                for layer_dir in layer_dirs
+            ):
+                return version
+        return 0
+
 
 class TrdyPaths:
     # External managers paths
@@ -84,10 +110,22 @@ except OSError:
     except OSError:
         pass
 
-# Check if some tools are available
+# Check if some tools are available — native host paths, no Flatpak extensions
 gamemode_available = shutil.which("gamemoderun") or False
 gamescope_available = shutil.which("gamescope") or False
+hdr_wsi_available = any(
+    os.path.exists(p)
+    for p in [
+        "/usr/lib/libVkLayer_hdr_wsi.so",
+        "/usr/local/lib/libVkLayer_hdr_wsi.so",
+        "/usr/share/vulkan/implicit_layer.d/VkLayer_hdr_wsi.json",
+        "/etc/vulkan/implicit_layer.d/VkLayer_hdr_wsi.json",
+        "/run/current-system/sw/share/vulkan/implicit_layer.d/VkLayer_hdr_wsi.json",
+    ]
+)
 vkbasalt_available = Paths.is_vkbasalt_available()
+lsfg_vk_version = Paths.get_lsfg_vk_version()
+lsfg_vk_available = bool(lsfg_vk_version)
 mangohud_available = shutil.which("mangohud") or False
 obs_vkc_available = shutil.which("obs-vkcapture") or False
 sandbox_available = shutil.which("bwrap") or False

@@ -101,13 +101,13 @@ Popover pop_power {
     }
 
     $GtkModelButton btn_shutdown {
-      tooltip-text: _("Simulate a Windows system shutdown.");
       text: _("Shutdown");
+      tooltip-text: _("Simulate a Windows system shutdown");
     }
 
     $GtkModelButton btn_reboot {
-      tooltip-text: _("Simulate a Windows system reboot.");
       text: _("Reboot");
+      tooltip-text: _("Simulate a Windows system reboot");
     }
   }
 }
@@ -234,6 +234,11 @@ template $DetailsBottle: Adw.PreferencesPage {
             styles [
               "tag",
             ]
+
+            Image img_runner {
+              visible: false;
+              pixel-size: 18;
+            }
 
             Label label_runner {
               label: _("Runner");

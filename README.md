@@ -1,4 +1,3 @@
-# ⚠️ NOT MAINTAINING ANYMORE CUZ THIS SHIT SUCKS
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/bottlesdevs/Bottles/main/data/icons/hicolor/scalable/apps/com.usebottles.bottles.svg" width="64">

@@ -17,6 +17,7 @@
 
 import os
 import shutil
+from concurrent.futures import CancelledError
 from datetime import datetime
 from gettext import gettext as _
 from glob import glob
@@ -122,39 +123,66 @@ class VersioningManager:
             )
         bottle_path = ManagerUtils.get_bottle_path(config)
         patterns = self.__get_patterns(config)
-
-        drive_c_path = os.path.join(bottle_path, "drive_c")
-        drive_c_size = (
-            FileUtils().get_path_size(drive_c_path, human=False)
-            if os.path.exists(drive_c_path)
-            else 0
-        )
-
-        required_space = drive_c_size + (50 * 1024 * 1024)
-        disk_usage = FileUtils().get_disk_size(path=bottle_path, human=False)
-
-        if disk_usage["free"] < required_space:
-            human_req = FileUtils.get_human_size(required_space)
-            return Result(
-                status=False,
-                message=_(
-                    "Not enough disk space to create a snapshot! "
-                    "Requires at least {0} of free space."
-                ).format(human_req),
+        task = Task(title=_("Committing state..."), cancellable=True)
+        task_id = TaskManager.add(task)
+        try:
+            task.subtitle = _("Calculating...")
+            drive_c_path = os.path.join(bottle_path, "drive_c")
+            drive_c_size = (
+                FileUtils().get_path_size(
+                    drive_c_path,
+                    human=False,
+                    cancel_event=task.cancel_event,
+                )
+                if os.path.exists(drive_c_path)
+                else 0
             )
 
-        repo = FVSRepo(
-            repo_path=bottle_path,
-            use_compression=config.Parameters.versioning_compression,
-        )
-        task_id = TaskManager.add(Task(title=_("Committing state …")))
-        try:
-            repo.commit(message, ignore=patterns, task_id=task_id)
+            required_space = drive_c_size + (50 * 1024 * 1024)
+            disk_usage = FileUtils().get_disk_size(path=bottle_path, human=False)
+
+            if disk_usage["free"] < required_space:
+                human_req = FileUtils.get_human_size(required_space)
+                return Result(
+                    status=False,
+                    message=_(
+                        "Not enough disk space to create a snapshot! "
+                        "Requires at least {0} of free space."
+                    ).format(human_req),
+                )
+
+            if task.cancel_event.is_set():
+                raise CancelledError
+
+            repo = FVSRepo(
+                repo_path=bottle_path,
+                use_compression=config.Parameters.versioning_compression,
+            )
+            repo.commit(
+                message,
+                ignore=patterns,
+                task_id=task_id,
+                cancel_event=task.cancel_event,
+            )
+            repo._refresh()
+
+            return Result(
+                status=True,
+                message=_("New state [{0}] created successfully!").format(
+                    repo.active_state_id
+                ),
+                data={
+                    "state_id": repo.active_state_id,
+                    "states": repo.states,
+                    "branches": repo.branches,
+                    "active_branch": repo.active_branch,
+                },
+            )
+        except CancelledError:
+            return Result(status=False, message="cancelled")
         except FVSNothingToCommit:
-            TaskManager.remove(task_id)
             return Result(status=False, message=_("Nothing to commit"))
-        except (RuntimeError, Exception) as e:
-            TaskManager.remove(task_id)
+        except Exception as e:
             error_msg = str(e)
             if "no space left on device" in error_msg.lower():
                 return Result(
@@ -168,21 +196,8 @@ class VersioningManager:
                     error_msg
                 ),
             )
-
-        repo._refresh()
-        TaskManager.remove(task_id)
-        return Result(
-            status=True,
-            message=_("New state [{0}] created successfully!").format(
-                repo.active_state_id
-            ),
-            data={
-                "state_id": repo.active_state_id,
-                "states": repo.states,
-                "branches": repo.branches,
-                "active_branch": repo.active_branch,
-            },
-        )
+        finally:
+            TaskManager.remove(task_id)
 
     def list_states(
         self, config: BottleConfig, check_dirty: bool = False
@@ -192,30 +207,38 @@ class VersioningManager:
         of the given bottle and return them as a dict.
         """
         if not self.needs_migration(config):
-            if not shutil.which("fvs2"):
-                return Result(
-                    status=False,
-                    message=_("FVS2 is not installed or not in PATH."),
-                    data={},
-                )
+            bottle_path = ManagerUtils.get_bottle_path(config)
+            empty_data = {
+                "state_id": None,
+                "states": {},
+                "branches": [],
+                "active_branch": "",
+                "dirty": False,
+                "changed_files": 0,
+            }
+            if not os.path.isdir(bottle_path):
+                return Result(status=False, data=empty_data)
             try:
-                repo = FVSRepo(
-                    repo_path=ManagerUtils.get_bottle_path(config),
-                    use_compression=config.Parameters.versioning_compression,
-                )
-                if check_dirty:
-                    repo.check_dirty()
-            except FVSStateNotFound:
-                logging.warning(
-                    "The FVS repository may be corrupted, trying to re-initialize it"
-                )
-                self.re_initialize(config)
-                repo = FVSRepo(
-                    repo_path=ManagerUtils.get_bottle_path(config),
-                    use_compression=config.Parameters.versioning_compression,
-                )
-                if check_dirty:
-                    repo.check_dirty()
+                try:
+                    repo = FVSRepo(
+                        repo_path=bottle_path,
+                        use_compression=config.Parameters.versioning_compression,
+                    )
+                    if check_dirty:
+                        repo.check_dirty()
+                except FVSStateNotFound:
+                    logging.warning(
+                        "The FVS repository may be corrupted, trying to re-initialize it"
+                    )
+                    self.re_initialize(config)
+                    repo = FVSRepo(
+                        repo_path=bottle_path,
+                        use_compression=config.Parameters.versioning_compression,
+                    )
+                    if check_dirty:
+                        repo.check_dirty()
+            except FileNotFoundError:
+                return Result(status=False, data=empty_data)
             return Result(
                 status=True,
                 message=_("States list retrieved successfully!"),

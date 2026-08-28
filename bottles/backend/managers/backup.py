@@ -16,10 +16,15 @@
 #
 
 import os
+import re
 import shutil
 import tarfile
+import tempfile
+from concurrent.futures import CancelledError
+from datetime import datetime
 from gettext import gettext as _
-from typing import Callable, Optional
+from threading import Event, Lock
+from typing import Callable, ClassVar, Optional
 
 import pathvalidate
 
@@ -35,6 +40,87 @@ from bottles.backend.utils.manager import ManagerUtils
 logging = Logger()
 
 
+class _CancellableReader:
+    def __init__(self, stream, cancel_event: Event):
+        self._stream = stream
+        self._cancel_event = cancel_event
+
+    def read(self, size=-1):
+        if self._cancel_event.is_set():
+            raise CancelledError
+        data = self._stream.read(size)
+        if self._cancel_event.is_set():
+            raise CancelledError
+        return data
+
+
+class _BackupTarFile(tarfile.TarFile):
+    def __init__(
+        self,
+        *args,
+        source_path: str,
+        cancel_event: Optional[Event] = None,
+        **kwargs,
+    ):
+        self._source_path = source_path
+        self._cancel_event = cancel_event
+        super().__init__(*args, **kwargs)
+
+    def add(self, name, arcname=None, recursive=True, *, filter=None):
+        if self._cancel_event and self._cancel_event.is_set():
+            raise CancelledError
+        if arcname is None:
+            arcname = name
+
+        try:
+            tarinfo = self.gettarinfo(name, arcname)
+        except FileNotFoundError as error:
+            return self._skip_missing(name, error)
+
+        if tarinfo is None:
+            return None
+        if filter is not None:
+            tarinfo = filter(tarinfo)
+            if tarinfo is None:
+                return None
+
+        if tarinfo.isreg():
+            try:
+                source = tarfile.bltn_open(name, "rb")
+            except FileNotFoundError as error:
+                return self._skip_missing(name, error)
+            with source:
+                self.addfile(tarinfo, source)
+        elif tarinfo.isdir():
+            self.addfile(tarinfo)
+            if recursive:
+                try:
+                    entries = sorted(os.listdir(name))
+                except FileNotFoundError as error:
+                    return self._skip_missing(name, error)
+                for entry in entries:
+                    self.add(
+                        os.path.join(name, entry),
+                        os.path.join(arcname, entry),
+                        recursive,
+                        filter=filter,
+                    )
+        else:
+            self.addfile(tarinfo)
+
+    def addfile(self, tarinfo, fileobj=None):
+        if self._cancel_event and self._cancel_event.is_set():
+            raise CancelledError
+        if fileobj is not None and self._cancel_event is not None:
+            fileobj = _CancellableReader(fileobj, self._cancel_event)
+        return super().addfile(tarinfo, fileobj)
+
+    def _skip_missing(self, name, error):
+        if os.path.realpath(name) == self._source_path:
+            raise error
+        logging.warning(f"Skipping file removed during backup: {name}")
+
+
 class ProgressTrackingFilter:
     """
     A filter wrapper that tracks uncompressed bytes being added to the tar
@@ -46,14 +132,19 @@ class ProgressTrackingFilter:
         total_size: int,
         task: Optional[Task] = None,
         base_filter: Optional[Callable] = None,
+        cancel_event: Optional[Event] = None,
     ):
         self._total_size = total_size
         self._task = task
         self._base_filter = base_filter
+        self._cancel_event = cancel_event
         self._processed = 0
         self._last_percent = -1
 
     def __call__(self, tarinfo: tarfile.TarInfo) -> Optional[tarfile.TarInfo]:
+        if self._cancel_event and self._cancel_event.is_set():
+            raise CancelledError
+
         # Apply base filter first
         if self._base_filter:
             tarinfo = self._base_filter(tarinfo)
@@ -76,6 +167,11 @@ class ProgressTrackingFilter:
 
 
 class BackupManager:
+    _BOTTLE_PATH_TOKEN = "%BOTTLE_PATH%"
+    _PROGRAM_BACKUP_PATTERN = re.compile(r"^\d{8}-\d{6}-\d{6}$")
+    _program_backup_locks: ClassVar[dict[str, Lock]] = {}
+    _program_backup_locks_guard: ClassVar[Lock] = Lock()
+
     @staticmethod
     def _validate_path(path: str) -> bool:
         """Validate if the path is not None or empty."""
@@ -85,14 +181,293 @@ class BackupManager:
         return True
 
     @staticmethod
+    def _program_backup_timestamp() -> str:
+        return datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+
+    @classmethod
+    def _get_program_backup_lock(cls, path: str) -> Lock:
+        with cls._program_backup_locks_guard:
+            return cls._program_backup_locks.setdefault(path, Lock())
+
+    @classmethod
+    def serialize_program_backup_path(
+        cls, config: BottleConfig, path: str
+    ) -> Optional[str]:
+        bottle_path = os.path.abspath(ManagerUtils.get_bottle_path(config))
+        selected_path = os.path.abspath(path)
+        try:
+            if os.path.commonpath(
+                (bottle_path, selected_path)
+            ) != bottle_path or os.path.commonpath(
+                (os.path.realpath(bottle_path), os.path.realpath(selected_path))
+            ) != os.path.realpath(bottle_path):
+                return None
+        except ValueError:
+            return None
+
+        relative_path = os.path.relpath(selected_path, bottle_path)
+        if relative_path == ".":
+            return None
+        return os.path.join(cls._BOTTLE_PATH_TOKEN, relative_path)
+
+    @classmethod
+    def resolve_program_backup_path(
+        cls, config: BottleConfig, path: str
+    ) -> Optional[str]:
+        if not isinstance(path, str) or not path:
+            return None
+        token_prefix = f"{cls._BOTTLE_PATH_TOKEN}{os.sep}"
+        if path.startswith(token_prefix):
+            bottle_path = os.path.abspath(ManagerUtils.get_bottle_path(config))
+            resolved = os.path.abspath(
+                os.path.join(bottle_path, path.removeprefix(token_prefix))
+            )
+            try:
+                if os.path.commonpath(
+                    (bottle_path, resolved)
+                ) != bottle_path or os.path.commonpath(
+                    (os.path.realpath(bottle_path), os.path.realpath(resolved))
+                ) != os.path.realpath(bottle_path):
+                    return None
+            except ValueError:
+                return None
+            return resolved
+        return None
+
+    @staticmethod
+    def _safe_program_backup_name(value: str, fallback: str) -> str:
+        name = pathvalidate.sanitize_filename(
+            value if isinstance(value, str) else "", platform="universal"
+        ).strip()
+        if name in (".", ".."):
+            return fallback
+        return name or fallback
+
+    @classmethod
+    def get_program_backup_root(cls, config: BottleConfig, program: dict) -> str:
+        settings = program.get("automatic_backup") or {}
+        destination = settings.get("destination", "")
+        bottle_name = cls._safe_program_backup_name(config.Name, "Bottle")
+        program_name = cls._safe_program_backup_name(program.get("name", ""), "Program")
+        program_id = cls._safe_program_backup_name(program.get("id", ""), "")
+        if program_id:
+            program_name = f"{program_name}-{program_id}"
+        return os.path.join(destination, bottle_name, program_name)
+
+    @staticmethod
+    def is_program_backup_destination_valid(
+        config: BottleConfig, destination: str
+    ) -> bool:
+        if not isinstance(destination, str) or not destination:
+            return False
+        bottle_path = os.path.abspath(ManagerUtils.get_bottle_path(config))
+        destination_path = os.path.abspath(destination)
+        real_bottle_path = os.path.realpath(bottle_path)
+        real_destination_path = os.path.realpath(destination_path)
+        try:
+            return not (
+                os.path.commonpath((bottle_path, destination_path)) == bottle_path
+                or os.path.commonpath((real_bottle_path, real_destination_path))
+                == real_bottle_path
+            )
+        except ValueError:
+            return True
+
+    @staticmethod
+    def _copy_program_backup_path(source: str, destination: str) -> None:
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        if os.path.islink(source):
+            os.symlink(
+                os.readlink(source),
+                destination,
+                target_is_directory=os.path.isdir(source),
+            )
+        elif os.path.isdir(source):
+            shutil.copytree(source, destination, symlinks=True)
+        else:
+            shutil.copy2(source, destination, follow_symlinks=False)
+
+    @staticmethod
+    def _program_backup_paths_overlap(source: str, destination: str) -> bool:
+        if not os.path.isdir(source) or os.path.islink(source):
+            return False
+        source = os.path.realpath(source)
+        destination = os.path.realpath(destination)
+        try:
+            common = os.path.commonpath((source, destination))
+        except ValueError:
+            return False
+        return common in (source, destination)
+
+    @staticmethod
+    def _program_backup_source_contains(source: str, path: str) -> bool:
+        if not os.path.isdir(source) or os.path.islink(source):
+            return False
+        source = os.path.abspath(source)
+        path = os.path.abspath(path)
+        try:
+            return os.path.commonpath((source, path)) == source
+        except ValueError:
+            return False
+
+    @classmethod
+    def _trim_program_backups(cls, root: str, keep: int) -> None:
+        generations = sorted(
+            [
+                entry
+                for entry in os.scandir(root)
+                if entry.is_dir(follow_symlinks=False)
+                and cls._PROGRAM_BACKUP_PATTERN.fullmatch(entry.name)
+            ],
+            key=lambda entry: entry.name,
+        )
+        for entry in generations[:-keep]:
+            shutil.rmtree(entry.path)
+
+    @classmethod
+    def create_program_backup(cls, config: BottleConfig, program: dict) -> Result:
+        settings = program.get("automatic_backup")
+        if not isinstance(settings, dict) or not settings.get("enabled"):
+            return Result(False, message="disabled")
+
+        destination = settings.get("destination")
+        paths = settings.get("paths")
+        if (
+            not isinstance(destination, str)
+            or not os.path.isabs(destination)
+            or not os.path.isdir(destination)
+        ):
+            return Result(False, message="The backup folder is unavailable.")
+        if not isinstance(paths, list) or not paths:
+            return Result(False, message="No backup paths are configured.")
+
+        try:
+            keep = int(settings.get("keep", 5))
+        except (TypeError, ValueError):
+            keep = 5
+        keep = min(max(keep, 1), 20)
+
+        bottle_path = os.path.abspath(ManagerUtils.get_bottle_path(config))
+        if not cls.is_program_backup_destination_valid(config, destination):
+            return Result(
+                False,
+                message="The backup folder must be outside the bottle.",
+            )
+
+        root = cls.get_program_backup_root(config, program)
+        try:
+            if os.path.commonpath(
+                (os.path.realpath(destination), os.path.realpath(root))
+            ) != os.path.realpath(destination):
+                return Result(
+                    False,
+                    message="The program backup folder is unavailable.",
+                )
+        except ValueError:
+            return Result(
+                False,
+                message="The program backup folder is unavailable.",
+            )
+        if not cls.is_program_backup_destination_valid(config, root):
+            return Result(
+                False,
+                message="The program backup folder must be outside the bottle.",
+            )
+
+        selected = []
+        for configured_path in paths:
+            source = cls.resolve_program_backup_path(config, configured_path)
+            if (
+                not source
+                or not os.path.lexists(source)
+                or source in (item[1] for item in selected)
+            ):
+                continue
+            if any(
+                cls._program_backup_source_contains(item[1], source)
+                for item in selected
+            ):
+                continue
+            selected = [
+                item
+                for item in selected
+                if not cls._program_backup_source_contains(source, item[1])
+            ]
+            if cls._program_backup_paths_overlap(source, root):
+                return Result(
+                    False,
+                    message="The backup folder overlaps a selected directory.",
+                )
+            selected.append((configured_path, source))
+        if not selected:
+            return Result(False, message="No selected backup paths are available.")
+
+        lock = cls._get_program_backup_lock(os.path.realpath(root))
+        staging = None
+        task = Task(title=_("Backing up {0}").format(program.get("name", "Program")))
+        task_id = TaskManager.add(task)
+        try:
+            with lock:
+                os.makedirs(root, exist_ok=True)
+                staging = tempfile.mkdtemp(prefix=".backup-", dir=root)
+                manifest_paths = []
+                for configured_path, source in selected:
+                    source_path = os.path.abspath(source)
+                    relative_path = os.path.relpath(source_path, bottle_path)
+
+                    target = os.path.join(staging, relative_path)
+                    cls._copy_program_backup_path(source, target)
+                    manifest_paths.append(
+                        {"source": configured_path, "backup": relative_path}
+                    )
+
+                timestamp = cls._program_backup_timestamp()
+                manifest = {
+                    "created": timestamp,
+                    "bottle": config.Name,
+                    "program": program.get("name", ""),
+                    "paths": manifest_paths,
+                }
+                with open(
+                    os.path.join(staging, "backup.yml"),
+                    "w",
+                    encoding="utf-8",
+                ) as manifest_file:
+                    yaml.dump(manifest, manifest_file, sort_keys=False)
+
+                final_path = os.path.join(root, timestamp)
+                os.replace(staging, final_path)
+                staging = None
+                try:
+                    cls._trim_program_backups(root, keep)
+                except OSError as error:
+                    logging.warning(f"Failed to rotate automatic backups: {error}")
+                logging.info(
+                    f"Automatic backup for [{program.get('name', '')}] saved to "
+                    f"[{final_path}]."
+                )
+                return Result(True, data={"path": final_path})
+        except (OSError, TypeError, ValueError, yaml.YAMLError) as error:
+            logging.error(f"Failed to create automatic backup: {error}")
+            return Result(False, message=str(error))
+        finally:
+            if staging:
+                shutil.rmtree(staging, ignore_errors=True)
+            TaskManager.remove(task_id)
+
+    @staticmethod
     def _calculate_dir_size(
-        path: str, exclude_filter: Optional[Callable] = None
+        path: str,
+        exclude_filter: Optional[Callable] = None,
+        cancel_event: Optional[Event] = None,
     ) -> int:
         """
         Calculate the total size of a directory, respecting the exclude filter.
         """
         total_size = 0
         for dirpath, dirnames, filenames in os.walk(path):
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError
             # Apply exclude filter logic to directories
             if exclude_filter:
                 # Check if this directory should be excluded
@@ -103,6 +478,8 @@ class BackupManager:
                     continue
 
             for filename in filenames:
+                if cancel_event and cancel_event.is_set():
+                    raise CancelledError
                 filepath = os.path.join(dirpath, filename)
                 # Apply exclude filter to files
                 if exclude_filter:
@@ -122,38 +499,86 @@ class BackupManager:
         destination_path: str,
         exclude_filter: Optional[Callable] = None,
         task: Optional[Task] = None,
+        cancel_event: Optional[Event] = None,
     ) -> bool:
         """Helper function to create a tar.gz file from a source path."""
+        temp_path = None
         try:
+            source_path = os.path.realpath(source_path)
+            destination_path = os.path.abspath(destination_path)
+            destination_dir = os.path.dirname(destination_path)
+            destinations = (
+                os.path.realpath(destination_dir),
+                os.path.realpath(destination_path),
+            )
+            if any(
+                os.path.commonpath((source_path, target)) == source_path
+                for target in destinations
+            ):
+                logging.error("The backup destination is inside the bottle.")
+                return False
+
             # Calculate total size for progress tracking
             total_size = 0
             if task:
-                task.subtitle = _("Calculating…")
+                task.subtitle = _("Calculating...")
                 total_size = BackupManager._calculate_dir_size(
-                    source_path, exclude_filter
+                    source_path, exclude_filter, cancel_event
                 )
 
-            os.chdir(os.path.dirname(source_path))
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError
 
             # Create progress-tracking filter if task is provided
             if task and total_size > 0:
                 progress_filter = ProgressTrackingFilter(
-                    total_size, task, exclude_filter
+                    total_size, task, exclude_filter, cancel_event
                 )
                 active_filter = progress_filter
             else:
                 active_filter = exclude_filter
 
-            with tarfile.open(destination_path, "w:gz") as tar:
-                tar.add(os.path.basename(source_path), filter=active_filter)
+            file_descriptor, temp_path = tempfile.mkstemp(
+                prefix=f".{os.path.basename(destination_path)}.",
+                suffix=".tmp",
+                dir=destination_dir,
+            )
+            with os.fdopen(file_descriptor, "wb") as temp_file:
+                with _BackupTarFile.open(
+                    temp_path,
+                    "w:gz",
+                    fileobj=temp_file,
+                    source_path=source_path,
+                    cancel_event=cancel_event,
+                ) as tar:
+                    tar.add(
+                        source_path,
+                        arcname=os.path.basename(source_path),
+                        filter=active_filter,
+                    )
+
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError
+
+            os.replace(temp_path, destination_path)
+            temp_path = None
 
             if task:
                 task.subtitle = "100%"
 
             return True
-        except (FileNotFoundError, PermissionError, tarfile.TarError, ValueError) as e:
+        except CancelledError:
+            logging.info("Backup cancelled.")
+            return False
+        except (OSError, tarfile.TarError, ValueError) as e:
             logging.error(f"Error creating backup: {e}")
             return False
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except FileNotFoundError:
+                    pass
 
     @staticmethod
     def _safe_extract_tarfile(
@@ -218,16 +643,24 @@ class BackupManager:
         if scope == "config":
             backup_created = config.dump(path).status
         else:
-            task = Task(title=_("Backup {0}").format(config.Name))
+            task = Task(title=_("Backup {0}").format(config.Name), cancellable=True)
             task_id = TaskManager.add(task)
             bottle_path = ManagerUtils.get_bottle_path(config)
-            backup_created = BackupManager._create_tarfile(
-                bottle_path,
-                path,
-                exclude_filter=BackupManager.exclude_filter,
-                task=task,
-            )
-            TaskManager.remove(task_id)
+            backup_cancelled = False
+            try:
+                backup_created = BackupManager._create_tarfile(
+                    bottle_path,
+                    path,
+                    exclude_filter=BackupManager.exclude_filter,
+                    task=task,
+                    cancel_event=task.cancel_event,
+                )
+                backup_cancelled = not backup_created and task.cancel_event.is_set()
+            finally:
+                TaskManager.remove(task_id)
+
+            if backup_cancelled:
+                return Result(status=False, message="cancelled")
 
         if backup_created:
             logging.info(f"Backup successfully saved to: {path}.")
@@ -242,6 +675,8 @@ class BackupManager:
         Filter which excludes some unwanted files from the backup.
         """
         if "dosdevices" in tarinfo.name:
+            return None
+        if "lsfg-vk" in tarinfo.name.split("/"):
             return None
         return tarinfo
 
@@ -302,21 +737,40 @@ class BackupManager:
         """
         logging.info(f"Duplicating bottle: {config.Name} as {name}")
 
-        sanitized_name = pathvalidate.sanitize_filename(name, platform="universal")
+        if not name.strip():
+            return Result(status=False, message=_("Bottle name cannot be empty."))
+
+        sanitized_name = pathvalidate.sanitize_filename(
+            name.replace(" ", "-"), platform="universal"
+        )
+        if not sanitized_name:
+            return Result(status=False, message=_("Bottle name is not valid."))
+
         source_path = ManagerUtils.get_bottle_path(config)
         destination_path = os.path.join(Paths.bottles, sanitized_name)
 
+        duplicate_name = name
+        suffix = 1
+        while os.path.lexists(destination_path):
+            duplicate_name = f"{name}__{suffix}"
+            destination_path = os.path.join(
+                Paths.bottles, f"{sanitized_name}__{suffix}"
+            )
+            suffix += 1
+
         return BackupManager._duplicate_bottle_directory(
-            config, source_path, destination_path, name
+            config, source_path, destination_path, duplicate_name
         )
 
     @staticmethod
     def _duplicate_bottle_directory(
         config: BottleConfig, source_path: str, destination_path: str, new_name: str
     ) -> Result:
+        destination_created = False
+        duplicate_succeeded = False
         try:
-            if not os.path.exists(destination_path):
-                os.makedirs(destination_path)
+            os.makedirs(destination_path)
+            destination_created = True
             for item in [
                 "drive_c",
                 "system.reg",
@@ -330,7 +784,6 @@ class BackupManager:
                     shutil.copytree(
                         source_item,
                         destination_item,
-                        ignore=shutil.ignore_patterns(".*"),
                         symlinks=True,
                     )
                 elif os.path.isfile(source_item):
@@ -346,7 +799,11 @@ class BackupManager:
                 yaml.dump(config_data, config_file, indent=4)
 
             logging.info(f"Bottle duplicated successfully as {new_name}.")
+            duplicate_succeeded = True
             return Result(status=True)
-        except (FileNotFoundError, PermissionError, OSError) as e:
+        except (OSError, shutil.Error) as e:
             logging.error(f"Error duplicating bottle: {e}")
-            return Result(status=False)
+            return Result(status=False, message=str(e))
+        finally:
+            if destination_created and not duplicate_succeeded:
+                shutil.rmtree(destination_path, ignore_errors=True)

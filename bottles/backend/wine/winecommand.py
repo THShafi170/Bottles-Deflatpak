@@ -11,6 +11,7 @@ from bottles.backend.globals import (
     Paths,
     gamemode_available,
     gamescope_available,
+    lsfg_vk_version,
     mangohud_available,
     obs_vkc_available,
     vmtouch_available,
@@ -23,6 +24,8 @@ from bottles.backend.models.result import Result
 from bottles.backend.utils.display import DisplayUtils
 from bottles.backend.utils.generic import detect_encoding, is_ntsync_available
 from bottles.backend.utils.gpu import GPUUtils
+from bottles.backend.utils.hidraw import normalize_hidraw_id
+from bottles.backend.utils.lsfgvk import get_lsfg_vk_dll_path
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.terminal import TerminalUtils
@@ -30,6 +33,10 @@ from bottles.backend.utils.umu import UMUUtils
 from bottles.backend.utils.wine import WineUtils
 
 logging = Logger()
+
+
+def _is_enabled_value(value) -> bool:
+    return value not in (None, "", "0", False)
 
 
 class WineEnv:
@@ -95,9 +102,38 @@ class WineEnv:
     def has(self, key):
         return key in self.__env
 
+    def get_value(self, key):
+        return self.__env.get(key)
 
-def apply_wayland_preferences(env: "WineEnv", params) -> None:
-    if not getattr(params, "wayland", False):
+    def is_enabled(self, key):
+        return _is_enabled_value(self.__env.get(key))
+
+
+def _proton_option_enabled(get_value, option: str) -> bool:
+    for key in (f"PROTON_USE_{option}", f"PROTON_ENABLE_{option}"):
+        value = get_value(key)
+        if value is not None:
+            return _is_enabled_value(value)
+    return False
+
+
+def _wayland_requested(env: "WineEnv", params) -> bool:
+    return getattr(params, "wayland", False) or _proton_option_enabled(
+        env.get_value, "WAYLAND"
+    )
+
+
+def _wayland_available(env: "WineEnv") -> bool:
+    return DisplayUtils.display_server_type() == "wayland" and bool(
+        env.has("WAYLAND_DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+    )
+
+
+def apply_wayland_preferences(
+    env: "WineEnv", params, xlocale_dir: Optional[str] = None
+) -> None:
+    proton_wayland_enabled = _proton_option_enabled(env.get_value, "WAYLAND")
+    if not _wayland_requested(env, params):
         return
     if DisplayUtils.display_server_type() != "wayland":
         return
@@ -105,7 +141,132 @@ def apply_wayland_preferences(env: "WineEnv", params) -> None:
     if not env.has("WAYLAND_DISPLAY") and wayland_display:
         env.add("WAYLAND_DISPLAY", wayland_display, override=True)
     if env.has("WAYLAND_DISPLAY") or wayland_display:
+        if proton_wayland_enabled:
+            if env.has("PROTON_WAYLAND_MONITOR"):
+                env.add(
+                    "WAYLANDDRV_PRIMARY_MONITOR",
+                    env.get_value("PROTON_WAYLAND_MONITOR"),
+                    override=True,
+                )
+            env.concat(
+                "WINEDLLOVERRIDES",
+                ["winex11.drv=d", "winewayland.drv=b"],
+                sep=";",
+            )
+            env.add("WINE_USE_EGL", "1", override=True)
+            env.add("WINE_DISABLE_FULLSCREEN_HACK", "1", override=True)
+            env.add("WINE_MOVE_HACK", "1")
+            env.add("PROTON_USE_XALIA", "0", override=True)
+            env.add("PROTON_NO_STEAMINPUT", "1", override=True)
+            env.remove("SteamVirtualGamepadInfo")
+            env.remove("SDL_GAMECONTROLLER_IGNORE_DEVICES")
+            env.remove("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD")
+            if xlocale_dir:
+                env.add("XLOCALEDIR", xlocale_dir)
         env.remove("DISPLAY")
+
+
+def apply_hdr_preferences(env: "WineEnv", params, gamescope_activated: bool) -> None:
+    if gamescope_activated:
+        env.remove("ENABLE_HDR_WSI")
+
+    hdr_enabled = getattr(params, "hdr", False) or _proton_option_enabled(
+        env.get_value, "HDR"
+    )
+    if not hdr_enabled:
+        return
+
+    if not gamescope_activated and not (
+        _wayland_requested(env, params) and _wayland_available(env)
+    ):
+        return
+
+    env.add("DXVK_HDR", "1")
+    if gamescope_activated:
+        env.remove("DISABLE_GAMESCOPE_WSI")
+        env.add("ENABLE_GAMESCOPE_WSI", "1", override=True)
+
+
+def apply_lsfg_vk_preferences(
+    env: "WineEnv", params, bottle_path: str, version: Optional[int] = None
+) -> None:
+    if version is None:
+        version = lsfg_vk_version
+
+    if not getattr(params, "lsfg_vk", False):
+        return
+
+    dll = get_lsfg_vk_dll_path(bottle_path)
+    try:
+        multiplier = int(getattr(params, "lsfg_vk_multiplier", 2))
+        flow_scale = float(getattr(params, "lsfg_vk_flow_scale", 1.0))
+    except (TypeError, ValueError):
+        multiplier = 0
+        flow_scale = 0
+    enabled = (
+        version in (1, 2)
+        and os.path.isfile(dll)
+        and os.access(dll, os.R_OK)
+        and 2 <= multiplier <= 4
+        and 0.25 <= flow_scale <= 1.0
+    )
+    if not enabled:
+        env.add("DISABLE_LSFG", "1", override=True)
+        env.add("DISABLE_LSFGVK", "1", override=True)
+        return
+
+    multiplier = str(multiplier)
+    flow_scale = str(flow_scale)
+    performance = "1" if getattr(params, "lsfg_vk_performance_mode", False) else "0"
+
+    if version == 2:
+        env.add("DISABLE_LSFG", "1", override=True)
+        env.remove("DISABLE_LSFGVK")
+        env.add("LSFGVK_ENV", "1", override=True)
+        env.add("LSFGVK_DLL_PATH", dll, override=True)
+        env.add("LSFGVK_MULTIPLIER", multiplier, override=True)
+        env.add("LSFGVK_FLOW_SCALE", flow_scale, override=True)
+        env.add("LSFGVK_PERFORMANCE_MODE", performance, override=True)
+        return
+
+    env.remove("DISABLE_LSFG")
+    env.add("DISABLE_LSFGVK", "1", override=True)
+    env.add("LSFG_LEGACY", "1", override=True)
+    env.add("LSFG_DLL_PATH", dll, override=True)
+    env.add("LSFG_MULTIPLIER", multiplier, override=True)
+    env.add("LSFG_FLOW_SCALE", flow_scale, override=True)
+    env.add("LSFG_PERFORMANCE_MODE", performance, override=True)
+
+
+def apply_frame_rate_limit(env: "WineEnv", params) -> None:
+    try:
+        limit = int(getattr(params, "frame_rate_limit", 0))
+    except (TypeError, ValueError):
+        return
+
+    if limit <= 0:
+        return
+
+    dxvk_config = env.get_value("DXVK_CONFIG")
+    frame_rate_config = (
+        f"dxgi.maxFrameRate = {limit}; d3d9.maxFrameRate = {limit}"
+    )
+    if dxvk_config:
+        frame_rate_config = f"{dxvk_config.rstrip('; ')}; {frame_rate_config}"
+
+    env.add("DXVK_CONFIG", frame_rate_config, override=True)
+    env.add("VKD3D_FRAME_RATE", str(limit), override=True)
+
+
+def apply_hidraw_preferences(env: "WineEnv", params) -> None:
+    selected = []
+    for value in getattr(params, "hidraw_devices", []):
+        identifier = normalize_hidraw_id(value)
+        if identifier and identifier not in selected:
+            selected.append(identifier)
+
+    if selected:
+        env.add("PROTON_ENABLE_HIDRAW", ",".join(selected), override=True)
 
 
 def _needs_steam_virtual_gamepad_workaround(runner_name: Optional[str]) -> bool:
@@ -156,9 +317,11 @@ class WineCommand:
         umu_id: str = "none",
         umu_store: str = "none",
         sandbox_override: Optional[str] = None,
+        forced_dll_overrides: Optional[str] = None,
     ):
         _environment = environment.copy()
         self.config = self._get_config(config)
+        self.forced_dll_overrides = forced_dll_overrides
         self.minimal = minimal
         # Per-launch override of the dedicated sandbox decided in the config:
         #   None  -> follow the bottle setting
@@ -249,12 +412,15 @@ class WineCommand:
 
         bottle = ManagerUtils.get_bottle_path(config)
         runner_path = ManagerUtils.get_runner_path(config.Runner)
+        proton_path = ""
 
         if config.Environment == "Steam":
             bottle = config.Path
             runner_path = config.RunnerPath
 
         if SteamUtils.is_proton(runner_path):
+            proton_path = runner_path
+            SteamUtils.sync_proton_vkd3d(runner_path, bottle, arch)
             runner_path = SteamUtils.get_dist_directory(runner_path)
 
         # Clean some env variables which can cause trouble
@@ -417,6 +583,9 @@ class WineCommand:
                 "VKD3D_SHADER_CACHE_PATH", os.path.join(bottle, "cache", "vkd3d_shader")
             )
 
+        apply_frame_rate_limit(env, params)
+        apply_hidraw_preferences(env, params)
+
         # LatencyFleX environment variables
         if params.latencyflex and not return_steam_env:
             _lf_path = ManagerUtils.get_latencyflex_path(config.LatencyFleX)
@@ -438,7 +607,7 @@ class WineCommand:
             env.add("MANGOHUD", "1")
             env.add("MANGOHUD_DLSYM", "1")
             if not params.mangohud_display_on_game_start:
-                env.add("MANGOHUD_CONFIG", "no_display")
+                env.add("MANGOHUD_CONFIG", "read_cfg,no_display")
 
         # vkBasalt environment variables
         if params.vkbasalt and not self.minimal:
@@ -448,6 +617,13 @@ class WineCommand:
             if os.path.isfile(vkbasalt_conf_path):
                 env.add("VKBASALT_CONFIG_FILE", vkbasalt_conf_path)
             env.add("ENABLE_VKBASALT", "1")
+
+        apply_lsfg_vk_preferences(
+            env,
+            params,
+            bottle,
+            version=lsfg_vk_version if arch != "win32" and not self.minimal else 0,
+        )
 
         # OBS Vulkan Capture environment variables
         if params.obsvkc and not self.minimal:
@@ -462,29 +638,7 @@ class WineCommand:
             env.add("DXVK_NVAPIHACK", "0")
             env.add("DXVK_ENABLE_NVAPI", "1")
 
-        # Esync environment variable
-        if params.sync == "esync":
-            env.add("WINEESYNC", "1")
-
-        # Fsync environment variable
-        if params.sync == "fsync":
-            env.add("WINEFSYNC", "1")
-
-        # NTsync environment variable — requires kernel device + Wine >= 10
-        if params.sync == "ntsync":
-            from bottles.backend.utils.generic import is_ntsync_available
-
-            if is_ntsync_available(self.runner):
-                env.add("WINENTSYNC", "1")
-                # Proton also honours PROTON_USE_NTSYNC when using umu
-                if SteamUtils.is_proton(self.runner) or params.use_umu:
-                    env.add("PROTON_USE_NTSYNC", "1")
-            else:
-                logging.warning(
-                    "ntsync requested but unavailable (missing /dev/ntsync or "
-                    "runner too old), falling back to fsync"
-                )
-                env.add("WINEFSYNC", "1")
+        self._apply_sync_environment(env, params.sync, self.runner)
 
         # Wine debug level
         if not return_steam_env:
@@ -541,6 +695,8 @@ class WineCommand:
         # env.add("vblank_mode", "0")
 
         # DLL Overrides
+        if getattr(self, "forced_dll_overrides", None):
+            dll_overrides.append(self.forced_dll_overrides)
         env.concat("WINEDLLOVERRIDES", dll_overrides, sep=";")
         if env.is_empty("WINEDLLOVERRIDES"):
             env.remove("WINEDLLOVERRIDES")
@@ -551,16 +707,52 @@ class WineCommand:
             # Wine arch
             env.add("WINEARCH", arch)
 
-        if params.use_umu and hasattr(self, "umu_proton_path"):
-            env.add("PROTONPATH", self.umu_proton_path)
-            env.add("GAMEID", self.umu_id)
-            env.add("STORE", self.umu_store)
-            env.add("UMU_RUNTIME_UPDATE", "0")
-            env.add("UMU_LOG", "1" if logging.debug_mode else "0")
+        xlocale_dir = None
+        if runner_path:
+            candidate = os.path.join(runner_path, "share/X11/locale")
+            if os.path.isdir(candidate):
+                xlocale_dir = candidate
+        apply_wayland_preferences(env, params, xlocale_dir)
+        apply_hdr_preferences(
+            env,
+            params,
+            bool(not self.minimal and gamescope_available and self.gamescope_activated),
+        )
 
-        apply_wayland_preferences(env, params)
+        resolved_env = env.get()["envs"]
+        if proton_path and not clean_env and not self.minimal:
+            proton_sandbox = None
+            if params.sandbox:
+                proton_sandbox = SandboxManager(
+                    chdir=bottle,
+                    clear_env=True,
+                    share_paths_ro=[proton_path],
+                    share_paths_rw=[bottle],
+                    share_net=config.Sandbox.share_net,
+                    share_display=False,
+                    share_sound=False,
+                    share_gpu=False,
+                )
+            SteamUtils.prepare_proton_fsr4(
+                proton_path, bottle, resolved_env, proton_sandbox
+            )
 
-        return env.get()["envs"]
+        return resolved_env
+
+    @staticmethod
+    def _apply_sync_environment(env: WineEnv, sync: str, runner: str) -> None:
+        if sync == "esync":
+            env.add("WINEESYNC", "1")
+        elif sync == "fsync":
+            env.add("WINEFSYNC", "1")
+        elif sync in ("wine", "ntsync"):
+            if is_ntsync_available(runner):
+                env.add("WINENTSYNC", "1")
+            elif sync == "ntsync":
+                logging.warning(
+                    "ntsync requested but unavailable, falling back to fsync"
+                )
+                env.add("WINEFSYNC", "1")
 
     def _get_runner_info(self) -> tuple[str, str]:
         config = self.config
@@ -625,9 +817,23 @@ class WineCommand:
         config = self.config
         params = config.Parameters
         runner = self.runner
+        self.steam_runtime_root = ""
 
         if environment is None:
             environment = {}
+
+        launch_prefix, launch_suffix = "", ""
+        if self.arguments:
+            launch_prefix, launch_suffix, launch_environment = (
+                SteamUtils.handle_launch_options(self.arguments)
+            )
+            if launch_environment.get("WINEDLLOVERRIDES") and environment.get(
+                "WINEDLLOVERRIDES"
+            ):
+                environment["WINEDLLOVERRIDES"] += ";" + launch_environment.pop(
+                    "WINEDLLOVERRIDES"
+                )
+            environment.update(launch_environment)
 
         if return_clean_cmd:
             return_steam_cmd = True
@@ -637,6 +843,46 @@ class WineCommand:
                 command = f"{self.proton_script} run {command}"
             else:
                 command = f"{runner} {command}"
+
+        if params.use_steam_runtime:
+            _rs = RuntimeManager.get_runtimes("steam")
+            _picked = {}
+
+            if _rs:
+                if "steamrt4" in _rs.keys() and "steamrt4" in self.runner_runtime:
+                    """
+                    Steam Linux Runtime 4 (steamrt4) is the default runtime used by Proton version >= 11.0
+                    """
+                    _picked = _rs["steamrt4"]
+                elif "sniper" in _rs.keys() and "sniper" in self.runner_runtime:
+                    """
+                    Sniper is the default runtime used by Proton version >= 8.0 and < 11.0
+                    """
+                    _picked = _rs["sniper"]
+                elif "soldier" in _rs.keys() and "soldier" in self.runner_runtime:
+                    """
+                    Sniper is the default runtime used by Proton version >= 5.13 and < 8.0
+                    """
+                    _picked = _rs["soldier"]
+                elif "scout" in _rs.keys():
+                    """
+                    For Wine runners, we cannot make assumption about which runtime would suits
+                    them the best, as it would depend on their build environment.
+                    Sniper/Soldier are not backward-compatible, defaulting to Scout should maximize compatibility.
+                    """
+                    _picked = _rs["scout"]
+            else:
+                logging.warning("Steam runtime was requested but not found")
+
+            if _picked:
+                logging.info(f"Using Steam runtime {_picked['name']}")
+                self.steam_runtime_root = os.path.dirname(_picked["entry_point"])
+                separator = "-- " if _picked["name"] != "scout" else ""
+                command = f"{_picked['entry_point']} {separator}{command}"
+            else:
+                logging.warning(
+                    "Steam runtime was requested and found but there are no valid combinations"
+                )
 
         if not self.minimal:
             if gamemode_available and params.gamemode:
@@ -669,9 +915,7 @@ class WineCommand:
                     f.write("".join(file))
 
                 # Update command
-                command = (
-                    f"{self._get_gamescope_cmd(return_steam_cmd)} -- {gamescope_run}"
-                )
+                command = f"{self._get_gamescope_cmd(return_steam_cmd, environment)} -- {gamescope_run}"
                 logging.info(f"Running Gamescope command: '{command}'")
                 logging.info(f"{gamescope_run} contains:")
                 with open(gamescope_run, "r") as f:
@@ -684,56 +928,11 @@ class WineCommand:
             if obs_vkc_available and params.obsvkc:
                 command = f"{obs_vkc_available} {command}"
 
-        if params.use_steam_runtime:
-            _rs = RuntimeManager.get_runtimes("steam")
-            _picked = {}
-
-            if _rs:
-                if "sniper" in _rs.keys() and "sniper" in self.runner_runtime:
-                    """
-                    Sniper is the default runtime used by Proton version >= 8.0
-                    """
-                    _picked = _rs["sniper"]
-                elif "soldier" in _rs.keys() and "soldier" in self.runner_runtime:
-                    """
-                    Sniper is the default runtime used by Proton version >= 5.13 and < 8.0
-                    """
-                    _picked = _rs["soldier"]
-                elif "scout" in _rs.keys():
-                    """
-                    For Wine runners, we cannot make assumption about which runtime would suits
-                    them the best, as it would depend on their build environment.
-                    Sniper/Soldier are not backward-compatible, defaulting to Scout should maximize compatibility.
-                    """
-                    _picked = _rs["scout"]
-            else:
-                logging.warning("Steam runtime was requested but not found")
-
-            if _picked:
-                logging.info(f"Using Steam runtime {_picked['name']}")
-                command = f"{_picked['entry_point']} {command}"
-            else:
-                logging.warning(
-                    "Steam runtime was requested and found but there are no valid combinations"
-                )
-
         if self.arguments:
-            prefix, suffix, extracted_env = SteamUtils.handle_launch_options(
-                self.arguments
-            )
-            if prefix:
-                command = f"{prefix} {command}"
-            if suffix:
-                command = f"{command} {suffix}"
-            if extracted_env:
-                if extracted_env.get("WINEDLLOVERRIDES") and environment.get(
-                    "WINEDLLOVERRIDES"
-                ):
-                    environment["WINEDLLOVERRIDES"] += ";" + extracted_env.get(
-                        "WINEDLLOVERRIDES"
-                    )
-                    del extracted_env["WINEDLLOVERRIDES"]
-                environment.update(extracted_env)
+            if launch_prefix:
+                command = f"{launch_prefix} {command}"
+            if launch_suffix:
+                command = f"{command} {launch_suffix}"
 
         if post_script not in (None, ""):
             post_cmd_parts = [post_script]
@@ -751,7 +950,11 @@ class WineCommand:
 
         return command
 
-    def _get_gamescope_cmd(self, return_steam_cmd: bool = False) -> str:
+    def _get_gamescope_cmd(
+        self,
+        return_steam_cmd: bool = False,
+        environment: Optional[dict] = None,
+    ) -> str:
         config = self.config
         params = config.Parameters
         gamescope_cmd = []
@@ -760,6 +963,16 @@ class WineCommand:
             gamescope_cmd = [gamescope_available]
             if return_steam_cmd:
                 gamescope_cmd = ["gamescope"]
+            effective_environment = config.Environment_Variables.copy()
+            effective_environment.update(environment or {})
+            hdr_enabled = params.hdr or _proton_option_enabled(
+                effective_environment.get, "HDR"
+            )
+            if (
+                hdr_enabled
+                and "--hdr-enabled" not in params.gamescope_custom_options.split()
+            ):
+                gamescope_cmd.append("--hdr-enabled")
             if params.gamescope_custom_options:
                 gamescope_cmd.append(params.gamescope_custom_options)
             if params.gamescope_fullscreen:
@@ -837,7 +1050,7 @@ class WineCommand:
             if self.config.Environment == "Steam" and self.config.RunnerPath
             else ManagerUtils.get_runner_path(self.config.Runner)
         )
-        for extra in (runner_root, self.runner_runtime):
+        for extra in (runner_root, self.steam_runtime_root):
             if extra and not str(extra).startswith("sys-"):
                 share_paths_ro.append(os.path.realpath(extra))
 
@@ -859,17 +1072,37 @@ class WineCommand:
             )
             chdir = bottle_path
 
+        share_paths_rw = [bottle_path]
+        for value in (
+            getattr(self, "arguments", ""),
+            getattr(self, "command", ""),
+        ):
+            try:
+                arguments = shlex.split(value)
+            except ValueError:
+                continue
+            for argument in arguments:
+                if (
+                    ManagerUtils.is_portal_document_path(argument)
+                    and argument not in share_paths_rw
+                ):
+                    share_paths_rw.append(argument)
+
+        hidraw_selected = any(
+            normalize_hidraw_id(value)
+            for value in self.config.Parameters.hidraw_devices
+        )
         return SandboxManager(
             envs=self.env,
             chdir=chdir,
+            clear_env=True,
             share_paths_rw=share_paths_rw,
             share_paths_ro=[p for p in share_paths_ro if p],
             share_net=self.config.Sandbox.share_net,
             share_sound=self.config.Sandbox.share_sound,
-            share_host_ro=self.config.Sandbox.share_host_ro,
-            share_gpu=self.config.Sandbox.share_gpu,
-            share_display=self.config.Sandbox.share_display,
-            share_user=self.config.Sandbox.share_user,
+            share_input=self.config.Sandbox.share_input or hidraw_selected,
+            share_usb=self.config.Sandbox.share_usb or hidraw_selected,
+            share_hidraw=hidraw_selected,
         )
 
     def run(self) -> Result[Optional[str]]:
@@ -957,6 +1190,13 @@ class WineCommand:
             # TypeError: codec is None
             logging.warning("stdout decoding failed")
             rv = str(stdout_data)[2:-1]  # trim b''
+
+        if proc.returncode:
+            return Result(
+                False,
+                data=rv,
+                message=f"Command exited with status {proc.returncode}.",
+            )
 
         # "ShellExecuteEx" exception may occur while executing command,
         # previously we rerun the command without `cwd` and `stdout=PIPE`

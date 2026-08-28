@@ -8,12 +8,15 @@ body:
       value: |
         # 🛑 STOP! READ THIS OR YOUR ISSUE WILL BE CLOSED! 🛑
 
+        ## USE A CLEAR, SPECIFIC TITLE
+        **Use at least 10 characters. Issues with shorter titles are closed automatically.**
+
         ## 🙅 NO ISSUES FOR WINDOWS PROGRAMS NOT WORKING
         **Bottles is a manager. If a program doesn't work, it's a Wine/Proton issue, NOT a Bottles bug.**
         Please visit [WineHQ](https://www.winehq.org) and [ProtonDB](https://www.protondb.com).
 
-        ## 🙅 ONLY NATIVE (NON-FLATPAK) PACKAGES SUPPORTED
-        **This fork (Bottles-Deflatpak) does NOT ship a Flatpak. We support source builds, RPM, DEB, Arch, and Nix packages only.**
+        ## 🙅 NO ISSUES FOR UNOFFICIAL PACKAGES
+        **We support the official [Flathub package](https://flathub.org/apps/details/com.usebottles.bottles) and the official [cpak package](https://github.com/Containerpak/store).**
 
         ```text
         *******************************************************************************
@@ -25,8 +28,10 @@ body:
         *  1. DO NOT OPEN ISSUES FOR WINDOWS PROGRAMS NOT WORKING IN BOTTLES!         *
         *     (This is usually a Wine/Proton problem, NOT a Bottles bug)              *
         *                                                                             *
-        *  2. DO NOT OPEN ISSUES IF YOU ARE USING THE UPSTREAM FLATPAK PACKAGE!       *
-        *     (This fork does NOT support or ship a Flatpak package)                 *
+        *  2. USE THE OFFICIAL FLATHUB OR cpak PACKAGE!                              *
+        *     (Distribution packages are not supported)                              *
+        *                                                                             *
+        *  3. USE A CLEAR, SPECIFIC TITLE WITH AT LEAST 10 CHARACTERS!                *
         *                                                                             *
         *******************************************************************************
         ```
@@ -63,15 +68,14 @@ body:
     attributes:
       label: Package
       description: |
-        How did you install Bottles-Deflatpak?
+        How did you install Bottles?
+
+        If you use Bottles from your distribution package manager, install the official [Flathub package](https://flathub.org/apps/details/com.usebottles.bottles) or [cpak package](https://github.com/Containerpak/store) and try to reproduce the bug there.
       options:
-        - Source (meson build)
-        - Arch Linux (.pkg.tar.zst / AUR)
-        - Debian / Ubuntu (.deb)
-        - Fedora / RHEL (.rpm)
-        - Nix / NixOS (Flake)
-        - Universal tarball (.tar.gz)
-        - Other
+        - Flatpak from Flathub
+        - Flatpak from Flathub Beta
+        - Flatpak from GitHub Artifacts
+        - cpak
     validations:
       required: true
 
@@ -91,7 +95,11 @@ body:
       description: |
         In Bottles, press the hamburger menu (`☰`) at the top right. Then press "About Bottles". Select "Troubleshooting", then "Debugging Information". Lastly, copy text and paste here.
 
-        If you are unable to run Bottles, then you can retrieve information by running `bottles-cli info health-check` in the terminal.
+        If you are unable to run Bottles, retrieve this information with one of these commands:
+
+        Flatpak: `flatpak run --command=bottles-cli com.usebottles.bottles info health-check`
+
+        cpak: `cpak run github.com/bottlesdevs/bottles @bottles-cli info health-check`
       render: shell
       placeholder: |
         Display:
@@ -120,7 +128,7 @@ body:
             Version: 5.16.9-200.fc35.x86_64
         Distro:
             Name: GNOME
-            Version: '"41"'
+            Version: '"41 (Flatpak runtime)"'
         Tools:
             cabextract: true
             p7zip: true
@@ -134,28 +142,28 @@ body:
     id: log
     attributes:
       label: Troubleshooting Logs
-      description: If applicable, run `bottles`, reproduce the issue and paste the logs here.
+      description: If applicable, run `flatpak run com.usebottles.bottles` or `cpak run github.com/bottlesdevs/bottles @bottles`, reproduce the issue and paste the logs here.
       render: shell
       placeholder: |
-        [Errno 2] No such file or directory: '/home/USER/.local/share/bottles/bottles/Opera-GX__185/bottle.yml'  File "/usr/share/bottles/bottles/frontend/utils/threading.py", line 61, in __target
+        [Errno 2] No such file or directory: '/home/USER/.var/app/com.usebottles.bottles/data/bottles/bottles/Opera-GX__185/bottle.yml'  File "/app/share/bottles/bottles/frontend/utils/threading.py", line 61, in __target
             result = self.task_func(*args, **kwargs)
 
-          File "/usr/share/bottles/bottles/frontend/windows/main_window.py", line 194, in get_manager
+          File "/app/share/bottles/bottles/frontend/windows/main_window.py", line 194, in get_manager
             mng = Manager(window=window, repo_fn_update=repo_fn_update)
 
-          File "/usr/share/bottles/bottles/backend/managers/manager.py", line 135, in __init__
+          File "/app/share/bottles/bottles/backend/managers/manager.py", line 135, in __init__
             times.update(self.checks(install_latest=False, first_run=True).data)
 
-          File "/usr/share/bottles/bottles/backend/managers/manager.py", line 189, in checks
+          File "/app/share/bottles/bottles/backend/managers/manager.py", line 189, in checks
             self.check_bottles()
 
-          File "/usr/share/bottles/bottles/backend/managers/manager.py", line 804, in check_bottles
+          File "/app/share/bottles/bottles/backend/managers/manager.py", line 804, in check_bottles
             process_bottle(b)
 
-          File "/usr/share/bottles/bottles/backend/managers/manager.py", line 758, in process_bottle
+          File "/app/share/bottles/bottles/backend/managers/manager.py", line 758, in process_bottle
             self.update_config(
 
-          File "/usr/share/bottles/bottles/backend/managers/manager.py", line 874, in update_config
+          File "/app/share/bottles/bottles/backend/managers/manager.py", line 874, in update_config
             with open(os.path.join(bottle_path, "bottle.yml"), "w") as conf_file
 
   - type: textarea

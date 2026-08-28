@@ -1,8 +1,11 @@
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
 bottles/backend/managers/backup.py
+bottles/backend/managers/eagle.py
+bottles/backend/managers/intel.py
 bottles/backend/managers/manager.py
 bottles/backend/managers/versioning.py
+bottles/backend/state.py
 bottles/frontend/main.py
 bottles/frontend/operation.py
 bottles/frontend/ui/about.blp
@@ -23,10 +26,12 @@ bottles/frontend/ui/dialog-drives.blp
 bottles/frontend/ui/dialog-duplicate.blp
 bottles/frontend/ui/dialog-env-vars.blp
 bottles/frontend/ui/dialog-exclusion-patterns.blp
+bottles/frontend/ui/dialog-file-associations.blp
 bottles/frontend/ui/dialog-gamescope.blp
 bottles/frontend/ui/dialog-installer.blp
 bottles/frontend/ui/dialog-journal.blp
 bottles/frontend/ui/dialog-launch-options.blp
+bottles/frontend/ui/dialog-lsfg-vk.blp
 bottles/frontend/ui/dialog-proton-alert.blp
 bottles/frontend/ui/dialog-rename.blp
 bottles/frontend/ui/dialog-run-args.blp
@@ -54,10 +59,15 @@ bottles/frontend/ui/program-entry.blp
 bottles/frontend/ui/state-entry.blp
 bottles/frontend/ui/task-entry.blp
 bottles/frontend/ui/window.blp
+bottles/frontend/utils/autostart.py
+bottles/frontend/utils/common.py
+bottles/frontend/utils/flatpak.py
+bottles/frontend/views/bottle_dependencies.py
 bottles/frontend/views/bottle_details.py
 bottles/frontend/views/bottle_preferences.py
 bottles/frontend/views/bottle_versioning.py
 bottles/frontend/views/details.py
+bottles/frontend/views/eagle.py
 bottles/frontend/views/importer.py
 bottles/frontend/views/list.py
 bottles/frontend/views/loading.py
@@ -71,14 +81,18 @@ bottles/frontend/widgets/library.py
 bottles/frontend/widgets/program.py
 bottles/frontend/widgets/state.py
 bottles/frontend/windows/crash.py
+bottles/frontend/windows/dependency_install.py
 bottles/frontend/windows/display.py
 bottles/frontend/windows/dlloverrides.py
 bottles/frontend/windows/drives.py
+bottles/frontend/windows/eagleintel.py
 bottles/frontend/windows/envvars.py
 bottles/frontend/windows/exclusionpatterns.py
+bottles/frontend/windows/fileassociations.py
 bottles/frontend/windows/generic.py
 bottles/frontend/windows/installer.py
 bottles/frontend/windows/launchoptions.py
+bottles/frontend/windows/lsfgvk.py
 bottles/frontend/windows/main_window.py
 bottles/frontend/windows/vkbasalt.py
 data/com.usebottles.bottles.desktop.in.in

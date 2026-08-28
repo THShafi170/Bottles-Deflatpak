@@ -1,12 +1,22 @@
 using Gtk 4.0;
 using Adw 1;
 
-template $DriveEntry: Adw.ActionRow {
+template $DriveEntry: Adw.EntryRow {
   title: "C:";
-  subtitle: _("/point/to/path");
+  show-apply-button: true;
 
   Box {
     spacing: 6;
+
+    Button btn_eject {
+      valign: center;
+      tooltip-text: _("Eject");
+      icon-name: "media-eject-symbolic";
+
+      styles [
+        "flat",
+      ]
+    }
 
     Button btn_remove {
       valign: center;

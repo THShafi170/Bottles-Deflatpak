@@ -30,6 +30,9 @@ except (ImportError, ValueError):
 from bottles.backend.globals import (
     gamemode_available,
     gamescope_available,
+    hdr_wsi_available,
+    is_cpak,
+    lsfg_vk_available,
     mangohud_available,
     obs_vkc_available,
     sandbox_available,
@@ -50,7 +53,9 @@ from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.steam import SteamUtils
 from bottles.backend.utils.threading import RunAsync
 from bottles.backend.utils.vulkan import VulkanUtils
+from bottles.backend.wine.adaptive import is_supported_runner
 from bottles.backend.wine.regkeys import RegKeys
+from bottles.frontend.utils.common import format_runner_name
 from bottles.frontend.utils.gtk import GtkUtils
 from bottles.frontend.windows.display import DisplayDialog
 from bottles.frontend.windows.dlloverrides import DLLOverridesDialog
@@ -58,6 +63,7 @@ from bottles.frontend.windows.drives import DrivesDialog
 from bottles.frontend.windows.envvars import EnvironmentVariablesDialog
 from bottles.frontend.windows.exclusionpatterns import ExclusionPatternsDialog
 from bottles.frontend.windows.gamescope import GamescopeDialog
+from bottles.frontend.windows.lsfgvk import LsfgVkDialog
 from bottles.frontend.windows.mangohud import MangoHudDialog
 from bottles.frontend.windows.protonalert import ProtonAlertDialog
 from bottles.frontend.windows.sandbox import SandboxDialog
@@ -65,6 +71,15 @@ from bottles.frontend.windows.vkbasalt import VkBasaltDialog
 from bottles.frontend.windows.vmtouch import VmtouchDialog
 
 logging = Logger()
+
+FLATPAK_INSTALL_COMMANDS = {
+    "gamescope": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope//25.08",
+    "hdr": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.HdrWsi//25.08",
+    "vkbasalt": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.vkBasalt//25.08",
+    "lsfg_vk": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.lsfgvk//25.08",
+    "mangohud": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.MangoHud//25.08",
+    "obsvkc": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.OBSVkCapture//25.08",
+}
 
 
 # noinspection PyUnusedLocal
@@ -75,6 +90,7 @@ class PreferencesView(Adw.PreferencesPage):
     # region Widgets
     btn_manage_gamescope = Gtk.Template.Child()
     btn_manage_vkbasalt = Gtk.Template.Child()
+    btn_manage_lsfg_vk = Gtk.Template.Child()
     btn_manage_mangohud = Gtk.Template.Child()
     btn_manage_sandbox = Gtk.Template.Child()
     btn_manage_versioning_patterns = Gtk.Template.Child()
@@ -84,12 +100,15 @@ class PreferencesView(Adw.PreferencesPage):
     row_nvapi = Gtk.Template.Child()
     row_discrete = Gtk.Template.Child()
     row_vkbasalt = Gtk.Template.Child()
+    row_lsfg_vk = Gtk.Template.Child()
     row_gamescope = Gtk.Template.Child()
     row_mangohud = Gtk.Template.Child()
     row_gamemode = Gtk.Template.Child()
     row_vmtouch = Gtk.Template.Child()
+    row_adaptive_launch = Gtk.Template.Child()
     row_obsvkc = Gtk.Template.Child()
     row_wayland = Gtk.Template.Child()
+    row_hdr = Gtk.Template.Child()
     row_winebridge = Gtk.Template.Child()
     row_umu = Gtk.Template.Child()
     row_proton_scripts = Gtk.Template.Child()
@@ -107,7 +126,9 @@ class PreferencesView(Adw.PreferencesPage):
     switch_mangohud = Gtk.Template.Child()
     switch_obsvkc = Gtk.Template.Child()
     switch_vkbasalt = Gtk.Template.Child()
+    switch_lsfg_vk = Gtk.Template.Child()
     switch_wayland = Gtk.Template.Child()
+    switch_hdr = Gtk.Template.Child()
     switch_winebridge = Gtk.Template.Child()
     switch_nvapi = Gtk.Template.Child()
     switch_umu = Gtk.Template.Child()
@@ -123,7 +144,9 @@ class PreferencesView(Adw.PreferencesPage):
     switch_auto_versioning = Gtk.Template.Child()
     switch_versioning_patterns = Gtk.Template.Child()
     switch_vmtouch = Gtk.Template.Child()
+    switch_adaptive_launch = Gtk.Template.Child()
     combo_runner = Gtk.Template.Child()
+    combo_d7vk = Gtk.Template.Child()
     combo_dxvk = Gtk.Template.Child()
     combo_vkd3d = Gtk.Template.Child()
     combo_nvapi = Gtk.Template.Child()
@@ -131,6 +154,8 @@ class PreferencesView(Adw.PreferencesPage):
     combo_windows = Gtk.Template.Child()
     combo_language = Gtk.Template.Child()
     combo_sync = Gtk.Template.Child()
+    spin_frame_rate_limit = Gtk.Template.Child()
+    spinner_d7vk = Gtk.Template.Child()
     spinner_dxvk = Gtk.Template.Child()
     spinner_vkd3d = Gtk.Template.Child()
     spinner_nvapi = Gtk.Template.Child()
@@ -142,6 +167,7 @@ class PreferencesView(Adw.PreferencesPage):
     group_details = Gtk.Template.Child()
     str_list_languages = Gtk.Template.Child()
     str_list_runner = Gtk.Template.Child()
+    str_list_d7vk = Gtk.Template.Child()
     str_list_dxvk = Gtk.Template.Child()
     str_list_vkd3d = Gtk.Template.Child()
     str_list_nvapi = Gtk.Template.Child()
@@ -159,6 +185,35 @@ class PreferencesView(Adw.PreferencesPage):
         self.config = config
         self.queue = details.queue
         self.details = details
+        self.combo_runner.set_list_factory(
+            GtkUtils.create_full_width_string_list_factory()
+        )
+
+        steam_runtimes = RuntimeManager.get_runtimes("steam")
+        self.row_steam_runtime.set_visible(True)
+        self.switch_steam_runtime.set_sensitive(bool(steam_runtimes))
+        if steam_runtimes:
+            self.switch_steam_runtime.connect(
+                "state-set", self.__toggle_feature_cb, "use_steam_runtime"
+            )
+        else:
+            self.row_steam_runtime.set_subtitle(
+                _(
+                    "Steam Runtime was not detected. Install it or grant Bottles "
+                    "access to Steam files, then restart Bottles."
+                )
+            )
+
+        if not is_cpak() and not Xdp.Portal.running_under_sandbox():
+            return
+
+        _not_available = _("This feature is unavailable on your system.")
+        _flatpak_not_available = _("{} To add this feature, please run").format(
+            _not_available
+        )
+        self._install_commands = FLATPAK_INSTALL_COMMANDS
+
+        is_flatpak = "FLATPAK_ID" in os.environ
 
         if not gamemode_available:
             self.switch_gamemode.set_tooltip_text(
@@ -179,6 +234,19 @@ class PreferencesView(Adw.PreferencesPage):
             )
             self.switch_vkbasalt.set_sensitive(False)
             self.btn_manage_vkbasalt.set_sensitive(False)
+
+        if not lsfg_vk_available:
+            _lsfg_vk_command = self._install_commands.get("lsfg_vk")
+            _lsfg_vk_not_available = (
+                f"{_flatpak_not_available} {_lsfg_vk_command}"
+                if is_flatpak
+                else _not_available
+            )
+            self.switch_lsfg_vk.set_tooltip_text(_lsfg_vk_not_available)
+            self.btn_manage_lsfg_vk.set_tooltip_text(_lsfg_vk_not_available)
+            self.__add_unavailable_indicator(
+                self.row_lsfg_vk, _lsfg_vk_command if is_flatpak else None
+            )
 
         if not mangohud_available:
             self.switch_mangohud.set_tooltip_text(
@@ -208,6 +276,17 @@ class PreferencesView(Adw.PreferencesPage):
                 _("This feature is unavailable on your system.")
             )
 
+        is_nvidia_gpu = GPUUtils.is_gpu(GPUVendors.NVIDIA)
+        if is_flatpak and is_nvidia_gpu and not hdr_wsi_available:
+            _hdr_command = self._install_commands.get("hdr")
+            _hdr_message = _(
+                "Older NVIDIA drivers require HdrWsi and ENABLE_HDR_WSI=1 for HDR."
+            )
+            self.switch_hdr.set_tooltip_text(_hdr_message)
+            self.__add_unavailable_indicator(
+                self.row_hdr, _hdr_command, message=_hdr_message
+            )
+
         # region signals
         self.row_manage_display.connect("activated", self.__show_display_settings)
         self.row_overrides.connect(
@@ -222,6 +301,9 @@ class PreferencesView(Adw.PreferencesPage):
         )
         self.btn_manage_vkbasalt.connect(
             "clicked", self.__show_feature_dialog, VkBasaltDialog
+        )
+        self.btn_manage_lsfg_vk.connect(
+            "clicked", self.__show_feature_dialog, LsfgVkDialog
         )
         self.btn_manage_mangohud.connect(
             "clicked", self.__show_feature_dialog, MangoHudDialog
@@ -240,7 +322,9 @@ class PreferencesView(Adw.PreferencesPage):
         self.switch_mangohud.connect("state-set", self.__toggle_feature_cb, "mangohud")
         self.switch_obsvkc.connect("state-set", self.__toggle_feature_cb, "obsvkc")
         self.switch_vkbasalt.connect("state-set", self.__toggle_feature_cb, "vkbasalt")
+        self.switch_lsfg_vk.connect("state-set", self.__toggle_feature_cb, "lsfg_vk")
         self.switch_wayland.connect("state-set", self.__toggle_wayland)
+        self.switch_hdr.connect("state-set", self.__toggle_hdr)
         self.switch_winebridge.connect(
             "state-set", self.__toggle_feature_cb, "winebridge"
         )
@@ -253,9 +337,7 @@ class PreferencesView(Adw.PreferencesPage):
             "state-set", self.__toggle_feature_cb, "proton_log"
         )
         self.switch_gamemode.connect("state-set", self.__toggle_feature_cb, "gamemode")
-        self.switch_gamescope.connect(
-            "state-set", self.__toggle_feature_cb, "gamescope"
-        )
+        self.switch_gamescope.connect("state-set", self.__toggle_gamescope)
         self.switch_sandbox.connect("state-set", self.__toggle_feature_cb, "sandbox")
         self.switch_discrete.connect(
             "state-set", self.__toggle_feature_cb, "discrete_gpu"
@@ -270,7 +352,11 @@ class PreferencesView(Adw.PreferencesPage):
             "state-set", self.__toggle_feature_cb, "versioning_exclusion_patterns"
         )
         self.switch_vmtouch.connect("state-set", self.__toggle_feature_cb, "vmtouch")
+        self.switch_adaptive_launch.connect(
+            "state-set", self.__toggle_feature_cb, "adaptive_launch"
+        )
         self.combo_runner.connect("notify::selected", self.__set_runner)
+        self.combo_d7vk.connect("notify::selected", self.__set_d7vk)
         self.combo_dxvk.connect("notify::selected", self.__set_dxvk)
         self.combo_vkd3d.connect("notify::selected", self.__set_vkd3d)
         self.combo_nvapi.connect("notify::selected", self.__set_nvapi)
@@ -278,20 +364,16 @@ class PreferencesView(Adw.PreferencesPage):
         self.combo_windows.connect("notify::selected", self.__set_windows)
         self.combo_language.connect("notify::selected-item", self.__set_language)
         self.combo_sync.connect("notify::selected", self.__set_sync_type)
+        self.spin_frame_rate_limit.connect(
+            "notify::value", self.__set_frame_rate_limit
+        )
         self.entry_name.connect("changed", self.__check_entry_name)
         self.entry_name.connect("apply", self.__save_name)
         # endregion
 
         """Set DXVK_NVAPI related rows to visible when an NVIDIA GPU is detected (invisible by default)"""
-        is_nvidia_gpu = GPUUtils.is_gpu(GPUVendors.NVIDIA)
         self.row_nvapi.set_visible(is_nvidia_gpu)
         self.combo_nvapi.set_visible(is_nvidia_gpu)
-
-        if RuntimeManager.get_runtimes("steam"):
-            self.row_steam_runtime.set_visible(True)
-            self.switch_steam_runtime.connect(
-                "state-set", self.__toggle_feature_cb, "use_steam_runtime"
-            )
 
         """Toggle some utilities according to its availability"""
         self.switch_gamemode.set_sensitive(gamemode_available)
@@ -299,14 +381,24 @@ class PreferencesView(Adw.PreferencesPage):
         self.btn_manage_gamescope.set_sensitive(gamescope_available)
         self.switch_vkbasalt.set_sensitive(vkbasalt_available)
         self.btn_manage_vkbasalt.set_sensitive(vkbasalt_available)
+        _lsfg_vk_supported = lsfg_vk_available and config.Arch != Arch.WIN32
+        self.switch_lsfg_vk.set_sensitive(_lsfg_vk_supported)
+        self.btn_manage_lsfg_vk.set_sensitive(_lsfg_vk_supported)
+        if config.Arch == Arch.WIN32:
+            _lsfg_vk_64_bit_only = _(
+                "lsfg-vk only supports 64-bit Vulkan applications."
+            )
+            self.switch_lsfg_vk.set_tooltip_text(_lsfg_vk_64_bit_only)
+            self.btn_manage_lsfg_vk.set_tooltip_text(_lsfg_vk_64_bit_only)
         self.switch_mangohud.set_sensitive(mangohud_available)
         self.btn_manage_mangohud.set_sensitive(mangohud_available)
         self.switch_obsvkc.set_sensitive(obs_vkc_available)
         self.switch_vmtouch.set_sensitive(vmtouch_available)
-        self.switch_sandbox.set_sensitive(sandbox_available)
-        self.btn_manage_sandbox.set_sensitive(sandbox_available)
+        self.__update_adaptive_launch_support()
 
-        if not VulkanUtils.check_support():
+        vulkan_supported = VulkanUtils.check_support()
+        if not vulkan_supported:
+            self.combo_d7vk.set_sensitive(False)
             self.combo_dxvk.set_sensitive(False)
             self.combo_vkd3d.set_sensitive(False)
             self.combo_nvapi.set_sensitive(False)
@@ -314,12 +406,17 @@ class PreferencesView(Adw.PreferencesPage):
             self.combo_latencyflex.set_sensitive(False)
             self.switch_vkbasalt.set_sensitive(False)
             self.btn_manage_vkbasalt.set_sensitive(False)
+            self.switch_lsfg_vk.set_sensitive(False)
+            self.btn_manage_lsfg_vk.set_sensitive(False)
             self.switch_obsvkc.set_sensitive(False)
 
         is_wayland_session = DisplayUtils.display_server_type() == "wayland"
         self.switch_wayland.set_sensitive(is_wayland_session)
+        self.__update_hdr_sensitivity()
 
-    def __create_unavailable_popover(self, command: str | None) -> Gtk.Popover:
+    def __create_unavailable_popover(
+        self, command: str | None, message: str | None = None
+    ) -> Gtk.Popover:
         popover = Gtk.Popover()
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_top(6)
@@ -328,7 +425,7 @@ class PreferencesView(Adw.PreferencesPage):
         box.set_margin_end(6)
 
         unavailable_label = Gtk.Label(
-            label=_("This feature is unavailable on your system."),
+            label=message or _("This feature is unavailable on your system."),
             xalign=0,
             wrap=True,
         )
@@ -364,19 +461,27 @@ class PreferencesView(Adw.PreferencesPage):
         popover.set_child(box)
         return popover
 
-    def __add_unavailable_indicator(self, row: Adw.ActionRow, command: str | None):
+    def __add_unavailable_indicator(
+        self,
+        row: Adw.ActionRow,
+        command: str | None,
+        message: str | None = None,
+    ):
         if not row:
             return
 
-        popover = self.__create_unavailable_popover(command)
+        popover = self.__create_unavailable_popover(command, message)
         menu_button = Gtk.MenuButton()
         menu_button.set_valign(Gtk.Align.CENTER)
         menu_button.set_icon_name("dialog-warning-symbolic")
         menu_button.set_has_frame(False)
         menu_button.set_popover(popover)
-        menu_button.set_tooltip_text(_("This feature is unavailable on your system."))
+        menu_button.set_tooltip_text(
+            message or _("This feature is unavailable on your system.")
+        )
 
         row.add_suffix(menu_button)
+        return menu_button
 
     def __copy_command_to_clipboard(self, _widget, command: str):
         display = Gdk.Display.get_default()
@@ -411,7 +516,7 @@ class PreferencesView(Adw.PreferencesPage):
         entries = library_manager.get_library()
 
         for uuid, entry in entries.items():
-            bottle = entry.get("bottle")
+            bottle = entry.get("bottle") or {}
             if bottle.get("name") == old_name:
                 logging.info(f"Updating library entry for {entry.get('name')}")
                 entries[uuid]["bottle"]["name"] = new_name
@@ -476,6 +581,7 @@ class PreferencesView(Adw.PreferencesPage):
         bottle configuration to be updated during the process.
         """
         self.combo_runner.handler_block_by_func(self.__set_runner)
+        self.combo_d7vk.handler_block_by_func(self.__set_d7vk)
         self.combo_dxvk.handler_block_by_func(self.__set_dxvk)
         self.combo_vkd3d.handler_block_by_func(self.__set_vkd3d)
         self.combo_nvapi.handler_block_by_func(self.__set_nvapi)
@@ -485,6 +591,7 @@ class PreferencesView(Adw.PreferencesPage):
 
         for string_list in [
             self.str_list_runner,
+            self.str_list_d7vk,
             self.str_list_dxvk,
             self.str_list_vkd3d,
             self.str_list_nvapi,
@@ -494,20 +601,21 @@ class PreferencesView(Adw.PreferencesPage):
         ]:
             string_list.splice(0, string_list.get_n_items())
 
-        self.str_list_dxvk.append("Disabled")
-        self.str_list_vkd3d.append("Disabled")
-        self.str_list_latencyflex.append("Disabled")
+        self.str_list_d7vk.append(_("Disabled"))
+        self.str_list_dxvk.append(_("Disabled"))
+        self.str_list_vkd3d.append(_("Disabled"))
+        self.str_list_latencyflex.append(_("Disabled"))
+        for d7vk in self.manager.d7vk_available:
+            self.str_list_d7vk.append(d7vk)
+
         for index, dxvk in enumerate(self.manager.dxvk_available):
             self.str_list_dxvk.append(dxvk)
 
         for index, vkd3d in enumerate(self.manager.vkd3d_available):
             self.str_list_vkd3d.append(vkd3d)
 
-        for runner in self.manager.runners_available:
-            _runner = runner
-            if runner.startswith("/"):
-                _runner = f"{os.path.basename(runner.strip('/'))} (Steam)"
-            self.str_list_runner.append(_runner)
+        for index, runner in enumerate(self.manager.runners_available):
+            self.str_list_runner.append(format_runner_name(runner))
 
         for index, nvapi in enumerate(self.manager.nvapi_available):
             self.str_list_nvapi.append(nvapi)
@@ -519,6 +627,7 @@ class PreferencesView(Adw.PreferencesPage):
             self.str_list_languages.append(lang)
 
         self.combo_runner.handler_unblock_by_func(self.__set_runner)
+        self.combo_d7vk.handler_unblock_by_func(self.__set_d7vk)
         self.combo_dxvk.handler_unblock_by_func(self.__set_dxvk)
         self.combo_vkd3d.handler_unblock_by_func(self.__set_vkd3d)
         self.combo_nvapi.handler_unblock_by_func(self.__set_nvapi)
@@ -535,14 +644,17 @@ class PreferencesView(Adw.PreferencesPage):
         self.switch_mangohud.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_nvapi.handler_block_by_func(self.__toggle_nvapi)
         self.switch_vkbasalt.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_lsfg_vk.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_wayland.handler_block_by_func(self.__toggle_wayland)
+        self.switch_hdr.handler_block_by_func(self.__toggle_hdr)
         self.switch_winebridge.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_obsvkc.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_umu.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_proton_scripts.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_proton_log.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_gamemode.handler_block_by_func(self.__toggle_feature_cb)
-        self.switch_gamescope.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_adaptive_launch.handler_block_by_func(self.__toggle_feature_cb)
+        self.switch_gamescope.handler_block_by_func(self.__toggle_gamescope)
         self.switch_sandbox.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_discrete.handler_block_by_func(self.__toggle_feature_cb)
         self.switch_versioning_compression.handler_block_by_func(
@@ -553,17 +665,28 @@ class PreferencesView(Adw.PreferencesPage):
         with contextlib.suppress(TypeError):
             self.switch_steam_runtime.handler_block_by_func(self.__toggle_feature_cb)
         self.combo_runner.handler_block_by_func(self.__set_runner)
+        self.combo_d7vk.handler_block_by_func(self.__set_d7vk)
         self.combo_dxvk.handler_block_by_func(self.__set_dxvk)
         self.combo_vkd3d.handler_block_by_func(self.__set_vkd3d)
         self.combo_nvapi.handler_block_by_func(self.__set_nvapi)
         self.combo_latencyflex.handler_block_by_func(self.__set_latencyflex)
         self.combo_windows.handler_block_by_func(self.__set_windows)
         self.combo_language.handler_block_by_func(self.__set_language)
-        self.combo_sync.handler_block_by_func(self.__set_sync_type)
+        self.spin_frame_rate_limit.handler_block_by_func(self.__set_frame_rate_limit)
         self.switch_mangohud.set_active(parameters.mangohud)
         self.switch_obsvkc.set_active(parameters.obsvkc)
         self.switch_vkbasalt.set_active(parameters.vkbasalt)
+        self.switch_lsfg_vk.set_active(parameters.lsfg_vk)
+        _lsfg_vk_supported = (
+            lsfg_vk_available
+            and config.Arch != Arch.WIN32
+            and VulkanUtils.check_support()
+        )
+        self.switch_lsfg_vk.set_sensitive(_lsfg_vk_supported)
+        self.btn_manage_lsfg_vk.set_sensitive(_lsfg_vk_supported)
         self.switch_wayland.set_active(parameters.wayland)
+        self.switch_hdr.set_active(parameters.hdr)
+        self.__update_hdr_sensitivity(parameters.hdr)
         self.switch_winebridge.set_active(parameters.winebridge)
         self.switch_nvapi.set_active(parameters.dxvk_nvapi)
         self.switch_umu.set_active(parameters.use_umu)
@@ -579,6 +702,8 @@ class PreferencesView(Adw.PreferencesPage):
         )
         self.switch_steam_runtime.set_active(parameters.use_steam_runtime)
         self.switch_vmtouch.set_active(parameters.vmtouch)
+        self.switch_adaptive_launch.set_active(parameters.adaptive_launch)
+        self.spin_frame_rate_limit.set_value(parameters.frame_rate_limit)
 
         # self.toggle_sync.set_active(parameters["sync"] == "wine")
         # self.toggle_esync.set_active(parameters["sync"] == "esync")
@@ -626,6 +751,15 @@ class PreferencesView(Adw.PreferencesPage):
         # endregion
 
         parameters = self.config.Parameters
+
+        _d7vk = self.config.D7VK
+        if parameters.d7vk:
+            if _d7vk in self.manager.d7vk_available:
+                self.combo_d7vk.set_selected(
+                    self.manager.d7vk_available.index(_d7vk) + 1
+                )
+        else:
+            self.combo_d7vk.set_selected(0)
 
         _dxvk = self.config.DXVK
         if parameters.dxvk:
@@ -686,14 +820,17 @@ class PreferencesView(Adw.PreferencesPage):
         self.switch_mangohud.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_nvapi.handler_unblock_by_func(self.__toggle_nvapi)
         self.switch_vkbasalt.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_lsfg_vk.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_wayland.handler_unblock_by_func(self.__toggle_wayland)
+        self.switch_hdr.handler_unblock_by_func(self.__toggle_hdr)
         self.switch_winebridge.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_obsvkc.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_umu.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_proton_scripts.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_proton_log.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_gamemode.handler_unblock_by_func(self.__toggle_feature_cb)
-        self.switch_gamescope.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_adaptive_launch.handler_unblock_by_func(self.__toggle_feature_cb)
+        self.switch_gamescope.handler_unblock_by_func(self.__toggle_gamescope)
         self.switch_sandbox.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_discrete.handler_unblock_by_func(self.__toggle_feature_cb)
         self.switch_versioning_compression.handler_unblock_by_func(
@@ -706,15 +843,35 @@ class PreferencesView(Adw.PreferencesPage):
         with contextlib.suppress(TypeError):
             self.switch_steam_runtime.handler_unblock_by_func(self.__toggle_feature_cb)
         self.combo_runner.handler_unblock_by_func(self.__set_runner)
+        self.combo_d7vk.handler_unblock_by_func(self.__set_d7vk)
         self.combo_dxvk.handler_unblock_by_func(self.__set_dxvk)
         self.combo_vkd3d.handler_unblock_by_func(self.__set_vkd3d)
         self.combo_nvapi.handler_unblock_by_func(self.__set_nvapi)
         self.combo_latencyflex.handler_unblock_by_func(self.__set_latencyflex)
         self.combo_windows.handler_unblock_by_func(self.__set_windows)
         self.combo_language.handler_unblock_by_func(self.__set_language)
-        self.combo_sync.handler_unblock_by_func(self.__set_sync_type)
+        self.spin_frame_rate_limit.handler_unblock_by_func(self.__set_frame_rate_limit)
 
         self.__set_steam_rules()
+        self.__update_adaptive_launch_support()
+
+    def __update_adaptive_launch_support(self) -> None:
+        supported = is_supported_runner(self.config.Runner)
+        message = (
+            ""
+            if supported
+            else _("Soda 11.0-5 or newer is required to enable Adaptive Launch.")
+        )
+        if not hasattr(self, "_adaptive_launch_warning"):
+            self._adaptive_launch_warning = self.__add_unavailable_indicator(
+                self.row_adaptive_launch,
+                None,
+                _("Soda 11.0-5 or newer is required to enable Adaptive Launch."),
+            )
+        self._adaptive_launch_warning.set_visible(not supported)
+        self.switch_adaptive_launch.set_sensitive(supported)
+        self.switch_adaptive_launch.set_tooltip_text(message)
+        self.row_adaptive_launch.set_tooltip_text(message)
 
     def __show_display_settings(self, widget):
         new_window = DisplayDialog(
@@ -743,8 +900,34 @@ class PreferencesView(Adw.PreferencesPage):
 
     def __toggle_wayland(self, _widget: Gtk.Widget, state: bool) -> None:
         self.__toggle_feature(state=state, key="wayland")
+        self.__update_hdr_sensitivity()
         rk = RegKeys(self.config)
         RunAsync(rk.toggle_wayland_driver, state=state)
+
+    def __toggle_hdr(self, _widget: Gtk.Widget, state: bool) -> None:
+        self.__toggle_feature(state=state, key="hdr")
+        self.__update_hdr_sensitivity(state)
+
+    def __toggle_gamescope(self, _widget: Gtk.Widget, state: bool) -> None:
+        self.__toggle_feature(state=state, key="gamescope")
+        self.__update_hdr_sensitivity()
+
+    def __update_hdr_sensitivity(self, active: bool | None = None) -> None:
+        if active is None:
+            active = self.config.Parameters.hdr
+        self.switch_hdr.set_sensitive(
+            active
+            or (
+                VulkanUtils.check_support()
+                and (
+                    (
+                        DisplayUtils.display_server_type() == "wayland"
+                        and self.config.Parameters.wayland
+                    )
+                    or (gamescope_available and self.config.Parameters.gamescope)
+                )
+            )
+        )
 
     def __set_sync_type(self, *_args):
         """
@@ -767,6 +950,18 @@ class PreferencesView(Adw.PreferencesPage):
         )
         self.combo_sync.set_sensitive(True)
         self.queue.end_task()
+
+    def __set_frame_rate_limit(self, spin_row, _pspec):
+        value = int(spin_row.get_value())
+        if value == self.config.Parameters.frame_rate_limit:
+            return
+
+        self.config = self.manager.update_config(
+            config=self.config,
+            key="frame_rate_limit",
+            value=value,
+            scope="Parameters",
+        ).data["config"]
 
     def __toggle_nvapi(self, widget=False, state=False):
         """Install/Uninstall NVAPI from the bottle"""
@@ -822,6 +1017,7 @@ class PreferencesView(Adw.PreferencesPage):
             for w in [
                 self.combo_runner,
                 self.switch_nvapi,
+                self.combo_d7vk,
                 self.combo_dxvk,
                 self.combo_nvapi,
                 self.combo_vkd3d,
@@ -843,6 +1039,7 @@ class PreferencesView(Adw.PreferencesPage):
 
                 if "config" in result.data:
                     self.config = result.data["config"]
+                self.__update_adaptive_launch_support()
                 if self.config.Parameters.use_steam_runtime:
                     self.switch_steam_runtime.handler_block_by_func(
                         self.__toggle_feature_cb
@@ -856,7 +1053,6 @@ class PreferencesView(Adw.PreferencesPage):
             self.__update_proton_visibility()
             self.queue.end_task()
 
-        set_widgets_status(False)
         runner = self.manager.runners_available[self.combo_runner.get_selected()]
 
         def run_task(status=True):
@@ -875,11 +1071,48 @@ class PreferencesView(Adw.PreferencesPage):
                 runner=runner,
             )
 
-        if re.search("^(GE-)?Proton", runner):
-            dialog = ProtonAlertDialog(self.window, run_task)
-            dialog.show()
-        else:
-            run_task()
+        def apply_runner():
+            set_widgets_status(False)
+            if re.search("^(GE-)?Proton", runner):
+                dialog = ProtonAlertDialog(self.window, run_task)
+                dialog.show()
+            else:
+                run_task()
+
+        if self.config.Parameters.hidraw_devices and "soda" not in runner.lower():
+            dialog = Adw.MessageDialog.new(
+                self.window,
+                _("HIDRAW support is not guaranteed"),
+                _(
+                    "Selective HIDRAW access is tested with Soda. The new "
+                    "runner may ignore it or behave differently. Continue anyway?"
+                ),
+            )
+            dialog.add_response("cancel", _("_Cancel"))
+            dialog.add_response("continue", _("_Continue"))
+            dialog.set_response_appearance(
+                "continue", Adw.ResponseAppearance.SUGGESTED
+            )
+            dialog.set_default_response("cancel")
+            dialog.set_close_response("cancel")
+
+            def on_response(_dialog, response):
+                if response == "continue":
+                    apply_runner()
+                    return
+
+                self.combo_runner.handler_block_by_func(self.__set_runner)
+                if self.config.Runner in self.manager.runners_available:
+                    self.combo_runner.set_selected(
+                        self.manager.runners_available.index(self.config.Runner)
+                    )
+                self.combo_runner.handler_unblock_by_func(self.__set_runner)
+
+            dialog.connect("response", on_response)
+            dialog.present()
+            return
+
+        apply_runner()
 
     def __dll_component_task_func(self, *args, **kwargs):
         # Remove old version
@@ -889,6 +1122,20 @@ class PreferencesView(Adw.PreferencesPage):
         # Install new version
         self.manager.install_dll_component(
             config=kwargs["config"], component=kwargs["component"]
+        )
+
+    def __set_d7vk(self, *_args):
+        """Set the D7VK version to use for the bottle"""
+        self.set_d7vk_status(pending=True)
+        self.queue.add_task()
+        selected = self.combo_d7vk.get_selected()
+        version = self.manager.d7vk_available[selected - 1] if selected else None
+        RunAsync(
+            task_func=self.manager.set_d7vk,
+            callback=self.set_d7vk_status,
+            config=self.config,
+            enabled=selected != 0,
+            version=version,
         )
 
     def __set_dxvk(self, *_args):
@@ -1073,6 +1320,30 @@ class PreferencesView(Adw.PreferencesPage):
         else:
             self.spinner_dxvk.stop()
             self.spinner_dxvk.set_visible(False)
+            self.queue.end_task()
+
+    @GtkUtils.run_in_main_loop
+    def set_d7vk_status(self, status=None, error=None, pending=False):
+        """Set the D7VK status"""
+        self.combo_d7vk.set_sensitive(not pending)
+        if pending:
+            self.spinner_d7vk.start()
+            self.spinner_d7vk.set_visible(True)
+        else:
+            if isinstance(status, Result) and status.ok and status.data:
+                self.config = status.data["config"]
+            elif error or not isinstance(status, Result) or not status.ok:
+                self.combo_d7vk.handler_block_by_func(self.__set_d7vk)
+                selected = 0
+                if (
+                    self.config.Parameters.d7vk
+                    and self.config.D7VK in self.manager.d7vk_available
+                ):
+                    selected = self.manager.d7vk_available.index(self.config.D7VK) + 1
+                self.combo_d7vk.set_selected(selected)
+                self.combo_d7vk.handler_unblock_by_func(self.__set_d7vk)
+            self.spinner_d7vk.stop()
+            self.spinner_d7vk.set_visible(False)
             self.queue.end_task()
 
     @GtkUtils.run_in_main_loop

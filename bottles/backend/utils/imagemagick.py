@@ -35,12 +35,9 @@ class ImageMagickUtils:
         return True
 
     def list_assets(self):
-        cmd = f"identify '{self.path}'"
-
         try:
-            res = subprocess.check_output(["bash", "-c", cmd])
-        except Exception as e:
-            logging.error(f"Could not list assets for {self.path}: {e}")
+            res = subprocess.check_output(["magick", "identify", self.path])
+        except:
             return []
 
         assets = []
@@ -68,7 +65,7 @@ class ImageMagickUtils:
 
         assets = self.list_assets()
         asset_index = -1
-        cmd = f"convert '{self.path}'"
+        source = self.path
 
         if asset_size not in assets:
             if not fallback:
@@ -80,13 +77,14 @@ class ImageMagickUtils:
             asset_index = assets.index(asset_size)
 
         if asset_index != -1:
-            cmd = f"convert '{self.path}[{asset_index}]'"
+            source = f"{self.path}[{asset_index}]"
+        cmd = ["magick", source]
         if resize > 0:
-            cmd += f" -thumbnail {resize}x{resize}"
+            cmd.extend(["-thumbnail", f"{resize}x{resize}"])
         if alpha:
-            cmd += " -alpha on -background none"
+            cmd.extend(["-alpha", "on", "-background", "none"])
         if flatten:
-            cmd += " -flatten"
+            cmd.append("-flatten")
 
-        cmd += f" '{dest}'"
-        subprocess.run(["bash", "-c", cmd])
+        cmd.append(dest)
+        subprocess.run(cmd, check=False)

@@ -15,7 +15,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from gi.repository import Gio
+import os
+import webbrowser
+from gettext import gettext as _
+
+
+def format_runner_name(runner: str) -> str:
+    if "FLATPAK_ID" in os.environ and runner.startswith("sys-wine-"):
+        version = runner.removeprefix("sys-wine-")
+        return _("Built-in Wine {version}").format(version=version)
+    return runner
+
+
+def get_runner_icon_name(runner: str) -> str | None:
+    runner = runner.lower()
+    for prefix, icon_name in (
+        ("protosoda", "protosoda-runner"),
+        ("vaniglia", "vaniglia-runner"),
+        ("caffe", "caffe-runner"),
+        ("soda", "soda-runner"),
+    ):
+        if runner == prefix or runner.startswith(f"{prefix}-"):
+            return icon_name
+    return None
 
 
 def open_doc_url(widget, page):

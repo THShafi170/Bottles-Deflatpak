@@ -34,6 +34,7 @@ class DependencyEntry(Adw.ActionRow):
 
     # region Widgets
     label_category = Gtk.Template.Child()
+    check_select = Gtk.Template.Child()
     btn_install = Gtk.Template.Child()
     btn_reinstall = Gtk.Template.Child()
     btn_remove = Gtk.Template.Child()
@@ -61,7 +62,7 @@ class DependencyEntry(Adw.ActionRow):
             If the dependency is plain, treat it as a placeholder, it
             can be used to display "fake" elements on the list
             """
-            self.set_title(dependency)
+            self.set_title(dependency[0])
             self.set_subtitle("")
             self.btn_install.set_visible(False)
             self.btn_remove.set_visible(False)
@@ -95,17 +96,42 @@ class DependencyEntry(Adw.ActionRow):
             button and show the btn_remove button
             """
             self.btn_install.set_visible(False)
-            self.btn_remove.set_visible(True)
             self.btn_reinstall.set_visible(True)
+            uninstaller = self.config.Uninstallers.get(dependency[0])
+            self.btn_remove.set_visible(
+                isinstance(uninstaller, str)
+                and uninstaller not in ["", "NO_UNINSTALLER"]
+            )
 
-        if dependency[0] in self.config.Uninstallers.keys():
-            """
-            If the dependency has no uninstaller, disable the
-            btn_remove button
-            """
-            uninstaller = self.config.Uninstallers[dependency[0]]
-            if uninstaller in [False, "NO_UNINSTALLER"]:
-                self.btn_remove.set_sensitive(False)
+        cached_by_arch = dependency[1].get("Cached", {})
+        cached = (
+            cached_by_arch.get(self.config.Arch, False)
+            if isinstance(cached_by_arch, dict)
+            else False
+        )
+        needs_offline_check = (
+            not self.manager.utils_conn.status
+            and dependency[0] not in self.config.Installed_Dependencies
+        )
+        if needs_offline_check and not cached and self.config.Installed_Dependencies:
+            cached = self.manager.dependency_manager.is_dependency_cached(
+                dependency[0],
+                arch=self.config.Arch,
+                installed=self.config.Installed_Dependencies,
+            )
+
+        if needs_offline_check and not cached:
+            self.btn_install.set_visible(False)
+            self.btn_err.set_visible(True)
+            self.btn_err.set_tooltip_text(
+                _(
+                    "This dependency is not installable offline because its files are not cached."
+                )
+            )
+            self.btn_manifest.set_sensitive(False)
+            self.btn_license.set_sensitive(False)
+
+        self.check_select.set_visible(self.btn_install.get_visible())
 
     def open_manifest(self, _widget):
         """
@@ -137,6 +163,8 @@ class DependencyEntry(Adw.ActionRow):
         self.queue.add_task()
         self.get_parent().set_sensitive(False)
         self.btn_install.set_visible(False)
+        self.check_select.set_active(False)
+        self.check_select.set_visible(False)
         self.spinner.show()
         self.spinner.start()
 
@@ -200,6 +228,8 @@ class DependencyEntry(Adw.ActionRow):
         """
         self.spinner.stop()
         self.btn_install.set_visible(False)
+        self.check_select.set_active(False)
+        self.check_select.set_visible(False)
         self.btn_remove.set_visible(False)
         self.btn_err.set_visible(True)
         self.get_parent().set_sensitive(True)
@@ -212,13 +242,19 @@ class DependencyEntry(Adw.ActionRow):
         self.spinner.stop()
         if not removed:
             self.btn_install.set_visible(False)
+            self.btn_reinstall.set_visible(True)
             if installer:
                 self.btn_remove.set_visible(True)
                 self.btn_remove.set_sensitive(True)
+            else:
+                self.btn_remove.set_visible(False)
         else:
             self.btn_remove.set_visible(False)
             self.btn_install.set_visible(True)
+            self.btn_reinstall.set_visible(False)
 
+        self.check_select.set_active(False)
+        self.check_select.set_visible(self.btn_install.get_visible())
         self.btn_reinstall.set_sensitive(True)
 
         with contextlib.suppress(AttributeError):
