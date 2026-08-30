@@ -184,9 +184,7 @@ class ProgramEntry(Adw.ActionRow):
         self.btn_add_steam_library.connect("clicked", self.add_to_library)
         self.btn_add_steam.connect("clicked", self.add_to_steam)
         self.btn_remove.connect("clicked", self.remove_program)
-        self.pop_actions.connect(
-            "notify::visible", self.__refresh_desktop_entry_state
-        )
+        self.pop_actions.connect("notify::visible", self.__refresh_desktop_entry_state)
 
         if not program.get("removed") and not is_steam and check_boot:
             self.__is_alive()
@@ -723,7 +721,7 @@ class ProgramEntry(Adw.ActionRow):
 
     def __show_desktop_entry_fallback(self, result: Result) -> None:
         title, description, command = ProgramEntry.__desktop_entry_fallback_content(
-            result, os.environ.get("FLATPAK_ID")
+            result, None
         )
 
         dialog = Adw.MessageDialog.new(self.window, title, description)
@@ -757,45 +755,24 @@ class ProgramEntry(Adw.ActionRow):
 
     @staticmethod
     def __desktop_entry_fallback_content(
-        result: Result, app_id: str | None
+        result: Result, app_id: str | None = None
     ) -> tuple[str, str, str | None]:
         if result.status:
             title = _("Desktop Entry Created Manually")
-            if app_id:
-                description = _(
-                    "The desktop portal was unavailable, so Bottles used its "
-                    "manual fallback. If the entry does not appear, close "
-                    "Bottles, run the command below, reopen Bottles and try again."
-                )
-            else:
-                description = _(
-                    "The desktop portal was unavailable, so Bottles used its "
-                    "manual fallback. If the entry does not appear, check the "
-                    "permissions of your desktop entry folders and try again."
-                )
+            description = _(
+                "The desktop portal was unavailable, so Bottles used its "
+                "manual fallback. If the entry does not appear, check the "
+                "permissions of your desktop entry folders and try again."
+            )
         else:
             title = _("Desktop Entry Could Not Be Created")
-            if app_id:
-                description = _(
-                    "The desktop portal and the manual fallback both failed. "
-                    "Close Bottles, run the command below, reopen Bottles and "
-                    "try again."
-                )
-            else:
-                description = _(
-                    "The desktop portal and the manual fallback both failed. "
-                    "Check that your desktop entry folders are writable and "
-                    "try again."
-                )
-
-        command = None
-        if app_id:
-            command = (
-                "flatpak override --user "
-                "--filesystem=xdg-data/applications:create "
-                f"--filesystem=xdg-desktop:create {app_id}"
+            description = _(
+                "The desktop portal and the manual fallback both failed. "
+                "Check that your desktop entry folders are writable and "
+                "try again."
             )
-        return title, description, command
+
+        return title, description, None
 
     def show_file_associations(self, _widget):
         self.pop_actions.popdown()

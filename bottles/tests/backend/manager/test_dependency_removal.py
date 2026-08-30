@@ -31,9 +31,7 @@ def test_reinstall_records_manifest_uninstaller():
 
     assert result.ok
     assert result.data["uninstaller"]
-    assert config.Uninstallers == {
-        "dotnet40": "Microsoft .NET Framework 4 Extended"
-    }
+    assert config.Uninstallers == {"dotnet40": "Microsoft .NET Framework 4 Extended"}
 
 
 def test_dependency_without_uninstaller_cannot_be_removed():

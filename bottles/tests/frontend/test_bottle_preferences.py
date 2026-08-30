@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -7,10 +8,10 @@ from gi.repository import Gio
 
 from bottles.backend.models.config import BottleConfig
 
-resource_path = Path("/app/share/bottles/bottles.gresource")
+resource_path = Path(os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"))
 if not resource_path.exists():
     pytest.skip(
-        "Bottle preferences tests require the Bottles Flatpak runtime",
+        "Bottle preferences tests require gresource to be built",
         allow_module_level=True,
     )
 Gio.resources_register(Gio.Resource.load(str(resource_path)))
@@ -18,25 +19,6 @@ Gio.resources_register(Gio.Resource.load(str(resource_path)))
 
 def _make_view(config):
     return SimpleNamespace(config=config, switch_hdr=Mock())
-
-
-def test_flatpak_addons_use_the_current_runtime_branch():
-    from bottles.frontend.views.bottle_preferences import FLATPAK_INSTALL_COMMANDS
-
-    assert set(FLATPAK_INSTALL_COMMANDS) == {
-        "gamescope",
-        "hdr",
-        "vkbasalt",
-        "lsfg_vk",
-        "mangohud",
-        "obsvkc",
-    }
-    assert all("remote-add" not in command for command in FLATPAK_INSTALL_COMMANDS.values())
-    assert all(command.endswith("//25.08") for command in FLATPAK_INSTALL_COMMANDS.values())
-    assert (
-        "org.freedesktop.Platform.VulkanLayer.OBSVkCapture"
-        in FLATPAK_INSTALL_COMMANDS["obsvkc"]
-    )
 
 
 def test_active_hdr_remains_available_to_disable_on_x11(monkeypatch):

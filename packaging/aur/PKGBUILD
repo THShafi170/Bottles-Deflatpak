@@ -3,7 +3,7 @@
 
 pkgname=bottles-deflatpak
 _pkgname=Bottles-Deflatpak
-pkgver=64.1
+pkgver=66.9
 pkgrel=1
 pkgdesc='Easily manage Wine and Proton prefixes (native fork without Flatpak)'
 arch=(any)

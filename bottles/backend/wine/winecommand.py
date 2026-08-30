@@ -248,9 +248,7 @@ def apply_frame_rate_limit(env: "WineEnv", params) -> None:
         return
 
     dxvk_config = env.get_value("DXVK_CONFIG")
-    frame_rate_config = (
-        f"dxgi.maxFrameRate = {limit}; d3d9.maxFrameRate = {limit}"
-    )
+    frame_rate_config = f"dxgi.maxFrameRate = {limit}; d3d9.maxFrameRate = {limit}"
     if dxvk_config:
         frame_rate_config = f"{dxvk_config.rstrip('; ')}; {frame_rate_config}"
 
@@ -298,6 +296,10 @@ class WineCommand:
     This class is used to run a wine command with a custom environment.
     It also handles the launch in a terminal or not.
     """
+
+    proton_script: Optional[str] = None
+    runner_runtime: str = ""
+    steam_runtime_root: Optional[str] = None
 
     def __init__(
         self,

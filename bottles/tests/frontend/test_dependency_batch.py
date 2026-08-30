@@ -1,13 +1,14 @@
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from gi.repository import Gio
 
-resource_path = Path("/app/share/bottles/bottles.gresource")
+resource_path = Path(os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"))
 if not resource_path.is_file():
     pytest.skip(
-        "Dependency frontend tests require the Bottles Flatpak runtime",
+        "Dependency frontend tests require gresource to be built",
         allow_module_level=True,
     )
 
@@ -20,8 +21,11 @@ from bottles.frontend.views.bottle_dependencies import DependenciesView  # noqa:
 from bottles.frontend.widgets.dependency import DependencyEntry  # noqa: E402
 
 
+from typing import Any  # noqa: E402
+
+
 class DialogStub:
-    instances = []
+    instances: list[Any] = []
 
     def __init__(self, *_args):
         self.steps = []

@@ -91,9 +91,7 @@ SOURCE_ATTRIBUTION = {
         "licenses": [
             {
                 "name": "LGPL-2.1-or-later",
-                "url": (
-                    "https://github.com/Winetricks/winetricks/blob/master/COPYING"
-                ),
+                "url": ("https://github.com/Winetricks/winetricks/blob/master/COPYING"),
             }
         ],
     },
@@ -460,9 +458,9 @@ class EagleIntel:
                 {
                     "name": trick["bottles_dep"],
                     "evidence": 0,
-                    "reason": _(
-                        "winetricks {verb} maps to this dependency"
-                    ).format(verb=trick["name"]),
+                    "reason": _("winetricks {verb} maps to this dependency").format(
+                        verb=trick["name"]
+                    ),
                 }
             )
 
@@ -623,9 +621,9 @@ class EagleIntel:
                     attribution_sources.append("bottles_dependencies")
             elif trick:
                 notes.append(
-                    _(
-                        "Reports mention winetricks verb '{verb}' (x{evidence})"
-                    ).format(verb=value, evidence=evidence)
+                    _("Reports mention winetricks verb '{verb}' (x{evidence})").format(
+                        verb=value, evidence=evidence
+                    )
                 )
 
         return {

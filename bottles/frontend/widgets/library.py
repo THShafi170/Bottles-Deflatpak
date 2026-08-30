@@ -76,6 +76,9 @@ class LibraryEntry(Gtk.Box):
     revealer_details = Gtk.Template.Child()
     overlay = Gtk.Template.Child()
 
+    is_steam: bool = False
+    is_umu: bool = False
+
     # endregion
 
     def __init__(self, library, uuid, entry, *args, **kwargs):
@@ -216,7 +219,7 @@ class LibraryEntry(Gtk.Box):
         return None
 
     def __get_program(self):
-        if self.is_umu:
+        if getattr(self, "is_umu", False):
             try:
                 self.game = self.manager.umu_repository.load(self.entry["source_id"])
             except (KeyError, FileNotFoundError, UmuRepositoryError) as error:
@@ -338,9 +341,7 @@ class LibraryEntry(Gtk.Box):
         def complete(result, error=False):
             self.btn_umu_steam.set_sensitive(True)
             if not error and result and result.ok:
-                self.window.show_toast(
-                    _('Added "{0}" to Steam').format(self.game.name)
-                )
+                self.window.show_toast(_('Added "{0}" to Steam').format(self.game.name))
             else:
                 self.window.show_toast(
                     _('Could not add "{0}" to Steam').format(self.game.name)
@@ -390,9 +391,7 @@ class LibraryEntry(Gtk.Box):
         dialog.set_title(_("Select Cover Image"))
         dialog.set_filters(filters)
         dialog.set_default_filter(image_filter)
-        pictures = GLib.get_user_special_dir(
-            GLib.UserDirectory.DIRECTORY_PICTURES
-        )
+        pictures = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
         if pictures:
             dialog.set_initial_folder(Gio.File.new_for_path(pictures))
         dialog.open(self.window, callback=set_cover)

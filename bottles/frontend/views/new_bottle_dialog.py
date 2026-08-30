@@ -24,14 +24,12 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
 
 from pathvalidate import sanitize_filename
 
-from bottles.backend.globals import is_cpak
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
 from bottles.backend.state import Task, TaskManager
 from bottles.backend.utils.threading import RunAsync
 from bottles.frontend.utils.common import format_runner_name
 from bottles.frontend.utils.filters import add_all_filters, add_yaml_filters
-from bottles.frontend.utils.flatpak import resolve_bottles_directory
 from bottles.frontend.utils.gtk import GtkUtils
 
 
@@ -94,9 +92,7 @@ class BottlesNewBottleDialog(Adw.Dialog):
         )
         # common variables and references
         self.window = GtkUtils.get_parent_window()
-        if not self.window or (
-            not is_cpak() and not Xdp.Portal.running_under_sandbox()
-        ):
+        if not self.window:
             return
 
         self.app = self.window.get_application()
@@ -214,7 +210,7 @@ class BottlesNewBottleDialog(Adw.Dialog):
             except GLib.Error:
                 return
 
-            path = resolve_bottles_directory(self.window, folder.get_path())
+            path = folder.get_path()
             if path is None:
                 return
 
@@ -263,7 +259,9 @@ class BottlesNewBottleDialog(Adw.Dialog):
             environment=self.selected_environment,
             runner=self.runner,
             arch=list(self.arch)[self.combo_arch.get_selected()],
-            dxvk=self.manager.dxvk_available[0] if self.manager.dxvk_available else False,
+            dxvk=self.manager.dxvk_available[0]
+            if self.manager.dxvk_available
+            else False,
             sandbox=self.switch_sandbox.get_active(),
             fn_logger=self.update_output,
             custom_environment=self.env_recipe_path,

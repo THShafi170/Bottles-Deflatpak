@@ -12,6 +12,7 @@ def test_extract_expands_cab_wildcards(monkeypatch, tmp_path: Path) -> None:
         archive.touch()
 
     commands = []
+
     def extract(command, check):
         assert check is True
         commands.append(command)
@@ -82,9 +83,7 @@ def test_extract_does_not_accept_preexisting_filtered_file(
     )
 
 
-def test_extract_replaces_broken_matching_symlink(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_extract_replaces_broken_matching_symlink(monkeypatch, tmp_path: Path) -> None:
     archive = tmp_path / "archive.cab"
     archive.touch()
     destination = tmp_path / "output"

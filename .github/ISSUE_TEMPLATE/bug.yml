@@ -142,7 +142,7 @@ body:
     id: log
     attributes:
       label: Troubleshooting Logs
-      description: If applicable, run `flatpak run com.usebottles.bottles` or `cpak run github.com/bottlesdevs/bottles @bottles`, reproduce the issue and paste the logs here.
+      description: If applicable, run `bottles` or `bottles-cli`, reproduce the issue and paste the logs here.
       render: shell
       placeholder: |
         [Errno 2] No such file or directory: '/home/USER/.var/app/com.usebottles.bottles/data/bottles/bottles/Opera-GX__185/bottle.yml'  File "/app/share/bottles/bottles/frontend/utils/threading.py", line 61, in __target

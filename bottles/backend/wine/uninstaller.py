@@ -29,7 +29,7 @@ class Uninstaller(WineProgram):
     def from_uuid(self, uuid: Optional[str] = None):
         args = ""
 
-        if uuid not in [None, ""]:
+        if uuid:
             args = f"--remove {shlex.quote(uuid)}"
 
         return self.launch(args=args, communicate=True, action_name="from_uuid")

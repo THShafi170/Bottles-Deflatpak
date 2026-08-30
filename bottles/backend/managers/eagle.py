@@ -29,7 +29,7 @@ import json
 import subprocess
 from gettext import gettext as _
 
-from bottles.backend.globals import Paths
+from bottles.backend.globals import Paths, ntsync_available
 from bottles.backend.managers.intel import EagleIntel
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
@@ -730,12 +730,10 @@ class EagleManager:
 
                 self._send_step(_("Querying community intelligence..."))
                 product_name = basename.rsplit(".", 1)[0]
-                intel_plan = self._intel_lookup(
-                    executable_path, None, product_name
-                )
+                intel_plan = self._intel_lookup(executable_path, None, product_name)
                 suggestions = []
                 self._merge_intel_suggestions(suggestions, intel_plan)
-                
+
                 results = {
                     "name": basename,
                     "product_name": product_name,

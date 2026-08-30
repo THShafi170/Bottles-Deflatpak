@@ -472,9 +472,7 @@ class DependencyManager:
 
         if not isinstance(uninstaller, str) or not uninstaller:
             uninstaller = "NO_UNINSTALLER"
-        self.__manager.update_config(
-            config, dependency[0], uninstaller, "Uninstallers"
-        )
+        self.__manager.update_config(config, dependency[0], uninstaller, "Uninstallers")
 
         # Remove entry from task manager
         TaskManager.remove(task_id)

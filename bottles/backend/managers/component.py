@@ -643,9 +643,7 @@ class ComponentManager:
         bottles = self.__manager.local_bottles
 
         if component_type in ["runner", "runner:proton"]:
-            used_by_bottle = component_name in [
-                b["Runner"] for _, b in bottles.items()
-            ]
+            used_by_bottle = component_name in [b["Runner"] for _, b in bottles.items()]
             if used_by_bottle:
                 return True
             catalog = getattr(self.__manager, "umu_proton_catalog", None)

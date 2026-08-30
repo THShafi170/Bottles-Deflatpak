@@ -157,22 +157,17 @@ def test_resolve_uses_installed_protosoda_offline(monkeypatch, tmp_path):
 def test_default_ignores_installed_unstable_protosoda(tmp_path):
     manager, _paths = _manager(tmp_path)
     manager.runners_available.append("protosoda-12.0-rc1")
-    manager.supported_proton_runners["protosoda-12.0-rc1"] = {
-        "Channel": "unstable"
-    }
+    manager.supported_proton_runners["protosoda-12.0-rc1"] = {"Channel": "unstable"}
 
     assert (
-        UmuProtonCatalog(manager).pin_value(DEFAULT_PROTON_VALUE)
-        == "protosoda-11.0-1"
+        UmuProtonCatalog(manager).pin_value(DEFAULT_PROTON_VALUE) == "protosoda-11.0-1"
     )
 
 
 def test_default_rejects_installed_protosoda_marked_unstable(tmp_path):
     manager, _paths = _manager(tmp_path)
     manager.runners_available = ["protosoda-12.0-1"]
-    manager.supported_proton_runners = {
-        "protosoda-12.0-1": {"Channel": "unstable"}
-    }
+    manager.supported_proton_runners = {"protosoda-12.0-1": {"Channel": "unstable"}}
 
     with pytest.raises(ValueError, match="ProtoSoda is not available"):
         UmuProtonCatalog(manager).pin_value(DEFAULT_PROTON_VALUE)

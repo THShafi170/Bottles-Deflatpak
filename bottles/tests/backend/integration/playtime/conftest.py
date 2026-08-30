@@ -6,22 +6,31 @@ import contextlib
 import sqlite3
 import pytest
 
-_glib_stub = types.SimpleNamespace(
-    SOURCE_REMOVE=False,
-    idle_add=lambda func, *args, **kwargs: func(),
-    timeout_add=lambda *_a, **_k: 0,
-    markup_escape_text=lambda text: text,
-)
-_gio_stub = types.SimpleNamespace(
-    Settings=lambda *args, **kwargs: types.SimpleNamespace(
-        get_boolean=lambda *a: False,
-        get_int=lambda *a: 0,
-        get_string=lambda *a: "",
+try:
+    import gi  # noqa: F401
+    from gi.repository import Gio, GLib  # noqa: F401
+except ImportError:
+    _glib_stub = types.SimpleNamespace(
+        SOURCE_REMOVE=False,
+        idle_add=lambda func, *args, **kwargs: func(),
+        timeout_add=lambda *_a, **_k: 0,
+        markup_escape_text=lambda text: text,
     )
-)
-_gi_repository = types.SimpleNamespace(GLib=_glib_stub, Gio=_gio_stub)
-sys.modules.setdefault("gi", types.SimpleNamespace(repository=_gi_repository))
-sys.modules.setdefault("gi.repository", _gi_repository)
+    _gio_stub = types.SimpleNamespace(
+        Settings=lambda *args, **kwargs: types.SimpleNamespace(
+            get_boolean=lambda *a: False,
+            get_int=lambda *a: 0,
+            get_string=lambda *a: "",
+        )
+    )
+    _gi_repository = types.SimpleNamespace(GLib=_glib_stub, Gio=_gio_stub)
+    sys.modules.setdefault(
+        "gi",
+        types.SimpleNamespace(
+            repository=_gi_repository, require_version=lambda *a, **k: None
+        ),
+    )
+    sys.modules.setdefault("gi.repository", _gi_repository)
 
 
 class _FVSRepoStub:

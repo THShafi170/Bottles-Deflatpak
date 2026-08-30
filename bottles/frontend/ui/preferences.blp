@@ -82,16 +82,6 @@ template $PreferencesWindow: Adw.PreferencesDialog {
       }
 
       Adw.ActionRow {
-        title: _("Show Funding Dialog");
-        subtitle: _("Whether to show the funding dialog to support Bottles development.");
-        activatable-widget: switch_show_funding;
-
-        Switch switch_show_funding {
-          valign: center;
-        }
-      }
-
-      Adw.ActionRow {
         title: _("Temp Files");
         subtitle: _("Clean temp files when Bottles launches?");
         activatable-widget: switch_temp;
@@ -564,7 +554,7 @@ template $PreferencesWindow: Adw.PreferencesDialog {
 
               Adw.ActionRow row_umu_runtime {
                 title: _("UMU Runtime Data");
-                subtitle: _("The standard ~/.local/share/umu directory is exposed to the Flatpak.");
+                subtitle: _("The standard ~/.local/share/umu directory.");
 
                 [suffix]
                 Button btn_umu_runtime {

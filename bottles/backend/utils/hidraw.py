@@ -38,8 +38,7 @@ def list_hidraw_devices(
             )
             _, vendor, product = properties["HID_ID"].split(":")
             identifier = normalize_hidraw_id(
-                f"0x{int(vendor, 16) & 0xFFFF:04X}/"
-                f"0x{int(product, 16) & 0xFFFF:04X}"
+                f"0x{int(vendor, 16) & 0xFFFF:04X}/0x{int(product, 16) & 0xFFFF:04X}"
             )
         except (KeyError, OSError, ValueError):
             continue

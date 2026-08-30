@@ -321,7 +321,9 @@ def test_soda_adaptive_launch_prepares_a_profile(tmp_path, monkeypatch):
             prepared["called"] = True
             return 3
 
-    monkeypatch.setattr("bottles.backend.wine.executor.AdaptiveLaunchProfile", FakeProfile)
+    monkeypatch.setattr(
+        "bottles.backend.wine.executor.AdaptiveLaunchProfile", FakeProfile
+    )
 
     executor = WineExecutor(config=config, exec_path=str(executable))
 
@@ -798,8 +800,7 @@ def test_frame_rate_limit_applies_to_dxvk_and_vkd3d():
 
     resolved = env.get()["envs"]
     assert resolved["DXVK_CONFIG"] == (
-        "dxgi.syncInterval = 0; dxgi.maxFrameRate = 120; "
-        "d3d9.maxFrameRate = 120"
+        "dxgi.syncInterval = 0; dxgi.maxFrameRate = 120; d3d9.maxFrameRate = 120"
     )
     assert resolved["VKD3D_FRAME_RATE"] == "120"
 
@@ -818,15 +819,11 @@ def test_frame_rate_limit_preserves_manual_environment_when_disabled():
 
 def test_hidraw_preferences_enable_only_selected_devices():
     env = WineEnv(clean=True)
-    params = BottleParams(
-        hidraw_devices=["0x044f/0xb10a", "1", "0x231D/0x0200"]
-    )
+    params = BottleParams(hidraw_devices=["0x044f/0xb10a", "1", "0x231D/0x0200"])
 
     apply_hidraw_preferences(env, params)
 
-    assert env.get()["envs"]["PROTON_ENABLE_HIDRAW"] == (
-        "0x044F/0xB10A,0x231D/0x0200"
-    )
+    assert env.get()["envs"]["PROTON_ENABLE_HIDRAW"] == ("0x044F/0xB10A,0x231D/0x0200")
 
 
 def test_hidraw_preferences_preserve_manual_environment_when_unset():
@@ -1035,6 +1032,7 @@ def test_winecommand_filters_host_environment(monkeypatch, tmp_path):
     winecmd.arguments = ""
     winecmd.runner = "/usr/bin/wine"
     winecmd.runner_runtime = ""
+    winecmd.proton_script = None
     winecmd.gamescope_activated = False
     winecmd.terminal = False
 
@@ -1117,6 +1115,7 @@ def test_winecommand_syncs_proton_vkd3d(monkeypatch, tmp_path):
     winecmd.minimal = True
     winecmd.runner = str(dist_path / "bin/wine")
     winecmd.runner_runtime = "sniper"
+    winecmd.proton_script = None
     winecmd.gamescope_activated = False
     winecmd.terminal = False
 
@@ -1157,7 +1156,7 @@ def test_wayland_sandbox_clears_parent_display(monkeypatch, tmp_path):
     bottle_path.mkdir()
     config = BottleConfig(Name="Test", Path=str(bottle_path), Runner="sys-wine")
 
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles")
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
     monkeypatch.setenv("DISPLAY", ":0")
     monkeypatch.setattr(
         "bottles.backend.wine.winecommand.ManagerUtils.get_bottle_path",
@@ -1173,17 +1172,14 @@ def test_wayland_sandbox_clears_parent_display(monkeypatch, tmp_path):
     winecmd.env = {"WAYLAND_DISPLAY": "wayland-0"}
     winecmd.cwd = str(bottle_path)
     winecmd.runner_runtime = ""
+    winecmd.proton_script = None
     winecmd.steam_runtime_root = None
 
     command = winecmd._get_sandbox_manager().get_cmd("wine")
 
-    assert "--clear-env" not in command
-    assert "env -i" in command
-    assert "WAYLAND_DISPLAY=wayland-0" in command
+    assert "--clearenv" in command
+    assert "--setenv WAYLAND_DISPLAY wayland-0" in command
     assert not any(token.startswith("DISPLAY=") for token in shlex.split(command))
-
-    monkeypatch.delenv("FLATPAK_ID")
-    command = winecmd._get_sandbox_manager().get_cmd("wine")
 
     assert command.index("--clearenv") < command.index(
         "--setenv WAYLAND_DISPLAY wayland-0"
@@ -1239,6 +1235,7 @@ def test_dedicated_sandbox_uses_selected_runtime_path(
     winecmd.arguments = ""
     winecmd.runner = str(runner_path / "files/bin/wine")
     winecmd.runner_runtime = "sniper"
+    winecmd.proton_script = None
     winecmd.gamescope_activated = False
     winecmd.cwd = str(bottle_path)
     winecmd.env = {}
@@ -1285,6 +1282,7 @@ def test_host_wrappers_run_outside_steam_runtime(
     winecmd.arguments = ""
     winecmd.runner = "/runner/files/bin/wine"
     winecmd.runner_runtime = "sniper"
+    winecmd.proton_script = None
     winecmd.gamescope_activated = False
 
     command = winecmd.get_cmd("game.exe")
@@ -1313,9 +1311,7 @@ def test_steam_runtime_uses_supported_command_separator(
     monkeypatch.setattr(
         winecommand.RuntimeManager,
         "get_runtimes",
-        lambda _category: {
-            runtime: {"name": runtime, "entry_point": str(entry_point)}
-        },
+        lambda _category: {runtime: {"name": runtime, "entry_point": str(entry_point)}},
     )
 
     winecmd = WineCommand.__new__(WineCommand)
@@ -1324,6 +1320,7 @@ def test_steam_runtime_uses_supported_command_separator(
     winecmd.arguments = ""
     winecmd.runner = "/runner/bin/wine"
     winecmd.runner_runtime = runtime
+    winecmd.proton_script = None
     winecmd.gamescope_activated = False
 
     command = winecmd.get_cmd("game.exe")
@@ -1365,6 +1362,7 @@ def test_dedicated_sandbox_shares_forwarded_document_read_write(monkeypatch, tmp
     )
     winecmd.cwd = str(bottle_path)
     winecmd.runner_runtime = ""
+    winecmd.proton_script = None
     winecmd.steam_runtime_root = None
     winecmd.env = {}
 

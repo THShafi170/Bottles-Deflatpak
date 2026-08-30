@@ -15,14 +15,25 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import re
 from gettext import gettext as _, ngettext
 
-from gi.repository import Adw, GLib, GObject, Gtk, Gio
+from gi.repository import Adw, GLib, GObject, Gtk
 
 from bottles.backend.logger import Logger
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.vulkan import VulkanUtils
-from bottles.frontend.utils.autostart import set_autostart_enabled
+
+
+def set_autostart_enabled(parent, enabled: bool, callback):
+    """Native autostart — writes/removes a .desktop entry in ~/.config/autostart."""
+    try:
+        result = ManagerUtils.set_autostart_entry(enabled)
+    except Exception as e:
+        Logger().warning(f"Failed to update autostart: {e}")
+        result = False
+    callback(result)
+
 
 logging = Logger()
 
@@ -88,9 +99,7 @@ class LaunchOptionsDialog(Adw.Window):
             self.switch_dxvk.set_sensitive(False)
         if not vulkan_ok or not self.global_d7vk:
             self.action_d7vk.set_subtitle(
-                msg_no_vulkan
-                if not vulkan_ok
-                else self.__msg_disabled.format("D7VK")
+                msg_no_vulkan if not vulkan_ok else self.__msg_disabled.format("D7VK")
             )
             self.switch_d7vk.set_sensitive(False)
         if not vulkan_ok or not self.global_vkd3d:

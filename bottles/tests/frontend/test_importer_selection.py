@@ -1,9 +1,15 @@
+import os
+
 # ruff: noqa: E402
 from types import SimpleNamespace
 
 from gi.repository import Gio
 
-Gio.resources_register(Gio.Resource.load("/app/share/bottles/bottles.gresource"))
+Gio.resources_register(
+    Gio.Resource.load(
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+    )
+)
 
 from bottles.frontend.views import importer
 

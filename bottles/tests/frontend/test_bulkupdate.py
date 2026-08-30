@@ -1,3 +1,4 @@
+import os
 # ruff: noqa: E402
 
 from pathlib import Path
@@ -6,10 +7,10 @@ from types import SimpleNamespace
 import pytest
 from gi.repository import Gio
 
-resource_path = Path("/app/share/bottles/bottles.gresource")
+resource_path = Path(os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"))
 if not resource_path.exists():
     pytest.skip(
-        "Bulk update tests require the Bottles Flatpak runtime",
+        "Bulk update tests require gresource to be built",
         allow_module_level=True,
     )
 Gio.resources_register(Gio.Resource.load(str(resource_path)))
@@ -53,8 +54,9 @@ def test_cleanup_target(update, expected):
 def test_bulk_update_removes_each_unused_old_component_once(monkeypatch):
     removed = []
     component_manager = SimpleNamespace(
-        uninstall=lambda component_type, name: removed.append((component_type, name))
-        or SimpleNamespace(ok=True)
+        uninstall=lambda component_type, name: (
+            removed.append((component_type, name)) or SimpleNamespace(ok=True)
+        )
     )
     manager = SimpleNamespace(
         component_manager=component_manager,

@@ -8,6 +8,7 @@ from bottles.backend.globals import Paths
 from bottles.backend.managers import component as component_module
 from bottles.backend.managers import dependency as dependency_module
 from bottles.backend.managers.component import ComponentManager
+from bottles.backend.utils import connection as connection_module
 from bottles.backend.managers.dependency import DependencyManager
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.repos.component import ComponentRepo
@@ -522,7 +523,7 @@ def test_cached_component_installs_without_network(tmp_path, monkeypatch):
 def test_offline_download_never_uses_network(tmp_path, monkeypatch):
     monkeypatch.setattr(Paths, "temp", str(tmp_path))
     monkeypatch.setattr(
-        component_module.pycurl,
+        connection_module.pycurl,
         "Curl",
         lambda: (_ for _ in ()).throw(AssertionError("network access attempted")),
     )
@@ -761,7 +762,7 @@ def test_cached_dependency_installs_without_network(tmp_path, monkeypatch):
 def test_missing_offline_dependency_does_not_use_network(tmp_path, monkeypatch):
     monkeypatch.setattr(Paths, "temp", str(tmp_path))
     monkeypatch.setattr(
-        component_module.pycurl,
+        connection_module.pycurl,
         "Curl",
         lambda: (_ for _ in ()).throw(AssertionError("network access attempted")),
     )

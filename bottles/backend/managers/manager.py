@@ -125,7 +125,7 @@ class Manager(metaclass=Singleton):
     supported_winebridge = {}
     supported_wine_runners = {}
     supported_proton_runners = {}
-    supported_d7vk: ClassVar[dict] = {}
+    supported_d7vk = {}
     supported_dxvk = {}
     supported_vkd3d = {}
     supported_nvapi = {}
@@ -156,8 +156,12 @@ class Manager(metaclass=Singleton):
             force_offline=self.settings.get_boolean("force-offline")
         )
         self.data_mgr = DataManager()
-        umu_data_path = self.settings.get_string("umu-data-path")
-        if umu_data_path in ("", "default"):
+        umu_data_path = (
+            self.settings.get_string("umu-data-path")
+            if hasattr(self.settings, "get_string")
+            else None
+        )
+        if not umu_data_path or umu_data_path in ("", "default"):
             umu_data_path = None
         elif not os.path.isdir(umu_data_path) or not os.access(umu_data_path, os.W_OK):
             logging.error(
@@ -941,9 +945,7 @@ class Manager(metaclass=Singleton):
     def get_managed_wine_runners(self) -> list[str]:
         """Return managed runners that can create regular Wine bottles."""
         return [
-            runner
-            for runner in self.runners_available
-            if not runner.startswith("sys-")
+            runner for runner in self.runners_available if not runner.startswith("sys-")
         ]
 
     def check_runtimes(self, install_latest: bool = True) -> bool:
@@ -2071,11 +2073,12 @@ class Manager(metaclass=Singleton):
             return cancel_result
 
         if not WineUtils.ensure_user_profile_alias(bottle_complete_path):
-            logging.warning(
-                "Could not create a shared Wine and Proton user profile, "
-                "continuing with the existing profiles."
+            logging.error(
+                "Could not create a shared Wine and Proton user profile.", jn=True
             )
-            log_update(_("Could not share the user profile, continuing…"))
+            message = _("Failed to prepare the bottle user profile.")
+            log_update(message)
+            return Result(False, data={"config": config}, message=message)
 
         # initialize wineprefix
         reg = Reg(config)

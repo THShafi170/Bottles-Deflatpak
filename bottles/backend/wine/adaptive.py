@@ -17,9 +17,7 @@ _MINIMUM_SODA_VERSION = (11, 0, 5)
 
 
 def is_supported_runner(runner: str) -> bool:
-    match = re.match(
-        r"^soda-(\d+)\.(\d+)-(\d+)(?:-|$)", runner or "", re.IGNORECASE
-    )
+    match = re.match(r"^soda-(\d+)\.(\d+)-(\d+)(?:-|$)", runner or "", re.IGNORECASE)
     if not match:
         return False
     return tuple(map(int, match.groups())) >= _MINIMUM_SODA_VERSION

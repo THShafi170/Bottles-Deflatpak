@@ -120,14 +120,11 @@ def test_lookup_prefers_artifact_then_builds_protondb_plan(tmp_path):
     assert plan["name"] == "Example Game"
     assert [item["name"] for item in plan["attributions"]] == ["ProtonDB"]
     assert [
-        license_info["name"]
-        for license_info in plan["attributions"][0]["licenses"]
+        license_info["name"] for license_info in plan["attributions"][0]["licenses"]
     ] == ["ODbL 1.0", "DbCL 1.0"]
     assert plan["parameters"]["dxvk_nvapi"]["value"] is True
     assert plan["env"] == {"DXVK_HUD": {"value": "fps", "evidence": 6}}
-    assert plan["dll_overrides"] == {
-        "version": {"value": "n,b", "evidence": 6}
-    }
+    assert plan["dll_overrides"] == {"version": {"value": "n,b", "evidence": 6}}
     assert plan["args"] == [{"value": "--safe-mode", "evidence": 5}]
 
     suggestions = []
@@ -212,9 +209,7 @@ def test_environment_database_override_is_discovered(monkeypatch, tmp_path):
     intel.close()
 
 
-def test_packaged_database_is_used_when_user_database_is_missing(
-    monkeypatch, tmp_path
-):
+def test_packaged_database_is_used_when_user_database_is_missing(monkeypatch, tmp_path):
     path, connection = create_database(tmp_path)
     connection.close()
     monkeypatch.delenv("EAGLE_INTEL_DB", raising=False)
@@ -338,8 +333,7 @@ def test_generic_executable_name_does_not_exact_match(tmp_path):
 def test_fuzzy_match_normalizes_digit_boundaries(tmp_path):
     path, connection = create_database(tmp_path)
     connection.execute(
-        "INSERT INTO software VALUES "
-        "(1, 'Cyberpunk 2077', NULL, NULL, 'protondb')"
+        "INSERT INTO software VALUES (1, 'Cyberpunk 2077', NULL, NULL, 'protondb')"
     )
     connection.execute("INSERT INTO report_agg VALUES (1, 20, 15, 5, 3, 'gold')")
     connection.commit()

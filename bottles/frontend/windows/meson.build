@@ -18,7 +18,6 @@ bottles_sources = [
   'rename.py',
   'drives.py',
   'eagleintel.py',
-  'funding.py',
   'gamescope.py',
   'vkbasalt.py',
   'mangohud.py',

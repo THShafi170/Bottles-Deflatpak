@@ -56,9 +56,7 @@ class DriveEntry(Adw.EntryRow):
             self.btn_path.set_visible(False)
             self.btn_eject.set_visible(False)
         else:
-            self.btn_eject.set_visible(
-                Drives(self.config).is_ejectable(self.drive[0])
-            )
+            self.btn_eject.set_visible(Drives(self.config).is_ejectable(self.drive[0]))
 
         # connect signals
         self.connect("changed", self.__validate)

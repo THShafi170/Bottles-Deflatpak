@@ -918,9 +918,9 @@ class CLI:
         _environment = self.args.environment
         _custom_environment = self.args.custom_environment
         _arch = "win64" if self.args.arch is None else self.args.arch
-        _runner = self.args.runner
-        _d7vk = self.args.d7vk
-        _dxvk = self.args.dxvk
+        _runner = getattr(self.args, "runner", None)
+        _d7vk = getattr(self.args, "d7vk", False)
+        _dxvk = getattr(self.args, "dxvk", False)
         _vkd3d = self.args.vkd3d
         _nvapi = self.args.nvapi
         _latencyflex = self.args.latencyflex

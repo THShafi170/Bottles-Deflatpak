@@ -303,9 +303,11 @@ def test_umu_remote_thumbnail_uses_separate_cover_storage(monkeypatch, tmp_path)
     monkeypatch.setattr(
         steamgriddb_module.requests,
         "get",
-        lambda url, **_kwargs: ImageResponse()
-        if url == "https://example.com/control.png"
-        else SearchResponse(),
+        lambda url, **_kwargs: (
+            ImageResponse()
+            if url == "https://example.com/control.png"
+            else SearchResponse()
+        ),
     )
 
     thumbnail = library_module.SteamGridDBManager.get_game_grid("Control")

@@ -24,13 +24,6 @@ from typing import List, Optional
 from bottles.backend.globals import sandbox_available
 
 
-FLATPAK_INFO = "/.flatpak-info"
-FLATPAK_SHARE_INPUT = 1 << 5
-FLATPAK_SHARE_USB = 1 << 6
-FLATPAK_SHARE_ALL_DEVICES = 1 << 9
-FLATPAK_SHARE_DEVICES_VERSION = (1, 17, 1)
-
-
 class SandboxManager:
     """
     Native bubblewrap sandbox manager for Bottles-Deflatpak.
@@ -76,8 +69,23 @@ class SandboxManager:
         self.share_display = share_display
         self.share_sound = share_sound
         self.share_gpu = share_gpu
+        self.share_input = share_input
+        self.share_usb = share_usb
+        self.share_hidraw = share_hidraw
         self.__uid = str(os.environ.get("UID", os.getuid()))
         self.__xdg_runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+
+    @staticmethod
+    def supports_input_devices() -> bool:
+        return os.path.isdir("/dev/input")
+
+    @staticmethod
+    def supports_usb_devices() -> bool:
+        return os.path.isdir("/dev/bus/usb")
+
+    @staticmethod
+    def supports_hidraw_devices() -> bool:
+        return os.path.isdir("/dev/hidraw")
 
     def __get_bwrap_args(self) -> List[str]:
         args = ["bwrap", "--unshare-all", "--die-with-parent"]
@@ -245,6 +253,20 @@ class SandboxManager:
             ]:
                 if os.path.exists(p):
                     args.extend(["--ro-bind", p, p])
+
+        # Input / USB / HID device access: block by default, bind when explicitly shared
+        if not self.share_input and os.path.isdir("/dev/input"):
+            args.extend(["--tmpfs", "/dev/input"])
+        elif self.share_input and self.supports_input_devices():
+            args.extend(["--dev-bind", "/dev/input", "/dev/input"])
+
+        if not self.share_usb and os.path.isdir("/dev/bus/usb"):
+            args.extend(["--tmpfs", "/dev/bus/usb"])
+        elif self.share_usb and self.supports_usb_devices():
+            args.extend(["--dev-bind", "/dev/bus/usb", "/dev/bus/usb"])
+
+        if self.share_hidraw and self.supports_hidraw_devices():
+            args.extend(["--dev-bind", "/dev/hidraw", "/dev/hidraw"])
 
         return args
 

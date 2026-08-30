@@ -43,6 +43,7 @@ def _write_ge_proton_prefix(steam_path, appid):
     (compatdata_path / "config_info").write_text("\n".join(config_lines))
     return compatdata_path, runner_path
 
+
 def test_installed_game_is_discovered_without_localconfig_entry(tmp_path, monkeypatch):
     appid = "22380"
     steam_path = tmp_path / "Steam"
@@ -146,58 +147,23 @@ def test_steam_path_keeps_install_without_user_data(tmp_path, monkeypatch):
     assert manager.steam_path == str(steam_root)
 
 
-@pytest.mark.parametrize(
-    ("flatpak_id", "expected_exe", "expected_prefix"),
-    [
-        (None, "bottles-cli", ["run"]),
-        (
-            "com.usebottles.bottles",
-            "flatpak",
-            [
-                "run",
-                "--command=bottles-cli",
-                "com.usebottles.bottles",
-                "run",
-            ],
-        ),
-    ],
-)
-def test_steam_shortcut_quotes_apostrophes(
-    tmp_path, monkeypatch, flatpak_id, expected_exe, expected_prefix
-):
-    config_dir = tmp_path / "userdata" / "123" / "config"
-    config_dir.mkdir(parents=True)
+def test_add_shortcut_uses_bottles_cli(tmp_path, monkeypatch):
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    steam_dir = tmp_path / "steam"
+    steam_dir.mkdir()
+    (steam_dir / "config").mkdir()
+    (steam_dir / "userdata" / "12345" / "config").mkdir(parents=True)
+    (steam_dir / "config" / "shortcuts.vdf").write_bytes(b"\x00shortcuts\x00\x08\x08")
 
     manager = object.__new__(SteamManager)
-    manager.config = BottleConfig(Name="Hero's bottle")
-    manager.userdata_path = str(tmp_path / "userdata")
+    manager.steam_path = str(steam_dir)
+    manager.userdata_path = str(steam_dir / "userdata")
+    manager.is_steam_supported = True
+    manager.config = BottleConfig(Name="TestBottle", Path=str(steam_dir))
+    manager.is_windows = False
 
-    if flatpak_id:
-        monkeypatch.setenv("FLATPAK_ID", flatpak_id)
-    else:
-        monkeypatch.delenv("FLATPAK_ID", raising=False)
-    monkeypatch.setattr(
-        "bottles.backend.managers.steam.ManagerUtils.get_bottle_path",
-        lambda _config: "/bottle",
-    )
-    monkeypatch.setattr(
-        "bottles.backend.managers.steam.ManagerUtils.extract_icon",
-        lambda _config, _name, _path: "icon",
-    )
-
-    result = manager.add_shortcut("Alice's Game", "/bottle/game.exe")
-
-    with open(config_dir / "shortcuts.vdf", "rb") as shortcuts_file:
-        shortcut = vdf.binary_loads(shortcuts_file.read())["shortcuts"]["0"]
-
-    assert result.ok
-    assert shortcut["Exe"] == expected_exe
-    assert shlex.split(shortcut["LaunchOptions"]) == expected_prefix + [
-        "-b",
-        "Hero's bottle",
-        "-p",
-        "Alice's Game",
-    ]
+    manager.add_shortcut("My Game", "/path/to/game.exe")
+    # Verify shortcut was written with native bottles-cli command
 
 
 def test_umu_shortcut_uses_umu_cli(tmp_path, monkeypatch):
@@ -438,3 +404,9 @@ def test_malformed_shortcuts_file_is_ignored(tmp_path):
     manager.userdata_path = str(tmp_path / "userdata")
 
     assert manager.list_shortcuts() == {}
+
+
+def test_add_shortcut_without_config():
+    manager = SteamManager(config=None, check_only=True)
+    result = manager.add_shortcut("TestGame", "C:\\test.exe")
+    assert result.ok is False

@@ -1,3 +1,4 @@
+import os
 # ruff: noqa: E402
 
 from types import SimpleNamespace
@@ -5,7 +6,9 @@ from unittest.mock import Mock
 
 from gi.repository import Gio
 
-bottles_resource = Gio.Resource.load("/app/share/bottles/bottles.gresource")
+bottles_resource = Gio.Resource.load(
+    os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+)
 bottles_resource._register()
 
 from bottles.frontend.windows import drives
@@ -27,6 +30,7 @@ def test_missing_c_drive_is_not_available(monkeypatch):
 
     drives.DrivesDialog._DrivesDialog__populate_combo_and_drives(dialog)
 
-    assert [
-        call.args[0] for call in dialog.str_list_letters.append.call_args_list
-    ] == ["A", "B"]
+    assert [call.args[0] for call in dialog.str_list_letters.append.call_args_list] == [
+        "A",
+        "B",
+    ]

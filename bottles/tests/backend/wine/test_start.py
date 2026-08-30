@@ -89,9 +89,7 @@ def test_start_quotes_external_unix_path(monkeypatch):
         host_cwd=True,
     )
 
-    assert captured["args"][0] == (
-        "/wait /unix '/games/KeePass Portable/KeePass.exe'"
-    )
+    assert captured["args"][0] == ("/wait /unix '/games/KeePass Portable/KeePass.exe'")
     assert captured["cwd"] == "/games/KeePass Portable"
 
 

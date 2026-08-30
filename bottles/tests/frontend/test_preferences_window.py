@@ -5,10 +5,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from gi.repository import Gio
+from gi.repository import Adw, Gio
 
 resource_path = Path(
-    os.environ.get("BOTTLES_TEST_RESOURCE", "/app/share/bottles/bottles.gresource")
+    os.environ.get(
+        "BOTTLES_TEST_RESOURCE",
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"),
+    )
 )
 if not resource_path.exists():
     pytest.skip(
@@ -16,13 +19,17 @@ if not resource_path.exists():
         allow_module_level=True,
     )
 Gio.resources_register(Gio.Resource.load(str(resource_path)))
+Adw.init()
 
 from bottles.frontend.windows import window as window_module
 from bottles.frontend.windows.window import BottlesWindow
 
 
+from typing import Any  # noqa: E402
+
+
 class PreferencesWindowStub:
-    instances = []
+    instances: list[Any] = []
 
     def __init__(self, window):
         self.window = window

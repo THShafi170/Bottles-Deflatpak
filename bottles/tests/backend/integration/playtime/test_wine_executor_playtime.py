@@ -8,6 +8,7 @@ from bottles.backend.models.config import BottleConfig
 from bottles.backend.wine.executor import WineExecutor
 from bottles.backend.wine.winepath import WinePath
 from bottles.backend.models.result import Result
+from bottles.backend.state import SignalManager
 
 
 class _Settings:
@@ -20,6 +21,9 @@ class _Settings:
 
 def _new_manager(tmpdir: str) -> Manager:
     os.environ["XDG_DATA_HOME"] = tmpdir
+    Manager._instances.pop(Manager, None)
+    Manager._playtime_signals_connected = False
+    SignalManager._SIGNALS.clear()
     m = Manager(g_settings=_Settings(), check_connection=False, is_cli=True)
     base_dir = os.path.join(tmpdir, "bottles")
     os.makedirs(base_dir, exist_ok=True)
@@ -64,8 +68,12 @@ def test_wine_executor_emits_and_updates_totals(mocker):
 
         # Stub WinePath conversions to avoid system calls / missing libs
         # Instance methods are bound; side_effect receives only the path argument
-        mocker.patch.object(WinePath, "to_unix", side_effect=lambda path: path)
-        mocker.patch.object(WinePath, "to_windows", side_effect=lambda path: path)
+        mocker.patch.object(
+            WinePath, "to_unix", side_effect=lambda path, *args, **kwargs: path
+        )
+        mocker.patch.object(
+            WinePath, "to_windows", side_effect=lambda path, *args, **kwargs: path
+        )
 
         execu = WineExecutor(
             config=_config("b1"),

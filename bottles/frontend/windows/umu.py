@@ -381,9 +381,7 @@ class UmuDependencyDialog(Adw.Dialog):
         self.btn_install.set_sensitive(selected)
 
     def __install(self, *_args):
-        names = tuple(
-            row._umu_name for row in self.rows if row._umu_check.get_active()
-        )
+        names = tuple(row._umu_name for row in self.rows if row._umu_check.get_active())
         if not names:
             return
 
@@ -418,9 +416,9 @@ class UmuDependencyDialog(Adw.Dialog):
                     len(names),
                 ).format(len(names))
             else:
-                message = (
-                    result.message if result is not None else ""
-                ) or _("Dependency installation failed.")
+                message = (result.message if result is not None else "") or _(
+                    "Dependency installation failed."
+                )
             dialog.finish(success, message)
             self.window.show_toast(message)
 
@@ -516,9 +514,7 @@ class UmuEnvironmentDialog(Adw.Dialog):
     def __add_variable(self, *_args):
         if not self.btn_add_variable.get_sensitive():
             return
-        name, value = ShUtils.split_assignment(
-            self.entry_new_variable.get_text()
-        )
+        name, value = ShUtils.split_assignment(self.entry_new_variable.get_text())
         if name in self.rows:
             self.rows[name].set_text(value)
         else:
@@ -532,9 +528,7 @@ class UmuEnvironmentDialog(Adw.Dialog):
         )
 
     def __save(self, *_args):
-        environment = {
-            name: row.get_text() for name, row in self.rows.items()
-        }
+        environment = {name: row.get_text() for name, row in self.rows.items()}
         self.callback(environment)
         self.close()
 
@@ -773,9 +767,7 @@ class UmuInstallDialog(Adw.Dialog):
                 _("Select the portable Windows executable for this game.")
             )
             self.row_installer.set_title(_("Portable Executable"))
-            self.row_installer.set_subtitle(
-                _("Select the .exe that starts the game.")
-            )
+            self.row_installer.set_subtitle(_("Select the .exe that starts the game."))
         else:
             self.page_files.set_title(_("Choose the Installer"))
             self.page_files.set_description(
@@ -801,9 +793,7 @@ class UmuInstallDialog(Adw.Dialog):
         self.window_title.set_subtitle(subtitles[page])
 
         self.btn_back.set_visible(page in ("intro", "installer", "setup", "error"))
-        self.btn_next.set_visible(
-            page in ("intro", "installer", "setup", "executable")
-        )
+        self.btn_next.set_visible(page in ("intro", "installer", "setup", "executable"))
         back_labels = {
             "intro": _("_Cancel"),
             "installing": _("_Stop"),
@@ -1086,9 +1076,7 @@ class UmuInstallDialog(Adw.Dialog):
             elif return_code is None:
                 message = _("The installer stopped without returning a result.")
             else:
-                message = _("The installer exited with status {0}.").format(
-                    return_code
-                )
+                message = _("The installer exited with status {0}.").format(return_code)
             self.status_error.set_description(message)
             self.__set_page("error")
             return
@@ -1486,9 +1474,7 @@ class UmuGameDialog(Adw.Dialog):
             "clicked", self.__reset_working_directory
         )
         self.btn_install_dependencies.connect("clicked", self.__install_dependencies)
-        self.btn_choose_dependencies.connect(
-            "clicked", self.__choose_dependencies
-        )
+        self.btn_choose_dependencies.connect("clicked", self.__choose_dependencies)
         self.combo_dependency_tool.connect(
             "notify::selected", self.__dependency_tool_changed
         )

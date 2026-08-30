@@ -1,3 +1,4 @@
+import os
 # ruff: noqa: E402
 
 from pathlib import Path
@@ -15,10 +16,10 @@ from gi.repository import Adw, Gio
 
 Adw.init()
 
-resource_path = Path("/app/share/bottles/bottles.gresource")
+resource_path = Path(os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"))
 if not resource_path.exists():
     pytest.skip(
-        "Steam Runtime frontend tests require the Bottles Flatpak runtime",
+        "Steam Runtime frontend tests require gresource to be built",
         allow_module_level=True,
     )
 Gio.resources_register(Gio.Resource.load(str(resource_path)))

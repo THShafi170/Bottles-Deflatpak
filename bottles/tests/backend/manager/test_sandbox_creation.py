@@ -174,6 +174,9 @@ def test_create_bottle_rejects_profile_link_outside_prefix(monkeypatch, tmp_path
             nonlocal wineboot_created
             wineboot_created = True
 
+        def init(self):
+            pass
+
     def unpack_template(_template, _config):
         users = tmp_path / "Unsafe" / "drive_c" / "users"
         users.mkdir()

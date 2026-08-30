@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -9,10 +10,10 @@ from bottles.backend.models.config import BottleConfig
 from bottles.backend.wine import winecommand
 from bottles.backend.wine.winecommand import WineCommand
 
-resource_path = Path("/app/share/bottles/bottles.gresource")
+resource_path = Path(os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"))
 if not resource_path.exists():
     pytest.skip(
-        "Gamescope frontend tests require the Bottles Flatpak runtime",
+        "Gamescope frontend tests require gresource to be built",
         allow_module_level=True,
     )
 Gio.resources_register(Gio.Resource.load(str(resource_path)))

@@ -1,3 +1,12 @@
+bottles-deflatpak (66.9) unstable; urgency=medium
+
+  * Sync with upstream 66.9.
+  * Enhanced native Bubblewrap sandboxing.
+  * Playtime session tracking and robust signal architecture.
+  * Native UMU / Proton catalog support.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Sun, 30 Aug 2026 22:15:00 +0600
+
 bottles-deflatpak (64.1) unstable; urgency=medium
 
   * Sync with upstream 64.1.

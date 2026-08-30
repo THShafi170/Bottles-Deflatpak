@@ -83,9 +83,7 @@ class CabExtract:
     @staticmethod
     def __replace_case_duplicates(files_before: dict, files_after: dict):
         previous = {
-            path.lower(): path
-            for path in files_before
-            if not os.path.islink(path)
+            path.lower(): path for path in files_before if not os.path.islink(path)
         }
         for path, timestamp in files_after.items():
             if files_before.get(path) == timestamp:

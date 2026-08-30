@@ -46,9 +46,7 @@ def test_manager_default_gsettings_stub():
     assert Manager().settings.get_boolean("anything") is False
 
 
-def test_delete_sandboxed_bottle_does_not_restart_wine(
-    mocker, monkeypatch, tmp_path
-):
+def test_delete_sandboxed_bottle_does_not_restart_wine(mocker, monkeypatch, tmp_path):
     bottles_path = tmp_path / "bottles"
     bottle_path = bottles_path / "Sandboxed"
     bottle_path.mkdir(parents=True)

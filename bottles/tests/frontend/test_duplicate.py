@@ -1,9 +1,12 @@
+import os
 from types import SimpleNamespace
 
 import pytest
 from gi.repository import Gio
 
-bottles_resource = Gio.Resource.load("/app/share/bottles/bottles.gresource")
+bottles_resource = Gio.Resource.load(
+    os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+)
 bottles_resource._register()
 
 from bottles.backend.models.result import Result  # noqa: E402

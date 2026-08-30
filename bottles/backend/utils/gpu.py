@@ -16,6 +16,8 @@
 #
 
 import os
+import re
+import shutil
 import subprocess
 from enum import Enum
 from functools import lru_cache

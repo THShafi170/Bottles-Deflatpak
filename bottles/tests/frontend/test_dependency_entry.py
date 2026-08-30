@@ -18,10 +18,15 @@ from gi.repository import Gio
 
 blueprint_compiler = shutil.which("blueprint-compiler")
 resource_bundle = Path(
-    os.environ.get("BOTTLES_TEST_RESOURCE", "/app/share/bottles/bottles.gresource")
+    os.environ.get(
+        "BOTTLES_TEST_RESOURCE",
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"),
+    )
 )
 if blueprint_compiler is None or not resource_bundle.is_file():
-    pytest.skip("Bottles Flatpak test resources are required", allow_module_level=True)
+    pytest.skip(
+        "Bottles gresource test resources are required", allow_module_level=True
+    )
 
 resource_dir = tempfile.TemporaryDirectory(prefix="bottles-dependency-entry-")
 source_root = Path(__file__).resolve().parents[3]

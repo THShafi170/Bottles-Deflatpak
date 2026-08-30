@@ -61,9 +61,7 @@ def test_load_preserves_custom_inherited_environment(limit_environment, inherite
 
 
 def test_load_discards_legacy_component_update_preference():
-    result = BottleConfig._fill_with(
-        {"Parameters": {"show_component_updates": False}}
-    )
+    result = BottleConfig._fill_with({"Parameters": {"show_component_updates": False}})
 
     assert result.ok
     assert "show_component_updates" not in result.data.Parameters

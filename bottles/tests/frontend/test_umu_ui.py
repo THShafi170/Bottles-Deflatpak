@@ -10,7 +10,10 @@ from gi.repository import Adw, Gio, Gtk
 from bottles.backend.umu import UmuDatabaseEntry
 
 resource_path = Path(
-    os.environ.get("BOTTLES_TEST_RESOURCE", "/app/share/bottles/bottles.gresource")
+    os.environ.get(
+        "BOTTLES_TEST_RESOURCE",
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"),
+    )
 )
 if not resource_path.exists():
     pytest.skip(

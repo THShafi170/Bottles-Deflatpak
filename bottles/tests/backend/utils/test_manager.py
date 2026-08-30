@@ -49,32 +49,11 @@ class DynamicLauncherPortal:
         )
 
 
-@pytest.mark.parametrize(
-    ("flatpak_id", "expected_prefix"),
-    [
-        (None, ["bottles-cli"]),
-        (
-            "com.usebottles.bottles",
-            [
-                "flatpak",
-                "run",
-                "--command=bottles-cli",
-                "--file-forwarding",
-                "com.usebottles.bottles",
-            ],
-        ),
-    ],
-)
-def test_desktop_entry_uses_host_launch_command(
-    tmp_path, monkeypatch, flatpak_id, expected_prefix
-):
+def test_desktop_entry_uses_host_launch_command(tmp_path, monkeypatch):
     portal = DynamicLauncherPortal()
     icon = tmp_path / "icon.svg"
     icon.write_text("<svg xmlns='http://www.w3.org/2000/svg'/>")
-    if flatpak_id:
-        monkeypatch.setenv("FLATPAK_ID", flatpak_id)
-    else:
-        monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
     monkeypatch.setattr(manager, "portal", portal)
     monkeypatch.setattr(manager.SignalManager, "send", lambda *_args: None)
 
@@ -93,15 +72,16 @@ def test_desktop_entry_uses_host_launch_command(
         for line in portal.desktop_entry.splitlines()
         if line.strip().startswith("Exec=")
     )
-    field_arguments = ["@@u", "%u", "@@"] if flatpak_id else ["%u"]
-    assert shlex.split(exec_line) == expected_prefix + [
+    assert shlex.split(exec_line) == [
+        "bottles-cli",
         "run",
         "-p",
         "Alice's Game",
         "-b",
         "Hero's bottle",
         "--",
-    ] + field_arguments
+        "%u",
+    ]
 
 
 class PortalProxyStub:
@@ -655,22 +635,6 @@ def test_desktop_entry_rejects_control_characters():
         )
 
 
-def test_desktop_entry_exec_uses_flatpak_file_forwarding_for_host(monkeypatch):
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles.Devel")
-    config = BottleConfig(Name="Documents")
-    program = {
-        "name": "Document Editor",
-        "executable": "editor.exe",
-        "file_extensions": [".txt"],
-    }
-
-    assert ManagerUtils.get_desktop_entry_exec(config, program, for_host=True) == (
-        "flatpak run --command=bottles-cli --file-forwarding "
-        '"com.usebottles.bottles.Devel" run -p "Document Editor" '
-        '-b "Documents" -- @@ %f @@'
-    )
-
-
 def test_umu_desktop_entry_exec_uses_game_id(monkeypatch):
     monkeypatch.delenv("FLATPAK_ID", raising=False)
     config = {"Name": "UMU-test"}
@@ -682,22 +646,6 @@ def test_umu_desktop_entry_exec_uses_game_id(monkeypatch):
 
     assert ManagerUtils.get_desktop_entry_exec(config, program, for_host=True) == (
         'bottles-cli umu run --game "e33f87f0-648e-44d2-bb73-78c9f60f77cf"'
-    )
-
-
-def test_umu_desktop_entry_exec_uses_flatpak_cli(monkeypatch):
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles")
-    config = {"Name": "UMU-test"}
-    program = {
-        "name": "Test Game",
-        "executable": "game.exe",
-        "umu_game": "e33f87f0-648e-44d2-bb73-78c9f60f77cf",
-    }
-
-    assert ManagerUtils.get_desktop_entry_exec(config, program, for_host=True) == (
-        "flatpak run --command=bottles-cli "
-        '"com.usebottles.bottles" umu run --game '
-        '"e33f87f0-648e-44d2-bb73-78c9f60f77cf"'
     )
 
 
@@ -791,7 +739,7 @@ def test_create_desktop_entry_installs_associations_through_portal(
 
     icon = tmp_path / "icon.svg"
     icon.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles.Devel")
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
     monkeypatch.setattr(manager, "portal", Portal())
     monkeypatch.setattr(manager, "APP_ID", "com.usebottles.bottles")
     monkeypatch.setattr(
@@ -814,10 +762,8 @@ def test_create_desktop_entry_installs_associations_through_portal(
     assert installed["token"] == "test-token"
     assert installed["desktop_id"] == ManagerUtils.get_desktop_entry_id(config, program)
     assert (
-        "Exec=flatpak run --command=bottles-cli --file-forwarding "
-        '"com.usebottles.bottles.Devel" run -p "Document Editor" '
-        '-b "Documents" -- @@ %f @@'
-        in installed["content"]
+        'Exec=bottles-cli run -p "Document Editor" '
+        '-b "Documents" -- %f' in installed["content"]
     )
     assert "MimeType=text/plain;" in installed["content"]
     assert callback_called == [True]
@@ -1012,7 +958,10 @@ def test_unknown_portal_state_without_manual_launcher_fails(monkeypatch, tmp_pat
     )
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert ManagerUtils.remove_desktop_entry(
-        BottleConfig(Name="Unknown"),
-        {"name": "Editor", "executable": "editor.exe"},
-    ) is False
+    assert (
+        ManagerUtils.remove_desktop_entry(
+            BottleConfig(Name="Unknown"),
+            {"name": "Editor", "executable": "editor.exe"},
+        )
+        is False
+    )

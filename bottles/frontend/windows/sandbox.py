@@ -101,9 +101,7 @@ class SandboxDialog(Adw.Window):
         )
         dialog.add_response("cancel", _("_Cancel"))
         dialog.add_response("continue", _("_Continue"))
-        dialog.set_response_appearance(
-            "continue", Adw.ResponseAppearance.SUGGESTED
-        )
+        dialog.set_response_appearance("continue", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
 
@@ -166,9 +164,7 @@ class SandboxDialog(Adw.Window):
             and SandboxManager.supports_hidraw_devices()
         )
         self.__updating_device_rows = True
-        self.switch_input.set_active(
-            self.config.Sandbox.share_input or hidraw_required
-        )
+        self.switch_input.set_active(self.config.Sandbox.share_input or hidraw_required)
         self.switch_usb.set_active(self.config.Sandbox.share_usb or hidraw_required)
         self.switch_input.set_sensitive(
             SandboxManager.supports_input_devices() and not hidraw_required

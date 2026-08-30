@@ -1,9 +1,14 @@
+import os
 from types import SimpleNamespace
 
 import pytest
 from gi.repository import Gio
 
-Gio.resources_register(Gio.Resource.load("/app/share/bottles/bottles.gresource"))
+Gio.resources_register(
+    Gio.Resource.load(
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+    )
+)
 
 from bottles.frontend.views.list import (  # noqa: E402
     BottleView,

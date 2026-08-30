@@ -72,8 +72,8 @@ class WineUtils:
             os.makedirs(users_dir, exist_ok=True)
             users_real = os.path.realpath(users_dir)
             entries = os.listdir(users_dir)
-            public_roots = []
-            profile_targets = {}
+            public_roots: list[str] = []
+            profile_targets: dict[tuple[int, int], str] = {}
 
             for entry_name in entries:
                 if entry_name.casefold() != "public":

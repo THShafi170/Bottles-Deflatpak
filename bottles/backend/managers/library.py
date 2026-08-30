@@ -274,9 +274,7 @@ class LibraryManager:
         except FileNotFoundError:
             pass
 
-    def remove_from_library(
-        self, _uuid: str, config: Optional[BottleConfig] = None
-    ):
+    def remove_from_library(self, _uuid: str, config: Optional[BottleConfig] = None):
         """
         Removes an entry from the library.yml file.
         """

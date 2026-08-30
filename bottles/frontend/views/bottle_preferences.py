@@ -22,16 +22,10 @@ from gettext import gettext as _
 
 from gi.repository import Adw, Gdk, Gtk
 
-try:
-    from gi.repository import Xdp
-except (ImportError, ValueError):
-    Xdp = None
-
 from bottles.backend.globals import (
     gamemode_available,
     gamescope_available,
     hdr_wsi_available,
-    is_cpak,
     lsfg_vk_available,
     mangohud_available,
     obs_vkc_available,
@@ -71,15 +65,6 @@ from bottles.frontend.windows.vkbasalt import VkBasaltDialog
 from bottles.frontend.windows.vmtouch import VmtouchDialog
 
 logging = Logger()
-
-FLATPAK_INSTALL_COMMANDS = {
-    "gamescope": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope//25.08",
-    "hdr": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.HdrWsi//25.08",
-    "vkbasalt": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.vkBasalt//25.08",
-    "lsfg_vk": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.lsfgvk//25.08",
-    "mangohud": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.MangoHud//25.08",
-    "obsvkc": "flatpak install flathub org.freedesktop.Platform.VulkanLayer.OBSVkCapture//25.08",
-}
 
 
 # noinspection PyUnusedLocal
@@ -204,88 +189,52 @@ class PreferencesView(Adw.PreferencesPage):
                 )
             )
 
-        if not is_cpak() and not Xdp.Portal.running_under_sandbox():
-            return
-
         _not_available = _("This feature is unavailable on your system.")
-        _flatpak_not_available = _("{} To add this feature, please run").format(
-            _not_available
-        )
-        self._install_commands = FLATPAK_INSTALL_COMMANDS
-
-        is_flatpak = "FLATPAK_ID" in os.environ
 
         if not gamemode_available:
-            self.switch_gamemode.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_gamemode.set_tooltip_text(_not_available)
             self.switch_gamemode.set_sensitive(False)
 
         if not gamescope_available:
-            self.switch_gamescope.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_gamescope.set_tooltip_text(_not_available)
             self.switch_gamescope.set_sensitive(False)
             self.btn_manage_gamescope.set_sensitive(False)
 
         if not vkbasalt_available:
-            self.switch_vkbasalt.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_vkbasalt.set_tooltip_text(_not_available)
             self.switch_vkbasalt.set_sensitive(False)
             self.btn_manage_vkbasalt.set_sensitive(False)
 
         if not lsfg_vk_available:
-            _lsfg_vk_command = self._install_commands.get("lsfg_vk")
-            _lsfg_vk_not_available = (
-                f"{_flatpak_not_available} {_lsfg_vk_command}"
-                if is_flatpak
-                else _not_available
-            )
-            self.switch_lsfg_vk.set_tooltip_text(_lsfg_vk_not_available)
-            self.btn_manage_lsfg_vk.set_tooltip_text(_lsfg_vk_not_available)
-            self.__add_unavailable_indicator(
-                self.row_lsfg_vk, _lsfg_vk_command if is_flatpak else None
-            )
+            self.switch_lsfg_vk.set_tooltip_text(_not_available)
+            self.btn_manage_lsfg_vk.set_tooltip_text(_not_available)
+            self.__add_unavailable_indicator(self.row_lsfg_vk, None)
 
         if not mangohud_available:
-            self.switch_mangohud.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_mangohud.set_tooltip_text(_not_available)
             self.switch_mangohud.set_sensitive(False)
             self.btn_manage_mangohud.set_sensitive(False)
 
         if not obs_vkc_available:
-            self.switch_obsvkc.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_obsvkc.set_tooltip_text(_not_available)
             self.switch_obsvkc.set_sensitive(False)
 
         if not vmtouch_available:
-            self.switch_vmtouch.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_vmtouch.set_tooltip_text(_not_available)
             self.switch_vmtouch.set_sensitive(False)
 
         if not sandbox_available:
-            self.switch_sandbox.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.switch_sandbox.set_tooltip_text(_not_available)
             self.switch_sandbox.set_sensitive(False)
-            self.btn_manage_sandbox.set_tooltip_text(
-                _("This feature is unavailable on your system.")
-            )
+            self.btn_manage_sandbox.set_tooltip_text(_not_available)
 
         is_nvidia_gpu = GPUUtils.is_gpu(GPUVendors.NVIDIA)
-        if is_flatpak and is_nvidia_gpu and not hdr_wsi_available:
-            _hdr_command = self._install_commands.get("hdr")
+        if is_nvidia_gpu and not hdr_wsi_available:
             _hdr_message = _(
                 "Older NVIDIA drivers require HdrWsi and ENABLE_HDR_WSI=1 for HDR."
             )
             self.switch_hdr.set_tooltip_text(_hdr_message)
-            self.__add_unavailable_indicator(
-                self.row_hdr, _hdr_command, message=_hdr_message
-            )
+            self.__add_unavailable_indicator(self.row_hdr, None, message=_hdr_message)
 
         # region signals
         self.row_manage_display.connect("activated", self.__show_display_settings)
@@ -364,9 +313,7 @@ class PreferencesView(Adw.PreferencesPage):
         self.combo_windows.connect("notify::selected", self.__set_windows)
         self.combo_language.connect("notify::selected-item", self.__set_language)
         self.combo_sync.connect("notify::selected", self.__set_sync_type)
-        self.spin_frame_rate_limit.connect(
-            "notify::value", self.__set_frame_rate_limit
-        )
+        self.spin_frame_rate_limit.connect("notify::value", self.__set_frame_rate_limit)
         self.entry_name.connect("changed", self.__check_entry_name)
         self.entry_name.connect("apply", self.__save_name)
         # endregion
@@ -1090,9 +1037,7 @@ class PreferencesView(Adw.PreferencesPage):
             )
             dialog.add_response("cancel", _("_Cancel"))
             dialog.add_response("continue", _("_Continue"))
-            dialog.set_response_appearance(
-                "continue", Adw.ResponseAppearance.SUGGESTED
-            )
+            dialog.set_response_appearance("continue", Adw.ResponseAppearance.SUGGESTED)
             dialog.set_default_response("cancel")
             dialog.set_close_response("cancel")
 

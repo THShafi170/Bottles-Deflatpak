@@ -19,7 +19,6 @@ import os
 import shlex
 import subprocess
 
-from bottles.backend.globals import Paths
 from bottles.backend.logger import Logger
 
 logging = Logger()

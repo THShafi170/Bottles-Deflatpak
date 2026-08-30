@@ -22,6 +22,9 @@ class _Settings:
 
 def _new_manager(tmpdir: str) -> Manager:
     os.environ["XDG_DATA_HOME"] = tmpdir
+    Manager._instances.pop(Manager, None)
+    Manager._playtime_signals_connected = False
+    SignalManager._SIGNALS.clear()
     m = Manager(g_settings=_Settings(), check_connection=False, is_cli=True)
     # Force a fresh tracker bound to this tmpdir DB
     base_dir = os.path.join(tmpdir, "bottles")

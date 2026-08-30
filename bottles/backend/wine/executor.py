@@ -96,8 +96,6 @@ class WineExecutor:
     ):
         logging.info("Launching an executable…")
         self.config = config
-        self.umu_id = umu_id
-        self.umu_store = umu_store
         # Per-launch dedicated sandbox override (None / "off"); see WineCommand.
         self.sandbox_override = sandbox_override
         self.__validate_path(exec_path)
@@ -233,9 +231,7 @@ class WineExecutor:
             for key, value in parameter_overrides.items():
                 config.Parameters[key] = value
         backup = program.get("automatic_backup")
-        automatic_backup_enabled = isinstance(backup, dict) and backup.get(
-            "enabled"
-        )
+        automatic_backup_enabled = isinstance(backup, dict) and backup.get("enabled")
         direct_wine_override = (
             any(
                 program.get(key) is not None
@@ -247,7 +243,7 @@ class WineExecutor:
 
         executor = cls(
             config=config,
-            exec_path=exec_path,
+            exec_path=program.get("path"),
             args=arguments,
             environment=environment,
             pre_script=cls._replace_placeholders(
@@ -270,14 +266,8 @@ class WineExecutor:
             program_hide_console=program.get("hide_console") is True,
             sandbox_override=sandbox_override,
         )
-        if (
-            executor.use_winebridge
-            and (
-                arguments
-                or environment
-                or parameter_overrides
-                or direct_wine_override
-            )
+        if executor.use_winebridge and (
+            arguments or environment or parameter_overrides or direct_wine_override
         ):
             logging.info(
                 "Using Wine directly because this program requires process tracking."
@@ -290,9 +280,7 @@ class WineExecutor:
 
                 backup_result = BackupManager.create_program_backup(config, program)
                 if not backup_result.status:
-                    logging.warning(
-                        f"Automatic backup failed: {backup_result.message}"
-                    )
+                    logging.warning(f"Automatic backup failed: {backup_result.message}")
             except Exception as error:
                 logging.error(f"Automatic backup failed: {error}")
         return result
@@ -533,9 +521,7 @@ class WineExecutor:
         raw_path = self._raw_exec_path
         if is_unix_path:
             raw_path = os.path.realpath(self._raw_exec_path)
-            bottle_path = os.path.realpath(
-                ManagerUtils.get_bottle_path(self.config)
-            )
+            bottle_path = os.path.realpath(ManagerUtils.get_bottle_path(self.config))
             try:
                 is_in_bottle = (
                     os.path.commonpath((raw_path, bottle_path)) == bottle_path
@@ -545,9 +531,7 @@ class WineExecutor:
 
         if self.use_winebridge and self.exec_type == "exe":
             winebridge = WineBridge(self.config)
-            if winebridge.is_available() and (
-                not is_unix_path or is_in_bottle
-            ):
+            if winebridge.is_available() and (not is_unix_path or is_in_bottle):
                 exec_path = (
                     winepath.to_windows(self._raw_exec_path, native=True)
                     if is_unix_path
@@ -611,8 +595,6 @@ class WineExecutor:
             pre_script_args=self.pre_script_args,
             post_script_args=self.post_script_args,
             cwd=self.cwd,
-            umu_id=self.umu_id,
-            umu_store=self.umu_store,
             sandbox_override=self.sandbox_override,
         )
         res = winecmd.run()

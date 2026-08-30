@@ -9,9 +9,13 @@ from types import SimpleNamespace
 import pytest
 
 blueprint_compiler = shutil.which("blueprint-compiler")
-resource_bundle = Path("/app/share/bottles/bottles.gresource")
+resource_bundle = Path(
+    os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+)
 if blueprint_compiler is None or not resource_bundle.is_file():
-    pytest.skip("Bottles Flatpak test resources are required", allow_module_level=True)
+    pytest.skip(
+        "Bottles gresource test resources are required", allow_module_level=True
+    )
 
 resource_dir = tempfile.TemporaryDirectory(prefix="bottles-steam-library-")
 source_root = Path(__file__).resolve().parents[3]
@@ -294,20 +298,6 @@ def test_add_entry_warns_after_manual_fallback_failure(monkeypatch):
 
     assert toasts == []
     assert warnings[0].status is False
-
-
-def test_flatpak_fallback_guidance_requires_restart():
-    title, description, command = (
-        ProgramEntry._ProgramEntry__desktop_entry_fallback_content(
-            Result(False, {"method": "manual", "paths": []}),
-            "com.usebottles.bottles.Devel",
-        )
-    )
-
-    assert title == "Desktop Entry Could Not Be Created"
-    assert "Close Bottles" in description
-    assert "reopen Bottles" in description
-    assert command.endswith("com.usebottles.bottles.Devel")
 
 
 def test_native_fallback_guidance_does_not_show_flatpak_command():

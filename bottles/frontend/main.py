@@ -18,13 +18,11 @@
 import gettext
 import locale
 import sys
-import webbrowser
-from os import environ, path
+from os import path
 
 import gi
 
 from bottles.backend.health import HealthChecker
-from bottles.backend.globals import is_official_package
 from bottles.backend.logger import Logger
 from bottles.frontend.params import (
     APP_ID,
@@ -95,14 +93,7 @@ class Bottles(Adw.Application):
         super().__init__(
             application_id=APP_ID,
             resource_base_path="/com/usebottles/bottles",
-            flags=(
-                Gio.ApplicationFlags.HANDLES_COMMAND_LINE
-                | (
-                    Gio.ApplicationFlags.NON_UNIQUE
-                    if environ.get("CPAK_CONTAINER_ID")
-                    else 0
-                )
-            ),
+            flags=(Gio.ApplicationFlags.HANDLES_COMMAND_LINE),
             register_session=True,
         )
         self.__create_action("quit", self.__quit, ["<primary>q", "<primary>w"])
@@ -421,12 +412,7 @@ class Bottles(Adw.Application):
             "/com/usebottles/bottles/appdata",
             f"{APP_MAJOR_VERSION}.{APP_MINOR_VERSION}",
         )
-        version = f"{APP_MAJOR_VERSION}.{APP_MINOR_VERSION}"
-        if is_official_package():
-            about_dialog.set_version(f"{version} ({_('Official Package')})")
-        else:
-            about_dialog.set_version(f"{version} ({_('Unofficial Package')})")
-            about_dialog.set_comments(_("Might not work as expected."))
+        about_dialog.set_version(f"{APP_MAJOR_VERSION}.{APP_MINOR_VERSION}")
         about_dialog.set_developers(developers)
         about_dialog.set_translator_credits(_("translator_credits"))
         about_dialog.set_artists(artists)

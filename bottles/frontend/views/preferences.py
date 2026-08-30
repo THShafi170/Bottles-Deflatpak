@@ -29,7 +29,6 @@ from bottles.backend.state import EventManager, Events
 from bottles.backend.utils.generic import sort_by_version
 from bottles.backend.utils.manager import ManagerUtils
 from bottles.backend.utils.threading import RunAsync
-from bottles.frontend.utils.flatpak import resolve_bottles_directory
 from bottles.frontend.utils.gtk import FONT_SCALE_VALUES
 from bottles.frontend.utils.localization import (
     UI_LANGUAGES,
@@ -59,7 +58,6 @@ class PreferencesWindow(Adw.PreferencesDialog):
     switch_theme = Gtk.Template.Child()
     switch_notifications = Gtk.Template.Child()
     switch_component_updates = Gtk.Template.Child()
-    switch_show_funding = Gtk.Template.Child()
     switch_force_offline = Gtk.Template.Child()
     switch_home_drive = Gtk.Template.Child()
     switch_temp = Gtk.Template.Child()
@@ -181,15 +179,6 @@ class PreferencesWindow(Adw.PreferencesDialog):
             self.switch_component_updates,
             "active",
             Gio.SettingsBindFlags.DEFAULT,
-        )
-        self.settings.bind(
-            "show-funding",
-            self.switch_show_funding,
-            "active",
-            Gio.SettingsBindFlags.DEFAULT,
-        )
-        self.switch_show_funding.connect(
-            "notify::active", self.__funding_setting_changed
         )
         self.settings.bind(
             "playtime-enabled",
@@ -373,10 +362,6 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 _("Disabled. Executables will run without being checked for threats.")
             )
 
-    def __funding_setting_changed(self, switch, _pspec):
-        if switch.get_active():
-            self.data.remove(UserDataKeys.FundingDismissed)
-
     def ui_update(self):
         # Show locally installed runners/DLLs right away so the pages never get
         # stuck on the loading spinner when the online catalog is slow or
@@ -515,7 +500,7 @@ class PreferencesWindow(Adw.PreferencesDialog):
             if response != Gtk.ResponseType.ACCEPT:
                 return
 
-            path = resolve_bottles_directory(self.window, dialog.get_file().get_path())
+            path = dialog.get_file().get_path()
             if path is None:
                 return
             self.__change_umu_path(path)
@@ -557,9 +542,7 @@ class PreferencesWindow(Adw.PreferencesDialog):
         )
         warning.add_response("cancel", _("Cancel"))
         warning.add_response("change", _("Change"))
-        warning.set_response_appearance(
-            "change", Adw.ResponseAppearance.DESTRUCTIVE
-        )
+        warning.set_response_appearance("change", Adw.ResponseAppearance.DESTRUCTIVE)
 
         def response(_dialog, response_id):
             if response_id == "change":
@@ -603,7 +586,7 @@ class PreferencesWindow(Adw.PreferencesDialog):
             if response != Gtk.ResponseType.ACCEPT:
                 return
 
-            path = resolve_bottles_directory(self.window, dialog.get_file().get_path())
+            path = dialog.get_file().get_path()
             if path is None:
                 return
 

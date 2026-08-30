@@ -78,9 +78,7 @@ class UmuProtonCatalog:
         }
 
         def version(name):
-            parts = (
-                name.removeprefix(PROTOSODA_PREFIX).replace("-", ".").split(".")
-            )
+            parts = name.removeprefix(PROTOSODA_PREFIX).replace("-", ".").split(".")
             if not all(part.isdigit() for part in parts):
                 return None
             return tuple(int(part) for part in parts)
@@ -161,7 +159,9 @@ class UmuProtonCatalog:
                 value = self.validate_value(path)
             except ValueError:
                 continue
-            source = "steam" if name in self.manager.external_runners else "bottles"
+            source: Literal["auto", "bottles", "steam"] = (
+                "steam" if name in self.manager.external_runners else "bottles"
+            )
             installed[name] = UmuProtonChoice(
                 key=f"{source}:{name}",
                 title=name,

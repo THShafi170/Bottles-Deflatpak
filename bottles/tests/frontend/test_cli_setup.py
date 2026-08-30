@@ -17,6 +17,7 @@ class FakeManager:
         self.create_result = create_result
         self.calls = []
         self.runners_available = []
+        self.d7vk_available = []
         self.dxvk_available = []
         self.vkd3d_available = []
         self.nvapi_available = []
@@ -34,6 +35,9 @@ class FakeManager:
 
     def check_runners(self, _install_latest):
         self.calls.append(("check_runners", {}))
+
+    def check_d7vk(self, _install_latest):
+        self.calls.append(("check_d7vk", {}))
 
     def check_dxvk(self, _install_latest):
         self.calls.append(("check_dxvk", {}))

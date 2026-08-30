@@ -21,7 +21,6 @@ import json
 import os
 import shutil
 import tempfile
-from typing import ClassVar
 
 from bottles.backend.dlls.dll import DLLComponent
 from bottles.backend.models.config import BottleConfig
@@ -30,7 +29,7 @@ from bottles.backend.utils.manager import ManagerUtils
 
 
 class D7VKComponent(DLLComponent):
-    dlls: ClassVar[dict[str, list[str]]] = {"x32": ["ddraw.dll"]}
+    dlls = {"x32": ["ddraw.dll"]}
     state_version = 1
 
     def __init__(self, version: str):

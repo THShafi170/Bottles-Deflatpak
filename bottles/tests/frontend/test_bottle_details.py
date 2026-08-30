@@ -1,3 +1,4 @@
+import os
 # ruff: noqa: E402
 
 from types import SimpleNamespace
@@ -5,7 +6,9 @@ from types import SimpleNamespace
 import pytest
 from gi.repository import Gio
 
-bottles_resource = Gio.Resource.load("/app/share/bottles/bottles.gresource")
+bottles_resource = Gio.Resource.load(
+    os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+)
 bottles_resource._register()
 
 from bottles.backend.models.config import BottleConfig
@@ -27,7 +30,7 @@ class WidgetStub:
         pass
 
 
-def test_flatpak_system_runner_uses_builtin_label(monkeypatch):
+def test_native_system_runner_label(monkeypatch):
     runner_label = WidgetStub()
     widget = WidgetStub()
     config = BottleConfig(
@@ -44,8 +47,10 @@ def test_flatpak_system_runner_uses_builtin_label(monkeypatch):
         label_name=widget,
         label_arch=widget,
         label_runner=runner_label,
+        img_runner=widget,
         label_environment=widget,
         dot_versioning=widget,
+        grid_versioning=widget,
         btn_versioning_badge=widget,
         label_state=widget,
         _BottleView__update_by_env=lambda: None,
@@ -53,7 +58,9 @@ def test_flatpak_system_runner_uses_builtin_label(monkeypatch):
         update_programs=lambda: None,
         populate_updates=lambda: None,
     )
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles")
+    view.set_runner_identity = lambda runner: BottleView.set_runner_identity(
+        view, runner
+    )
     monkeypatch.setattr(
         bottle_details.ManagerUtils,
         "get_bottle_path",
@@ -63,7 +70,7 @@ def test_flatpak_system_runner_uses_builtin_label(monkeypatch):
 
     BottleView.set_config(view, config)
 
-    assert runner_label.text == "Built-in Wine 11.0"
+    assert runner_label.text == "sys-wine-11.0"
 
 
 def test_missing_runner_dialog_waits_for_versioning_upgrade(monkeypatch):
@@ -90,10 +97,13 @@ def test_missing_runner_dialog_waits_for_versioning_upgrade(monkeypatch):
         label_name=widget,
         label_arch=widget,
         label_runner=widget,
+        img_runner=widget,
         label_environment=widget,
         dot_versioning=widget,
+        grid_versioning=widget,
         btn_versioning_badge=widget,
         label_state=widget,
+        set_runner_identity=lambda runner: None,
         _BottleView__update_by_env=lambda: None,
         _BottleView__set_steam_rules=lambda: None,
         _BottleView__upgrade_versioning=show_upgrade,

@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from gi.repository import Gio
 
+from typing import Any
+
 from bottles.backend.models.config import BottleConfig
 
 with patch.object(Gio.Settings, "new", return_value=object()):
@@ -10,7 +12,7 @@ with patch.object(Gio.Settings, "new", return_value=object()):
 
 
 class FakeManager:
-    configs = {}
+    configs: dict[str, Any] = {}
 
     def __init__(self, **_kwargs):
         self.local_bottles = self.configs

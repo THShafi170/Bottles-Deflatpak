@@ -389,9 +389,7 @@ class BottleView(Adw.PreferencesPage):
 
         def process_programs():
             wineserver_status = WineServer(self.config).is_alive()
-            programs = self.manager.get_programs(
-                self.config, force_update=force_update
-            )
+            programs = self.manager.get_programs(self.config, force_update=force_update)
             programs = sorted(programs, key=lambda p: p.get("name", "").lower())
             handled = 0
 

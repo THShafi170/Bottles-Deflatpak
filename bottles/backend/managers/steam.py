@@ -708,19 +708,17 @@ class SteamManager:
         SignalManager.send(Signals.GShowUri, Result(data=uri))
 
     def add_shortcut(self, program_name: str, program_path: str):
-        if "FLATPAK_ID" in os.environ:
-            cmd = "flatpak"
-            args = f"run --command=bottles-cli {os.environ['FLATPAK_ID']} run -b {{0}} -p {{1}}"
-        else:
-            cmd = "bottles-cli"
-            args = "run -b {0} -p {1}"
+        if not self.config:
+            logging.warning("Config is not set")
+            return Result(False)
+
+        cmd = "bottles-cli"
+        args = "run -b {0} -p {1}"
 
         return self.__add_command_shortcut(
             program_name,
             cmd,
-            args.format(
-                shlex.quote(self.config.Name), shlex.quote(program_name)
-            ),
+            args.format(shlex.quote(self.config.Name), shlex.quote(program_name)),
             ManagerUtils.get_bottle_path(self.config),
             ManagerUtils.extract_icon(self.config, program_name, program_path),
         )
@@ -784,9 +782,7 @@ class SteamManager:
             "umu_game": str(game.id),
         }
         config = {"Name": f"UMU-{game.id}"}
-        command = ManagerUtils.get_desktop_entry_exec(
-            config, program, for_host=True
-        )
+        command = ManagerUtils.get_desktop_entry_exec(config, program, for_host=True)
         executable, *arguments = shlex.split(command)
         return self.__add_command_shortcut(
             game.name,

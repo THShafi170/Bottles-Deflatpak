@@ -1,3 +1,4 @@
+import os
 # ruff: noqa: E402
 
 from types import SimpleNamespace
@@ -5,7 +6,9 @@ from types import SimpleNamespace
 import pytest
 from gi.repository import Gio
 
-bottles_resource = Gio.Resource.load("/app/share/bottles/bottles.gresource")
+bottles_resource = Gio.Resource.load(
+    os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
+)
 bottles_resource._register()
 
 from bottles.backend.models.config import BottleConfig
@@ -48,6 +51,7 @@ def harness(monkeypatch):
             ResponseAppearance=SimpleNamespace(DESTRUCTIVE=object()),
         ),
     )
+
     def run_async(*_args, **kwargs):
         events.append("delete")
         callbacks.append(kwargs["callback"])

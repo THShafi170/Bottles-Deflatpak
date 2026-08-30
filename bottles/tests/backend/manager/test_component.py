@@ -5,9 +5,7 @@ from bottles.backend.globals import Paths
 from bottles.backend.managers.component import ComponentManager
 
 
-def test_component_manager_preserves_catalog_x86_64_runner_name(
-    tmp_path, monkeypatch
-):
+def test_component_manager_preserves_catalog_x86_64_runner_name(tmp_path, monkeypatch):
     temp_path = tmp_path / "temp"
     runners_path = tmp_path / "runners"
     source_path = tmp_path / "source"

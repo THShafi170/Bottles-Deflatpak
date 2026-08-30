@@ -51,13 +51,19 @@ class FVSRepo:
     _REPO_LOCKS = {}
     _REPO_LOCKS_LOCK = Lock()
 
-    def __init__(self, repo_path: str, use_compression: bool = False, no_init: bool = False, block_size: int = DEFAULT_BLOCK_SIZE):
+    def __init__(
+        self,
+        repo_path: str,
+        use_compression: bool = False,
+        no_init: bool = False,
+        block_size: int = DEFAULT_BLOCK_SIZE,
+    ):
         self._repo_path = repo_path
         self._use_compression = use_compression
         self._block_size = block_size
         self._fvs2 = self._get_fvs2_bin()
         self._lock = self._get_repo_lock(repo_path)
-        
+
         self.__states = {}
         self.__active_state_id = None
         self.__active_branch = None
@@ -232,17 +238,13 @@ class FVSRepo:
 
         if cancel_event and cancel_event.is_set():
             raise CancelledError
-        
+
         with self._lock, self._commit_lock(cancel_event):
             metadata_snapshot = (
-                self._snapshot_commit_metadata()
-                if cancel_event is not None
-                else None
+                self._snapshot_commit_metadata() if cancel_event is not None else None
             )
             repository_files = (
-                self._snapshot_repository_files()
-                if cancel_event is not None
-                else None
+                self._snapshot_repository_files() if cancel_event is not None else None
             )
             args = [self._fvs2, "commit", "-m", message, "-v"]
 
@@ -269,7 +271,7 @@ class FVSRepo:
                 nonlocal captured_stdout, last_update, pending_stdout
                 output = output_text(output)
                 if output.startswith(captured_stdout):
-                    pending_stdout += output[len(captured_stdout):]
+                    pending_stdout += output[len(captured_stdout) :]
                 else:
                     pending_stdout += output
                 captured_stdout = output
@@ -323,11 +325,14 @@ class FVSRepo:
                         repository_files,
                     )
                     raise CancelledError
-            
+
             if process.returncode != 0:
                 full_stdout = output_text(stdout).lower()
                 full_stderr = output_text(stderr).lower()
-                if "nothing to commit" in full_stdout or "nothing to commit" in full_stderr:
+                if (
+                    "nothing to commit" in full_stdout
+                    or "nothing to commit" in full_stderr
+                ):
                     raise FVSNothingToCommit()
                 raise RuntimeError(f"FVS commit failed: {stderr}")
 
@@ -340,6 +345,7 @@ class FVSRepo:
     ):
         """Restore to a state. Does NOT auto-refresh; caller should refresh if needed."""
         from bottles.backend.state import TaskManager
+
         with self._lock, self._commit_lock():
             state_id = str(state_id)
             matched = False

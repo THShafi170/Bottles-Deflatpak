@@ -346,9 +346,7 @@ def test_prepare_proton_fsr4_uses_dedicated_sandbox(
     dll = prefix / "drive_c/windows/system32/amdxcffx64.dll"
     dll.parent.mkdir(parents=True)
     dll.write_bytes(b"fsr4")
-    marker = (
-        b'BOTTLES_PROTON_ENV={"FSR4_UPGRADE":"1",' b'"WINE_UPSCALER_REPLACE":"fsr4"}\n'
-    )
+    marker = b'BOTTLES_PROTON_ENV={"FSR4_UPGRADE":"1","WINE_UPSCALER_REPLACE":"fsr4"}\n'
     called = {}
 
     class Process:

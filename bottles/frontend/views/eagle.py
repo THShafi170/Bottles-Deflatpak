@@ -16,6 +16,7 @@
 
 import os
 import uuid
+import webbrowser
 from gettext import gettext as _
 
 from gi.repository import Adw, GLib, Gtk
@@ -295,7 +296,9 @@ class EagleView(Gtk.Box):
                         intel["name"], intel["reports"]
                     )
                 )
-            intel_icon = Gtk.Image.new_from_icon_name("network-transmit-receive-symbolic")
+            intel_icon = Gtk.Image.new_from_icon_name(
+                "network-transmit-receive-symbolic"
+            )
             row.add_prefix(intel_icon)
 
             badges = Gtk.Box(spacing=6)
@@ -778,7 +781,7 @@ class EagleView(Gtk.Box):
             program["environment"] = environment
         if arguments:
             program["arguments"] = " ".join(arguments)
-        
+
         config = manager.update_config(
             config=config,
             key=_uuid,
@@ -876,8 +879,7 @@ class EagleView(Gtk.Box):
                 lines.append(f"- **Note:** {note}")
             for attribution in intel.get("attributions", []):
                 lines.append(
-                    f"- **Data credit:** [{attribution['name']}]"
-                    f"({attribution['url']})"
+                    f"- **Data credit:** [{attribution['name']}]({attribution['url']})"
                 )
                 for license_info in attribution["licenses"]:
                     lines.append(
@@ -890,7 +892,7 @@ class EagleView(Gtk.Box):
                     "not an official ProtonDB rating"
                 )
             lines.append("")
-        
+
         lines.append("## Detected Technologies")
         for category in [
             "Graphics",

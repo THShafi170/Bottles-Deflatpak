@@ -8,7 +8,10 @@ import pytest
 from gi.repository import Gio
 
 resource_path = Path(
-    os.environ.get("BOTTLES_TEST_RESOURCE", "/app/share/bottles/bottles.gresource")
+    os.environ.get(
+        "BOTTLES_TEST_RESOURCE",
+        os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource"),
+    )
 )
 if not resource_path.exists():
     pytest.skip(

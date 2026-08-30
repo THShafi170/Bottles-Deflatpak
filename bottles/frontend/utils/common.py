@@ -15,15 +15,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import webbrowser
-from gettext import gettext as _
+
+from gi.repository import Gio
 
 
 def format_runner_name(runner: str) -> str:
-    if "FLATPAK_ID" in os.environ and runner.startswith("sys-wine-"):
-        version = runner.removeprefix("sys-wine-")
-        return _("Built-in Wine {version}").format(version=version)
     return runner
 
 

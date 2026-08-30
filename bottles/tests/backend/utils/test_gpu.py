@@ -43,16 +43,12 @@ def test_nouveau_detection_uses_sysfs_inside_flatpak(monkeypatch):
 
 
 def test_nouveau_gpu_uses_nvk_icd(monkeypatch):
-    class FakeProcess:
-        def __init__(self, command, **_kwargs):
-            self.command = command
+    def fake_check_output(command, **_kwargs):
+        if "lspci" in command:
+            return "01:00.0 VGA compatible controller: NVIDIA Corporation"
+        return ""
 
-        def communicate(self):
-            if "NVIDIA" in self.command:
-                return b"01:00.0 VGA compatible controller: NVIDIA Corporation", b""
-            return b"", b""
-
-    monkeypatch.setattr(gpu_module.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(gpu_module.subprocess, "check_output", fake_check_output)
     monkeypatch.setattr(GPUUtils, "is_nouveau", lambda _self: True)
     monkeypatch.setattr(gpu_module, "get_nvidia_dll_path", lambda: None)
 
@@ -70,16 +66,12 @@ def test_nouveau_gpu_uses_nvk_icd(monkeypatch):
 
 
 def test_nvidia_gpu_falls_back_to_available_nvk_icd(monkeypatch):
-    class FakeProcess:
-        def __init__(self, command, **_kwargs):
-            self.command = command
+    def fake_check_output(command, **_kwargs):
+        if "lspci" in command:
+            return "01:00.0 VGA compatible controller: NVIDIA Corporation"
+        return ""
 
-        def communicate(self):
-            if "NVIDIA" in self.command:
-                return b"01:00.0 VGA compatible controller: NVIDIA Corporation", b""
-            return b"", b""
-
-    monkeypatch.setattr(gpu_module.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(gpu_module.subprocess, "check_output", fake_check_output)
     monkeypatch.setattr(GPUUtils, "is_nouveau", lambda _self: False)
     monkeypatch.setattr(gpu_module, "get_nvidia_dll_path", lambda: None)
 

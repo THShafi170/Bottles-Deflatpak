@@ -610,14 +610,8 @@ class ManagerUtils:
     def get_desktop_entry_exec(config, program: dict, for_host: bool = False) -> str:
         umu_game = program.get("umu_game")
         if umu_game:
-            command = "bottles-cli"
-            flatpak_id = os.environ.get("FLATPAK_ID")
-            if for_host and flatpak_id:
-                command = "flatpak run --command=bottles-cli {}".format(
-                    ManagerUtils.quote_desktop_entry_exec_arg(flatpak_id)
-                )
             return "{} umu run --game {}".format(
-                command,
+                "bottles-cli",
                 ManagerUtils.quote_desktop_entry_exec_arg(umu_game),
             )
 
@@ -625,21 +619,12 @@ class ManagerUtils:
             program.get("file_extensions", [])
         )
         field_code = "%f" if mime_types else "%u"
-        command = "bottles-cli"
-        field_argument = field_code
-        flatpak_id = os.environ.get("FLATPAK_ID")
-        if for_host and flatpak_id:
-            command = "flatpak run --command=bottles-cli --file-forwarding {}".format(
-                ManagerUtils.quote_desktop_entry_exec_arg(flatpak_id)
-            )
-            forwarding_marker = "@@" if field_code == "%f" else "@@u"
-            field_argument = f"{forwarding_marker} {field_code} @@"
 
         return "{} run -p {} -b {} -- {}".format(
-            command,
+            "bottles-cli",
             ManagerUtils.quote_desktop_entry_exec_arg(program.get("name", "")),
             ManagerUtils.quote_desktop_entry_exec_arg(config.get("Name", "")),
-            field_argument,
+            field_code,
         )
 
     @staticmethod
@@ -746,91 +731,6 @@ class ManagerUtils:
                 return app_id
 
         return ""
-
-        # Attempt via XDG DynamicLauncher portal (works on GNOME, KDE, and
-        # any desktop that implements xdg-desktop-portal).  Falls back to
-        # direct file writing when the portal is unavailable or rejects the
-        # request (e.g. KDE ≤ 5.x with a broken implementation).
-        if portal_available and portal:
-
-            def prepare_install_cb(self, result):
-                # Handle portal preparation failure (e.g. KDE's broken impl)
-                try:
-                    ret = portal.dynamic_launcher_prepare_install_finish(result)
-                    if ret is None:
-                        raise GLib.Error("Portal request was rejected or cancelled")
-                except GLib.Error as e:
-                    logging.warning(
-                        f"Dynamic Launcher portal preparation failed: {e}. "
-                        "Falling back to manual creation."
-                    )
-                    create_manual_fallback(icon, exec_cmd)
-                    return
-
-                launcher_id = f"{config.get('Name')}.{program.get('name')}"
-                sum_type = GLib.ChecksumType.SHA1
-                executable = (
-                    program.get("executable") or program.get("name") or "bottles"
-                )
-                try:
-                    portal.dynamic_launcher_install(
-                        ret["token"],
-                        "{}.App_{}.desktop".format(
-                            APP_ID,
-                            GLib.compute_checksum_for_string(sum_type, launcher_id, -1),
-                        ),
-                        "[Desktop Entry]\n"
-                        f"Exec={exec_cmd}\n"
-                        "Type=Application\n"
-                        "Terminal=false\n"
-                        "Categories=Game;\n"
-                        f"Comment=Launch {program.get('name')} using Bottles.\n"
-                        f"StartupWMClass={executable.lower()}",
-                    )
-                    SignalManager.send(Signals.DesktopEntryCreated)
-                except GLib.Error as e:
-                    logging.warning(
-                        f"Dynamic Launcher portal install failed: {e}. "
-                        "Falling back to manual creation."
-                    )
-                    create_manual_fallback(icon, exec_cmd)
-
-            if icon != "com.usebottles.bottles-program" and not os.path.exists(icon):
-                logging.warning(
-                    f"Icon file not found: {icon}. Falling back to default."
-                )
-                icon = "com.usebottles.bottles-program"
-
-            try:
-                if icon == "com.usebottles.bottles-program":
-                    icon_file = icon + ".svg"
-                    _icon = Gio.File.new_for_uri(
-                        f"resource:/com/usebottles/bottles/icons/scalable/apps/{icon_file}"
-                    )
-                else:
-                    _icon = Gio.File.new_for_path(icon)
-
-                icon_v = Gio.BytesIcon.new(_icon.load_bytes()[0]).serialize()
-                portal.dynamic_launcher_prepare_install(
-                    None,
-                    program.get("name"),
-                    icon_v,
-                    Xdp.LauncherType.APPLICATION,
-                    None,
-                    True,
-                    False,
-                    None,
-                    prepare_install_cb,
-                )
-                return
-            except Exception as e:
-                logging.warning(
-                    f"Could not initiate portal desktop entry creation: {e}. "
-                    "Falling back to manual creation."
-                )
-
-        # Portal unavailable or failed — write the .desktop file directly.
-        create_manual_fallback(icon, exec_cmd)
 
     @staticmethod
     def get_desktop_entry_id(config, program: dict):

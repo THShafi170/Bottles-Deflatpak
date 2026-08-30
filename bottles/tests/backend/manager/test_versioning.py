@@ -162,7 +162,9 @@ def test_create_state_does_not_initialize_after_cancellation(
         "get_bottle_path",
         lambda _config: str(bottle),
     )
-    monkeypatch.setattr(versioning_module.FileUtils, "get_disk_size", cancel_before_init)
+    monkeypatch.setattr(
+        versioning_module.FileUtils, "get_disk_size", cancel_before_init
+    )
     monkeypatch.setattr(
         versioning_module,
         "FVSRepo",
