@@ -86,7 +86,7 @@ You can also use `build-packages.sh` to produce an installable tarball:
 - `blueprint-compiler`
 - GTK 4, libadwaita (≥ 1.2), and GtkSourceView 5 development packages
 - Python 3 with the dependencies listed in `requirements.txt`
-- `cabextract`, `p7zip`, `xdpyinfo`, `ImageMagick`
+- `cabextract`, `7zip` (or `p7zip`), `xdpyinfo`, `ImageMagick`
 - `bubblewrap` (optional, for hardened sandboxing)
 - `umu-launcher` (optional, for enhanced Proton support)
 

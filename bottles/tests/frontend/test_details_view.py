@@ -57,3 +57,44 @@ def test_unload_view_empties_the_page_stack():
     DetailsView.unload_view(view)
 
     assert stack.get_first_child() is None
+
+
+def test_build_pages_avoids_duplicate_stack_entries(monkeypatch):
+    from gi.repository import Adw, Gtk, GLib
+    from bottles.backend.models.config import BottleConfig
+
+    stack = Gtk.Stack()
+    pref = Adw.Bin()
+    deps = Adw.Bin()
+    view = SimpleNamespace(
+        config=BottleConfig(),
+        view_bottle=Adw.Bin(),
+        default_view=Gtk.Box(),
+        view_preferences=pref,
+        view_dependencies=deps,
+        view_registry_rules=Adw.Bin(),
+        view_versioning=Adw.Bin(),
+        view_installers=Adw.Bin(),
+        view_taskmanager=Adw.Bin(),
+        view_eagle=Adw.Bin(),
+        stack_bottle=stack,
+        set_actions=lambda widget: None,
+    )
+    view.view_bottle.actions = Gtk.Box()
+
+    # First build
+    DetailsView.build_pages(view)
+    context = GLib.MainContext.default()
+    while context.pending():
+        context.iteration(False)
+
+    assert stack.get_child_by_name("preferences") == pref
+    assert stack.get_child_by_name("dependencies") == deps
+
+    # Second build (should safely not duplicate)
+    DetailsView.build_pages(view)
+    while context.pending():
+        context.iteration(False)
+
+    assert stack.get_child_by_name("preferences") == pref
+    assert stack.get_child_by_name("dependencies") == deps

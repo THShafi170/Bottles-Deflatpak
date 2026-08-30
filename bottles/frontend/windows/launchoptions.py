@@ -49,6 +49,11 @@ class LaunchOptionsDialog(Adw.Window):
     entry_arguments = Gtk.Template.Child()
     switch_arguments = Gtk.Template.Child()
     switch_hide_console = Gtk.Template.Child()
+    combo_path_mode = Gtk.Template.Child()
+    str_list_path_mode = Gtk.Template.Child()
+    entry_executable = Gtk.Template.Child()
+    btn_executable_reset = Gtk.Template.Child()
+    btn_executable_browse = Gtk.Template.Child()
     switch_autostart = Gtk.Template.Child()
     btn_save = Gtk.Template.Child()
     btn_pre_script = Gtk.Template.Child()
@@ -178,6 +183,8 @@ class LaunchOptionsDialog(Adw.Window):
         self.btn_cwd_reset.connect("clicked", self.__reset_cwd)
         self.btn_automatic_backup.connect("clicked", self.__show_automatic_backup)
         self.btn_reset_defaults.connect("clicked", self.__reset_defaults)
+        self.btn_executable_reset.connect("clicked", self.__reset_executable)
+        self.btn_executable_browse.connect("clicked", self.__choose_executable)
         self.entry_arguments.connect("activate", self.__save)
         self.entry_executable.connect("changed", self.__executable_changed)
         self.switch_arguments.connect("notify::active", self.__toggle_arguments)
@@ -533,7 +540,53 @@ class LaunchOptionsDialog(Adw.Window):
             save,
         ).present()
 
+    def __executable_changed(self, *_args):
+        text = self.entry_executable.get_text().strip()
+        self.btn_executable_reset.set_visible(text != "")
+
+        is_windows = bool(self.__path_re.match(text))
+        is_unix = text.startswith("/")
+        is_valid = is_windows or is_unix or text == ""
+
+        if is_valid or text == "":
+            self.entry_executable.remove_css_class("error")
+            self.btn_save.set_sensitive(True)
+        else:
+            self.entry_executable.add_css_class("error")
+            self.btn_save.set_sensitive(False)
+
+    def __reset_executable(self, *_args):
+        self.entry_executable.set_text(self.program.get("path", ""))
+        self.btn_executable_reset.set_visible(False)
+
+    def __choose_executable(self, *_args):
+        def set_path(dialog, result):
+            try:
+                file = dialog.open_finish(result)
+                if file is None:
+                    return
+                self.entry_executable.set_text(file.get_path())
+            except GLib.Error as error:
+                if error.code != 2:
+                    logging.warning("Error selecting executable: %s" % error)
+
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title(_("Select Executable"))
+        dialog.set_modal(True)
+        bottle_path = ManagerUtils.get_bottle_path(self.config)
+        import os
+        from gi.repository import Gio
+
+        if os.path.exists(bottle_path):
+            dialog.set_initial_folder(Gio.File.new_for_path(bottle_path))
+        dialog.open(parent=self.window, callback=set_path)
+
     def __reset_defaults(self, *_args):
+        self.entry_executable.set_text("")
+        self.entry_executable.remove_css_class("error")
+        self.btn_save.set_sensitive(True)
+        self.btn_executable_reset.set_visible(False)
+        self.combo_path_mode.set_selected(0)
         self.switch_d7vk.set_active(self.global_d7vk)
         self.switch_dxvk.set_active(self.global_dxvk)
         self.switch_vkd3d.set_active(self.global_vkd3d)

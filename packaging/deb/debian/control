@@ -33,7 +33,7 @@ Depends: ${python3:Depends},
          hicolor-icon-theme,
          python3-icoextract,
          imagemagick,
-         p7zip-full,
+         7zip | p7zip-full,
          patool,
          x11-utils,
          libdconf1,
@@ -56,8 +56,18 @@ Depends: ${python3:Depends},
          python3-pefile,
          python3-yara,
          gir1.2-libportal-1.0,
+         gir1.2-libportal-gtk4-1,
+         gir1.2-gdkpixbuf-2.0,
          bubblewrap,
          umu-launcher
+Recommends: gamemode,
+            mangohud,
+            gamescope,
+            vmtouch,
+            pciutils,
+            vulkan-tools
+Suggests: obs-vkcapture,
+          vkbasalt
 Description: Easily manage wine and proton prefixes (Native Fork)
  Bottles lets you run Windows software on Linux, such as applications
  and games. It introduces a workflow that helps you organize by

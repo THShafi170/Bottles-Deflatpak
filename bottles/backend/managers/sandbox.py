@@ -99,6 +99,10 @@ class SandboxManager:
         # Basic filesystem skeleton
         args.extend(["--proc", "/proc"])
         args.extend(["--dev", "/dev"])
+        if os.path.exists("/dev/shm"):
+            args.extend(["--dev-bind-try", "/dev/shm", "/dev/shm"])
+        if os.path.exists("/dev/pts"):
+            args.extend(["--dev-bind-try", "/dev/pts", "/dev/pts"])
         args.extend(["--tmpfs", "/tmp"])
         args.extend(["--dir", "/var"])
         args.extend(["--dir", "/run"])
@@ -112,7 +116,11 @@ class SandboxManager:
             "/sbin",
             # NixOS / immutable-rootfs distros
             "/nix/store",
+            "/nix/var/nix/profiles",
             "/run/current-system",
+            "/run/booted-system",
+            "/etc/profiles/per-user",
+            "/etc/static",
         ]:
             if os.path.exists(p):
                 args.extend(["--ro-bind", p, p])
@@ -129,6 +137,9 @@ class SandboxManager:
             "/usr/share/icons",
             "/usr/share/themes",
             "/usr/share/fontconfig",
+            "/usr/share/applications",
+            "/usr/share/desktop-directories",
+            "/usr/share/mime",
         ]:
             if os.path.exists(p):
                 args.extend(["--ro-bind", p, p])
@@ -152,7 +163,7 @@ class SandboxManager:
             if p and os.path.exists(p):
                 args.extend(["--bind", p, p])
 
-        # D-Bus session socket (needed for display/sound forwarding)
+        # D-Bus session socket (needed for desktop portal / browser handover / display / sound forwarding)
         if (self.share_display or self.share_sound) and self.__xdg_runtime_dir:
             dbus_socket = os.path.join(self.__xdg_runtime_dir, "bus")
             if os.path.exists(dbus_socket):
@@ -164,6 +175,9 @@ class SandboxManager:
                         f"unix:path={dbus_socket}",
                     ]
                 )
+            doc_socket = os.path.join(self.__xdg_runtime_dir, "doc")
+            if os.path.exists(doc_socket):
+                args.extend(["--bind", doc_socket, doc_socket])
 
         # Networking
         if self.share_net:
@@ -199,6 +213,16 @@ class SandboxManager:
                 wayland_socket = os.path.join(self.__xdg_runtime_dir, wayland_display)
                 if os.path.exists(wayland_socket):
                     args.extend(["--bind", wayland_socket, wayland_socket])
+
+            for env_key in [
+                "XDG_CURRENT_DESKTOP",
+                "DESKTOP_SESSION",
+                "XDG_DATA_DIRS",
+                "XDG_CONFIG_DIRS",
+            ]:
+                val = os.environ.get(env_key)
+                if val and env_key not in self.envs:
+                    args.extend(["--setenv", env_key, val])
 
         # Sound sharing — PulseAudio + PipeWire
         if self.share_sound and self.__xdg_runtime_dir:
@@ -249,6 +273,8 @@ class SandboxManager:
                 "/usr/lib/i386-linux-gnu/dri",
                 "/run/opengl-driver",
                 "/run/opengl-driver-32",
+                "/run/current-system/sw/share/vulkan",
+                "/run/current-system/sw/lib",
                 "/etc/static",
             ]:
                 if os.path.exists(p):
@@ -259,6 +285,8 @@ class SandboxManager:
             args.extend(["--tmpfs", "/dev/input"])
         elif self.share_input and self.supports_input_devices():
             args.extend(["--dev-bind", "/dev/input", "/dev/input"])
+            if os.path.exists("/run/udev"):
+                args.extend(["--ro-bind", "/run/udev", "/run/udev"])
 
         if not self.share_usb and os.path.isdir("/dev/bus/usb"):
             args.extend(["--tmpfs", "/dev/bus/usb"])

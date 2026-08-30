@@ -13,7 +13,7 @@
   gtksourceview5,
   libadwaita,
   cabextract,
-  p7zip,
+  _7zz,
   xdpyinfo,
   imagemagick,
   lsb-release,
@@ -87,7 +87,7 @@ python3Packages.buildPythonApplication {
     ]
     ++ [
       cabextract
-      p7zip
+      _7zz
       xdpyinfo
       imagemagick
       vkbasalt-cli

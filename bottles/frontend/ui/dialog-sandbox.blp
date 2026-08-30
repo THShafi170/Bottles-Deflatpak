@@ -21,8 +21,18 @@ template $SandboxDialog: Adw.Window {
 
     Adw.PreferencesPage {
       Adw.PreferencesGroup {
-        title: _("Hardware & Resources");
+        title: _("Hardware and Resources");
         description: _("Configure resource access for the native Bubblewrap sandbox.");
+
+        Adw.ActionRow {
+          title: _("Share Network");
+          subtitle: _("Allow internet and network access inside the bottle");
+          activatable-widget: switch_net;
+
+          Switch switch_net {
+            valign: center;
+          }
+        }
 
         Adw.ActionRow {
           title: _("Share GPU");

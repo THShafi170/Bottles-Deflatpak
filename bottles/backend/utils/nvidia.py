@@ -96,6 +96,15 @@ def get_nvidia_dll_path():
     if not GPUUtils.is_gpu(GPUVendors.NVIDIA):
         return None
 
+    # Check NixOS graphics driver paths
+    for nix_candidate in [
+        "/run/opengl-driver/lib/nvidia/wine",
+        "/run/opengl-driver/share/nvidia/wine",
+        "/run/opengl-driver-32/lib/nvidia/wine",
+    ]:
+        if os.path.isfile(os.path.join(nix_candidate, "nvngx.dll")):
+            return nix_candidate
+
     libglx_path = get_nvidia_glx_path()
     if not libglx_path:
         logging.warning("Unable to locate libGLX_nvidia")

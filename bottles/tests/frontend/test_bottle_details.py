@@ -190,3 +190,25 @@ def test_update_programs_controls_cache_refresh(monkeypatch, force_update):
     BottleView.update_programs(view, force_update=force_update)
 
     assert calls == [{"force_update": force_update}]
+
+
+def test_run_dialog_launches_rundll32_shell32(monkeypatch):
+    calls = []
+    config = BottleConfig(Name="Test")
+    view = SimpleNamespace(config=config)
+
+    class FakeRunDLL32:
+        def __init__(self, target_config):
+            assert target_config == config
+
+        def run_dialog(self):
+            calls.append("run_dialog")
+
+    monkeypatch.setattr(bottle_details, "RunDLL32", FakeRunDLL32)
+    monkeypatch.setattr(
+        bottle_details, "RunAsync", lambda fn, *args, **kwargs: fn(*args, **kwargs)
+    )
+
+    BottleView.run_dialog(view, None)
+
+    assert calls == ["run_dialog"]

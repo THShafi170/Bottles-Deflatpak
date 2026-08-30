@@ -51,6 +51,11 @@ packagecache
 .build
 *.buildinfo
 *.tar.gz
+*.pkg.tar.zst
+*.rpm
+/rpmbuild/
+/packaging/aur/src/
+/packaging/aur/pkg/
 
 
 # Ignore files generated during build

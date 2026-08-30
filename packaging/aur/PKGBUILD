@@ -22,7 +22,7 @@ depends=(
   imagemagick
   libadwaita
   libportal-gtk4
-  p7zip
+  7zip
   patool
   python
   python-chardet
@@ -52,6 +52,9 @@ optdepends=(
   'gamescope: Gamescope compositor'
   'mangohud: Performance overlay'
   'vmtouch: File preloading'
+  'obs-vkcapture: Vulkan/OpenGL game capture for OBS Studio'
+  'vulkan-tools: Vulkan capability detection'
+  'pciutils: GPU detection'
 )
 makedepends=(
   blueprint-compiler

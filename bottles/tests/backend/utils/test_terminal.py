@@ -44,3 +44,11 @@ def test_check_support_returns_false_when_no_terminals_available(monkeypatch):
     monkeypatch.setattr(_shutil, "which", lambda _: None)
     terminal = TerminalUtils()
     assert terminal.check_support() is False
+
+
+def test_supported_terminals_contain_modern_terminals():
+    bins = [t[0] for t in TerminalUtils.terminals]
+    assert "ptyxis" in bins
+    assert "ghostty" in bins
+    assert "alacritty" in bins
+    assert "foot" in bins

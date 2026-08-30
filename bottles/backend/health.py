@@ -86,6 +86,16 @@ class HealthChecker:
                 key = "ImageMagick"
             elif tool == "fvs2":
                 key = "FVS"
+            elif tool == "p7zip":
+                has_7z = bool(
+                    shutil.which("7z")
+                    or shutil.which("7zz")
+                    or shutil.which("7za")
+                    or shutil.which("7zr")
+                    or shutil.which("p7zip")
+                )
+                setattr(self, "p7zip", has_7z)
+                continue
 
             # Check for python modules or binaries
             if tool in ["icoextract", "pefile", "markdown", "patool"]:

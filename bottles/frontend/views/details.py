@@ -185,13 +185,25 @@ class DetailsView(Adw.Bin):
             if self.view_bottle.get_parent() is None:
                 self.default_view.append(self.view_bottle)
 
-            self.stack_bottle.add_named(self.view_preferences, "preferences")
-            self.stack_bottle.add_named(self.view_dependencies, "dependencies")
-            self.stack_bottle.add_named(self.view_registry_rules, "registry_rules")
-            self.stack_bottle.add_named(self.view_versioning, "versioning")
-            self.stack_bottle.add_named(self.view_installers, "installers")
-            self.stack_bottle.add_named(self.view_taskmanager, "taskmanager")
-            self.stack_bottle.add_named(self.view_eagle, "eagle")
+            pages_to_add = [
+                (self.view_preferences, "preferences"),
+                (self.view_dependencies, "dependencies"),
+                (self.view_registry_rules, "registry_rules"),
+                (self.view_versioning, "versioning"),
+                (self.view_installers, "installers"),
+                (self.view_taskmanager, "taskmanager"),
+                (self.view_eagle, "eagle"),
+            ]
+
+            for view, name in pages_to_add:
+                if name in self.__pages:
+                    if self.stack_bottle.get_child_by_name(name) is None:
+                        if view.get_parent() is not None:
+                            view.get_parent().remove(view)
+                        self.stack_bottle.add_named(view, name)
+                else:
+                    if self.stack_bottle.get_child_by_name(name) is not None:
+                        self.stack_bottle.remove(view)
 
             if self.view_bottle.actions.get_parent() is None:
                 self.set_actions(self.view_bottle.actions)

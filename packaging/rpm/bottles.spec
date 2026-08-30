@@ -29,11 +29,11 @@ Requires:       gtk4
 Requires:       gtksourceview5
 Requires:       hicolor-icon-theme
 Requires:       libadwaita >= 1.1.99
-Requires:       p7zip                   %dnl # needed by the dependencies manager
+Requires:       7zip                    %dnl # needed for archive extraction (7z)
 Requires:       patool
 Requires:       xdpyinfo                %dnl # needed by the display util
 Requires:       ImageMagick             %dnl # needed for icon conversion
-Requires:       libportal
+Requires:       libportal-gtk4
 Requires:       bubblewrap              %dnl # needed for native sandboxing
 Requires:       umu-launcher            %dnl # needed for UMU support
 # fvs2 is the versioning backend (Go binary). It is not yet in Fedora/RHEL
@@ -81,7 +81,8 @@ Recommends:     mangohud
 Suggests:       obs-studio-plugin-vkcapture
 Recommends:     vkBasalt
 Recommends:     vmtouch
-Recommends:     bubblewrap
+Recommends:     pciutils
+Recommends:     vulkan-tools
 
 
 %description
@@ -112,8 +113,8 @@ Features:
 
 %install
 %meson_install
-# The gettext domain is 'bottles'
-%find_lang bottles
+# The gettext domain is 'com.usebottles.bottles'
+%find_lang com.usebottles.bottles
 
 
 %check
@@ -121,7 +122,7 @@ appstream-util validate-relax --nonet %buildroot%_metainfodir/*.xml
 desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
-%files -f bottles.lang
+%files -f com.usebottles.bottles.lang
 %license COPYING.md
 %doc README.md
 %{_bindir}/bottles
@@ -130,10 +131,17 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 %{_datadir}/applications/*.desktop
 %{_datadir}/glib-2.0/schemas/*.gschema.xml
 %{_datadir}/icons/hicolor/*/apps/*.svg
+%{_datadir}/licenses/com.usebottles.bottles/
 %{_metainfodir}/*.xml
 
 
 %changelog
+* Mon Aug 31 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 66.10-1
+- Sync with upstream 66.10
+- Add Run dialogue command to Legacy Wine Tools
+- Fix Chrome/Chromium browser handover crash
+- Pure native execution with enhanced NixOS and driver support
+
 * Tue Jun 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 64.1-1
 - Sync with upstream 64.1
 - Eagle malware/stealer scanner with crash-detection prompt
@@ -155,5 +163,5 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 - Integrated NixOS patches directly into the code
 - Robust terminal quoting and desktop entry portal support
 
-* Sun Feb 23 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 62.0-1
+* Mon Feb 23 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 62.0-1
 - Universal RPM package (distro-agnostic)

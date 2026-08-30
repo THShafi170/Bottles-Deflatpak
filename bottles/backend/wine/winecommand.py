@@ -454,6 +454,8 @@ class WineCommand:
                 override=True,
             )
             env.add("PROTON_USE_SECCOMP", "1", override=True)
+            env.add("USER", "steamuser", override=True)
+            env.add("USERNAME", "steamuser", override=True)
 
             if params.proton_log:
                 env.add("PROTON_LOG", "1", override=True)
@@ -470,6 +472,10 @@ class WineCommand:
 
             for e in environment:
                 env.add(e, environment[e], override=True)
+
+        current_path = os.environ.get("PATH", "/usr/bin:/bin")
+        if os.path.isdir(Paths.helpers):
+            env.add("PATH", f"{Paths.helpers}:{current_path}")
 
         # Language
         if config.Language != "sys":
@@ -851,19 +857,20 @@ class WineCommand:
             _picked = {}
 
             if _rs:
-                if "steamrt4" in _rs.keys() and "steamrt4" in self.runner_runtime:
+                runner_rt = self.runner_runtime or ""
+                if "steamrt4" in _rs.keys() and "steamrt4" in runner_rt:
                     """
                     Steam Linux Runtime 4 (steamrt4) is the default runtime used by Proton version >= 11.0
                     """
                     _picked = _rs["steamrt4"]
-                elif "sniper" in _rs.keys() and "sniper" in self.runner_runtime:
+                elif "sniper" in _rs.keys() and "sniper" in runner_rt:
                     """
                     Sniper is the default runtime used by Proton version >= 8.0 and < 11.0
                     """
                     _picked = _rs["sniper"]
-                elif "soldier" in _rs.keys() and "soldier" in self.runner_runtime:
+                elif "soldier" in _rs.keys() and "soldier" in runner_rt:
                     """
-                    Sniper is the default runtime used by Proton version >= 5.13 and < 8.0
+                    Soldier is the default runtime used by Proton version >= 5.13 and < 8.0
                     """
                     _picked = _rs["soldier"]
                 elif "scout" in _rs.keys():
@@ -1046,6 +1053,8 @@ class WineCommand:
         # its entry point inside the dedicated sandbox. Symlinks are resolved so
         # the real target gets shared, not just the link.
         share_paths_ro = [Paths.runners, Paths.temp]
+        if os.path.isdir(Paths.helpers):
+            share_paths_ro.append(Paths.helpers)
 
         runner_root = (
             self.config.RunnerPath
@@ -1102,6 +1111,8 @@ class WineCommand:
             share_paths_ro=[p for p in share_paths_ro if p],
             share_net=self.config.Sandbox.share_net,
             share_sound=self.config.Sandbox.share_sound,
+            share_display=True,
+            share_gpu=True,
             share_input=self.config.Sandbox.share_input or hidraw_selected,
             share_usb=self.config.Sandbox.share_usb or hidraw_selected,
             share_hidraw=hidraw_selected,

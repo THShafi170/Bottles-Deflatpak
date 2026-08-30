@@ -16,6 +16,7 @@
 #
 
 import filecmp
+import os
 import shutil
 import subprocess
 from functools import lru_cache
@@ -30,11 +31,23 @@ class VulkanUtils:
         "/usr/local/etc/vulkan",
         "/run/opengl-driver/share/vulkan",
         "/run/opengl-driver-32/share/vulkan",
+        "/run/current-system/sw/share/vulkan",
         "/usr/lib/x86_64-linux-gnu/vulkan",
         "/usr/lib/i386-linux-gnu/vulkan",
         "/usr/lib/vulkan",
         "/usr/lib64/vulkan",
     ]
+
+    @classmethod
+    def get_icd_dirs(cls) -> list[str]:
+        dirs = list(cls.__vk_icd_dirs)
+        xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", "").split(":")
+        for d in xdg_data_dirs:
+            if d:
+                candidate = os.path.join(d, "vulkan")
+                if candidate not in dirs and os.path.isdir(candidate):
+                    dirs.append(candidate)
+        return dirs
 
     def __init__(self):
         self.loaders = self.__get_vk_icd_loaders()
@@ -42,7 +55,7 @@ class VulkanUtils:
     def __get_vk_icd_loaders(self):
         loaders = {"nvidia": [], "nouveau": [], "amd": [], "intel": []}
 
-        for _dir in self.__vk_icd_dirs:
+        for _dir in self.get_icd_dirs():
             _files = glob(f"{_dir}/icd.d/*.json", recursive=True)
 
             for file in _files:

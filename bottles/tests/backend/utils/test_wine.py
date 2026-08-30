@@ -205,6 +205,18 @@ def test_steamuser_host_name_does_not_create_self_link(tmp_path):
     assert not steamuser.is_symlink()
 
 
+def test_proton_profile_creation_does_not_create_host_user(monkeypatch, tmp_path):
+    prefix = tmp_path / "prefix"
+    monkeypatch.setenv("USER", "myhostuser")
+
+    assert WineUtils.ensure_user_profile_alias(str(prefix), "steamuser") is True
+
+    users = prefix / "drive_c" / "users"
+    assert (users / "steamuser").is_dir()
+    assert not (users / "myhostuser").exists()
+    assert len(list(users.iterdir())) == 1
+
+
 def test_case_variant_steamuser_gets_lowercase_alias(tmp_path):
     prefix = tmp_path / "prefix"
 
@@ -675,3 +687,23 @@ def test_conflicting_real_profiles_do_not_block_bottle_creation(tmp_path):
     assert WineUtils.ensure_user_profile_alias(str(prefix), "mirko") is True
     assert not (users / "mirko").is_symlink()
     assert not (users / "steamuser").is_symlink()
+
+
+def test_find_system_wine_which(monkeypatch):
+    monkeypatch.setattr(wine_module.shutil, "which", lambda _cmd: "/usr/bin/wine")
+    monkeypatch.setattr(wine_module.os.path, "isfile", lambda _path: True)
+    monkeypatch.setattr(wine_module.os, "access", lambda _path, _mode: True)
+
+    assert WineUtils.find_system_wine() == "/usr/bin/wine"
+
+
+def test_find_system_wine_nixos_fallback(monkeypatch):
+    monkeypatch.setattr(wine_module.shutil, "which", lambda _cmd: None)
+
+    def fake_isfile(path):
+        return path == "/run/current-system/sw/bin/wine"
+
+    monkeypatch.setattr(wine_module.os.path, "isfile", fake_isfile)
+    monkeypatch.setattr(wine_module.os, "access", lambda _path, _mode: True)
+
+    assert WineUtils.find_system_wine() == "/run/current-system/sw/bin/wine"

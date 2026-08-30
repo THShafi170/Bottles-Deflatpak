@@ -155,20 +155,9 @@ Popover popover_exec_settings {
   }
 }
 
-template $DetailsBottle: Adw.PreferencesPage {
-  Overlay drop_overlay {
-    visible: false;
+template $DetailsBottle: Overlay {
+  Adw.PreferencesPage {
 
-    [overlay]
-    Adw.StatusPage {
-      icon-name: "system-run-symbolic";
-      title: _("Drop files to execute them");
-
-      styles [
-        "dragndrop_overlay",
-      ]
-    }
-  }
 
   Adw.PreferencesGroup {
     Adw.Clamp {
@@ -538,6 +527,15 @@ template $DetailsBottle: Adw.PreferencesPage {
     Adw.ExpanderRow {
       title: _("Legacy Wine Tools");
 
+      Adw.ActionRow row_run {
+        activatable: true;
+        title: _("Run");
+
+        Image {
+          icon-name: "external-link-symbolic";
+        }
+      }
+
       Adw.ActionRow row_explorer {
         activatable: true;
         title: _("Explorer");
@@ -592,5 +590,16 @@ template $DetailsBottle: Adw.PreferencesPage {
         }
       }
     }
+  }
+}
+  [overlay]
+  Adw.StatusPage drop_overlay {
+    visible: false;
+    icon-name: "system-run-symbolic";
+    title: _("Drop files to execute them");
+
+    styles [
+      "dragndrop_overlay",
+    ]
   }
 }

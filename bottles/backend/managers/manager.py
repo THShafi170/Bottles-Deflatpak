@@ -753,6 +753,39 @@ class Manager(metaclass=Singleton):
             logging.info("LatencyFleX path doesn't exist, creating now.")
             os.makedirs(Paths.latencyflex, exist_ok=True)
 
+        if not os.path.isdir(Paths.helpers):
+            os.makedirs(Paths.helpers, exist_ok=True)
+
+        xdg_open_wrapper = os.path.join(Paths.helpers, "xdg-open")
+        wrapper_content = """#!/usr/bin/env sh
+# Clean Wine/Proton runner environment before handing over to host browser
+unset LD_LIBRARY_PATH
+unset LD_PRELOAD
+unset WINEDLLOVERRIDES
+unset WINEPREFIX
+unset WINEARCH
+unset WINEDEBUG
+unset PROTON_EAC_RUNTIME
+unset PROTON_BATTLEYE_RUNTIME
+unset VK_ICD_FILENAMES
+
+for p in /usr/bin/xdg-open /bin/xdg-open /usr/local/bin/xdg-open; do
+    if [ -x "$p" ]; then
+        exec "$p" "$@"
+    fi
+done
+
+if command -v gio >/dev/null 2>&1; then
+    exec gio open "$@"
+fi
+"""
+        try:
+            with open(xdg_open_wrapper, "w", encoding="utf-8") as f:
+                f.write(wrapper_content)
+            os.chmod(xdg_open_wrapper, 0o755)
+        except OSError:
+            pass
+
     @RunAsync.run_async
     def organize_components(self):
         """Get components catalog and organizes into supported_ lists."""
@@ -865,7 +898,7 @@ class Manager(metaclass=Singleton):
                         os.rename(winemenubuilder, f"{winemenubuilder}.lock")
 
         # check system wine
-        if system_wine := shutil.which("wine"):
+        if system_wine := WineUtils.find_system_wine():
             """
             If the Wine command is available, get the runner version
             and add it to the runners_available list.
@@ -2072,7 +2105,11 @@ class Manager(metaclass=Singleton):
         if cancel_result is not None:
             return cancel_result
 
-        if not WineUtils.ensure_user_profile_alias(bottle_complete_path):
+        runner_path = ManagerUtils.get_runner_path(config.Runner)
+        is_proton = SteamUtils.is_proton(runner_path)
+        profile_user = "steamuser" if is_proton else None
+
+        if not WineUtils.ensure_user_profile_alias(bottle_complete_path, profile_user):
             logging.error(
                 "Could not create a shared Wine and Proton user profile.", jn=True
             )

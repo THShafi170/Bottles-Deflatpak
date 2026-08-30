@@ -55,12 +55,19 @@ template $InstallerDialog: Adw.Window {
       StackPage page_resources {
         name: "page_resources";
 
-        child: Adw.PreferencesPage {
-          Adw.PreferencesGroup group_resources {
-            description: _("This installer requires some local resources which cannot be provided otherwise.");
+        child: Box {
+          orientation: vertical;
+
+          Adw.PreferencesPage {
+            vexpand: true;
+
+            Adw.PreferencesGroup group_resources {
+              description: _("This installer requires some local resources which cannot be provided otherwise.");
+            }
           }
 
           Button btn_proceed {
+            margin-bottom: 24;
             label: _("Proceed");
             sensitive: false;
             visible: false;

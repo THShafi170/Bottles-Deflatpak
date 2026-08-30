@@ -40,6 +40,7 @@ from bottles.backend.wine.control import Control
 from bottles.backend.wine.executor import WineExecutor
 from bottles.backend.wine.explorer import Explorer
 from bottles.backend.wine.regedit import Regedit
+from bottles.backend.wine.rundll32 import RunDLL32
 from bottles.backend.wine.taskmgr import Taskmgr
 from bottles.backend.wine.uninstaller import Uninstaller
 from bottles.backend.wine.wineboot import WineBoot
@@ -61,7 +62,7 @@ from bottles.frontend.windows.upgradeversioning import UpgradeVersioningDialog
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/details-bottle.ui")
-class BottleView(Adw.PreferencesPage):
+class BottleView(Gtk.Overlay):
     __gtype_name__ = "DetailsBottle"
     __registry = []
 
@@ -84,6 +85,7 @@ class BottleView(Adw.PreferencesPage):
     row_dependencies = Gtk.Template.Child()
     row_snapshots = Gtk.Template.Child()
     row_taskmanager = Gtk.Template.Child()
+    row_run = Gtk.Template.Child()
     row_debug = Gtk.Template.Child()
     row_explorer = Gtk.Template.Child()
     row_cmd = Gtk.Template.Child()
@@ -175,6 +177,7 @@ class BottleView(Adw.PreferencesPage):
         self.row_snapshots.connect("activated", self.__change_page, "versioning")
         self.row_taskmanager.connect("activated", self.__change_page, "taskmanager")
         self.row_winecfg.connect("activated", self.run_winecfg)
+        self.row_run.connect("activated", self.run_dialog)
         self.row_debug.connect("activated", self.run_debug)
         self.row_explorer.connect("activated", self.run_explorer)
         self.row_cmd.connect("activated", self.run_cmd)
@@ -257,9 +260,28 @@ class BottleView(Adw.PreferencesPage):
         self.__update_by_env()
 
         # set update_date
-        update_date = datetime.strptime(self.config.Update_Date, "%Y-%m-%d %H:%M:%S.%f")
-        update_date = update_date.strftime("%b %d %Y %H:%M:%S")
-        self.label_name.set_tooltip_text(_("Updated: %s" % update_date))
+        if self.config.Update_Date:
+            try:
+                update_date = datetime.strptime(
+                    self.config.Update_Date, "%Y-%m-%d %H:%M:%S.%f"
+                )
+                self.label_name.set_tooltip_text(
+                    _("Updated: %s" % update_date.strftime("%b %d %Y %H:%M:%S"))
+                )
+            except (ValueError, TypeError):
+                try:
+                    update_date = datetime.strptime(
+                        self.config.Update_Date, "%Y-%m-%d %H:%M:%S"
+                    )
+                    self.label_name.set_tooltip_text(
+                        _("Updated: %s" % update_date.strftime("%b %d %Y %H:%M:%S"))
+                    )
+                except (ValueError, TypeError):
+                    self.label_name.set_tooltip_text(
+                        _("Updated: %s" % self.config.Update_Date)
+                    )
+        else:
+            self.label_name.set_tooltip_text(None)
 
         # set arch
         self.label_arch.set_text((self.config.Arch or "n/a").capitalize())
@@ -880,6 +902,10 @@ the Bottles preferences or choose a new one to run applications."
     def run_winecfg(self, widget):
         program = WineCfg(self.config)
         RunAsync(program.launch)
+
+    def run_dialog(self, widget):
+        program = RunDLL32(self.config)
+        RunAsync(program.run_dialog)
 
     def run_debug(self, widget):
         program = WineDbg(self.config)

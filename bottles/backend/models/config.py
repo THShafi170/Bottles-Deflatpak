@@ -91,8 +91,10 @@ class BottleSandboxParams(DictCompatMixIn):
     share_sound: bool = False
     share_input: bool = False
     share_usb: bool = False
-    # share_host_ro: bool = True  # TODO: implement, requires the Bottles runtime (next) for a minimal sandbox
-    # share_gpu: bool = True  # TODO: implement
+    share_host_ro: bool = False
+    share_display: bool = True
+    share_gpu: bool = True
+    share_user: bool = False
     share_paths_ro: List[str] = field(default_factory=lambda: [])
     share_paths_rw: List[str] = field(default_factory=lambda: [])
 
@@ -146,6 +148,8 @@ class BottleParams(DictCompatMixIn):
     use_eac_runtime: bool = True
     use_be_runtime: bool = True
     use_steam_runtime: bool = False
+    use_proton_scripts: bool = False
+    use_umu: bool = False
     winebridge: bool = False
     sandbox: bool = False
     versioning_compression: bool = False

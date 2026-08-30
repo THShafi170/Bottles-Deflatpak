@@ -616,7 +616,12 @@ class EagleManager:
         try:
             self._send_step(f"Extracting {installer_type} installer...")
 
-            seven_z = shutil.which("7z") or shutil.which("7za") or shutil.which("7zr")
+            seven_z = (
+                shutil.which("7z")
+                or shutil.which("7zz")
+                or shutil.which("7za")
+                or shutil.which("7zr")
+            )
             if seven_z:
                 cmd = [seven_z, "x", "-y", f"-o{extract_dir}", installer_path]
 

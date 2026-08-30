@@ -29,6 +29,7 @@ class SandboxDialog(Adw.Window):
 
     # region Widgets
     switch_net = Gtk.Template.Child()
+    switch_gpu = Gtk.Template.Child()
     switch_sound = Gtk.Template.Child()
     row_input = Gtk.Template.Child()
     switch_input = Gtk.Template.Child()
@@ -52,6 +53,7 @@ class SandboxDialog(Adw.Window):
 
         # connect signals
         self.switch_net.connect("state-set", self.__set_flag, "share_net")
+        self.switch_gpu.connect("state-set", self.__set_flag, "share_gpu")
         self.switch_sound.connect("state-set", self.__set_flag, "share_sound")
         self.switch_input.connect("state-set", self.__set_flag, "share_input")
         self.switch_usb.connect("state-set", self.__set_flag, "share_usb")
@@ -176,6 +178,7 @@ class SandboxDialog(Adw.Window):
 
     def __update(self, config):
         self.switch_net.set_active(config.Sandbox.share_net)
+        self.switch_gpu.set_active(config.Sandbox.share_gpu)
         self.switch_sound.set_active(config.Sandbox.share_sound)
         self.__populate_hidraw_devices()
         self.__update_device_permissions()

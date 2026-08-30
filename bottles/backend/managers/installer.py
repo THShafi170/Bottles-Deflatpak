@@ -161,7 +161,10 @@ class InstallerManager:
         if files := checks.get("files"):
             for f in files:
                 if f.startswith("userdir/"):
-                    current_user = os.getenv("USER")
+                    try:
+                        current_user = WineUtils.get_user_dir(bottle_path)
+                    except Exception:
+                        current_user = os.getenv("USER") or "steamuser"
                     f = f.replace("userdir/", f"users/{current_user}/")
 
                 _f = os.path.join(bottle_path, "drive_c", f)
@@ -282,7 +285,10 @@ class InstallerManager:
         upd_keys = step.get("upd_keys", {})
 
         if conf_path.startswith("userdir/"):
-            current_user = os.getenv("USER")
+            try:
+                current_user = WineUtils.get_user_dir(bottle)
+            except Exception:
+                current_user = os.getenv("USER") or "steamuser"
             conf_path = conf_path.replace("userdir/", f"drive_c/users/{current_user}/")
 
         conf_path = f"{bottle}/{conf_path}"

@@ -48,10 +48,13 @@ class TerminalUtils:
         # Third party
         ["foot", "%s"],
         ["kitty", "%s"],
+        ["ghostty", "-e %s"],
+        ["alacritty", "-e %s"],
         ["tilix", "-- %s"],
         ["st", "-e %s"],
         ["wezterm", "-e -- %s"],
         # Desktop environments
+        ["ptyxis", "-- %s"],
         ["cosmic-term", "-e sh -c %s"],
         ["xfce4-terminal", "-e %s"],
         ["konsole", "--noclose -e %s"],

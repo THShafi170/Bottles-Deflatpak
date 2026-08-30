@@ -140,10 +140,10 @@ def test_config_import_restores_runtime_settings(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(manager_module.TemplateManager, "new", lambda *_args: None)
     monkeypatch.setattr(
-        manager_module.WineUtils, "ensure_user_profile_alias", lambda _: True
+        manager_module.WineUtils, "ensure_user_profile_alias", lambda *_a, **_k: True
     )
     monkeypatch.setattr(
-        manager_module.WineUtils, "unlink_user_profile_links", lambda _: True
+        manager_module.WineUtils, "unlink_user_profile_links", lambda *_a, **_k: True
     )
     monkeypatch.setattr(manager_module, "WineBoot", WineBoot)
     monkeypatch.setattr(manager_module, "WineServer", WineServer)

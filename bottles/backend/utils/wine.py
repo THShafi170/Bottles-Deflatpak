@@ -3,6 +3,7 @@ import errno
 import os
 import pwd
 import secrets
+import shutil
 import stat
 from typing import Optional
 
@@ -430,3 +431,22 @@ class WineUtils:
             if not os.path.islink(os.path.join(usersdir, user_dir)):
                 return user_dir
         return profiles[0]
+
+    @staticmethod
+    def find_system_wine() -> Optional[str]:
+        system_wine = shutil.which("wine")
+        if system_wine:
+            return system_wine
+
+        # Common fallback paths for Linux & NixOS
+        for candidate in [
+            "/usr/bin/wine",
+            "/usr/local/bin/wine",
+            "/run/current-system/sw/bin/wine",
+            os.path.expanduser("~/.nix-profile/bin/wine"),
+            os.path.expanduser("~/.local/state/nix/profiles/profile/bin/wine"),
+        ]:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+
+        return None

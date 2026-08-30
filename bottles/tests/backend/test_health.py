@@ -19,3 +19,18 @@ def test_health_results_report_vulkan_support():
 
     assert results["Graphics"]["Vulkan"] is True
     assert results["Graphics"]["vendors"] == {"amd": {}}
+
+
+def test_check_tools_detects_7zip_variants(monkeypatch):
+    def fake_which(tool):
+        if tool == "7zz":
+            return "/usr/bin/7zz"
+        return None
+
+    monkeypatch.setattr("shutil.which", fake_which)
+    checker = object.__new__(HealthChecker)
+    checker.get_disk_data = lambda: {}
+    checker.get_ram_data = lambda: None
+
+    HealthChecker.check_tools(checker)
+    assert checker.p7zip is True

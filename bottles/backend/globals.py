@@ -38,6 +38,7 @@ class Paths:
     applications = f"{xdg_data_home}/applications/"
 
     temp = f"{base}/temp"
+    helpers = f"{base}/helpers"
     runtimes = f"{base}/runtimes"
     winebridge = f"{base}/winebridge"
     runners = f"{base}/runners"

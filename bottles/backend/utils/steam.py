@@ -59,41 +59,54 @@ class SteamUtils:
         """
         Checks if a directory is a Proton directory.
         """
+        if not path or not isinstance(path, (str, bytes, os.PathLike)):
+            return False
+
         toolmanifest = os.path.join(path, "toolmanifest.vdf")
         if not os.path.isfile(toolmanifest):
             return False
 
-        f = open(toolmanifest, "r", errors="replace")
-        data = SteamUtils.parse_vdf(f.read())
-        compat_layer_name = data.get("manifest", {}).get("compatmanager_layer_name", {})
-
-        commandline = data.get("manifest", {}).get("commandline", {})
-
-        return "proton" in compat_layer_name or "proton" in commandline
+        try:
+            with open(toolmanifest, "r", errors="replace") as f:
+                data = SteamUtils.parse_vdf(f.read())
+            manifest = data.get("manifest", {})
+            compat_layer_name = str(
+                manifest.get("compatmanager_layer_name", "")
+            ).casefold()
+            commandline = str(manifest.get("commandline", "")).casefold()
+            return "proton" in compat_layer_name or "proton" in commandline
+        except Exception:
+            return False
 
     @staticmethod
     def get_associated_runtime(path: str) -> Optional[str]:
         """
         Get the associated runtime of a Proton directory.
         """
+        if not path or not isinstance(path, (str, bytes, os.PathLike)):
+            return None
+
         toolmanifest = os.path.join(path, "toolmanifest.vdf")
         if not os.path.isfile(toolmanifest):
             logging.error(f"toolmanifest.vdf not found in Proton directory: {path}")
             return None
 
-        runtime = "scout"
-        f = open(toolmanifest, "r", errors="replace")
-        data = SteamUtils.parse_vdf(f.read())
-        tool_appid = data.get("manifest", {}).get("require_tool_appid", {})
+        try:
+            with open(toolmanifest, "r", errors="replace") as f:
+                data = SteamUtils.parse_vdf(f.read())
+            tool_appid = str(data.get("manifest", {}).get("require_tool_appid", ""))
 
-        if "4183110" in tool_appid:
-            runtime = "steamrt4"
-        elif "1628350" in tool_appid:
-            runtime = "sniper"
-        elif "1391110" in tool_appid:
-            runtime = "soldier"
+            if "4183110" in tool_appid:
+                return "steamrt4"
+            elif "1628350" in tool_appid:
+                return "sniper"
+            elif "1391110" in tool_appid:
+                return "soldier"
 
-        return runtime
+            return "scout"
+        except Exception as e:
+            logging.error(f"Failed to parse toolmanifest.vdf in Proton directory: {e}")
+            return None
 
     @staticmethod
     def get_dist_directory(path: str) -> str:

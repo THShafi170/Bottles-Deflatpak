@@ -33,7 +33,7 @@ from bottles.frontend.windows.versioning_manage_branches import (
 
 
 @Gtk.Template(resource_path="/com/usebottles/bottles/details-versioning.ui")
-class VersioningView(Adw.PreferencesPage):
+class VersioningView(Gtk.Box):
     __gtype_name__ = "DetailsVersioning"
     __registry = []
 

@@ -34,6 +34,30 @@ def test_bwrap_usb_devices_are_opt_in(monkeypatch):
     assert "--dev-bind /dev/bus/usb /dev/bus/usb" in shared
 
 
+def test_bwrap_includes_dev_shm_and_pts(monkeypatch):
+    monkeypatch.setattr(
+        "bottles.backend.managers.sandbox.os.path.exists",
+        lambda p: p in ("/dev/shm", "/dev/pts"),
+    )
+
+    command = SandboxManager().get_cmd("true")
+
+    assert "--dev-bind-try /dev/shm /dev/shm" in command
+    assert "--dev-bind-try /dev/pts /dev/pts" in command
+
+
+def test_bwrap_forwards_desktop_environment(monkeypatch):
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "GNOME")
+    monkeypatch.setenv("DESKTOP_SESSION", "gnome")
+    monkeypatch.setenv("XDG_DATA_DIRS", "/usr/share")
+
+    command = SandboxManager(share_display=True).get_cmd("true")
+
+    assert "--setenv XDG_CURRENT_DESKTOP GNOME" in command
+    assert "--setenv DESKTOP_SESSION gnome" in command
+    assert "--setenv XDG_DATA_DIRS /usr/share" in command
+
+
 def test_input_devices_are_opt_in():
     assert BottleConfig().Sandbox.share_input is False
 

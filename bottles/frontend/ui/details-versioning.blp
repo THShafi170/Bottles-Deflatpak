@@ -1,13 +1,17 @@
 using Gtk 4.0;
 using Adw 1;
 
-template $DetailsVersioning: Adw.PreferencesPage {
+template $DetailsVersioning: Box {
+  orientation: vertical;
+
+  Adw.Banner banner_dirty {
+    title: _("You have unsaved changes. Create a snapshot to save them.");
+    revealed: false;
+    button-label: _("Create Snapshot");
+  }
+
   Adw.PreferencesPage pref_page {
-    Adw.Banner banner_dirty {
-      title: _("You have unsaved changes. Create a snapshot to save them.");
-      revealed: false;
-      button-label: _("Create Snapshot");
-    }
+    vexpand: true;
 
     Adw.PreferencesGroup {
       Adw.ComboRow combo_branch {
@@ -68,6 +72,8 @@ template $DetailsVersioning: Adw.PreferencesPage {
   }
 
   Adw.StatusPage status_page {
+    vexpand: true;
+    visible: false;
     icon-name: "preferences-system-time-symbolic";
     title: _("No Snapshots Found");
     description: _("Create your first snapshot to start saving states of your preferences.");
