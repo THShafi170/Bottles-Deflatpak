@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    66.9
+Version:    66.10
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}

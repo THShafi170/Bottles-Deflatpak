@@ -9,7 +9,7 @@ from gi.repository import Gio
 bottles_resource = Gio.Resource.load(
     os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
 )
-bottles_resource._register()
+Gio.resources_register(bottles_resource)
 
 from bottles.backend.models.result import Result
 from bottles.backend.state import SignalManager, Task, TaskManager

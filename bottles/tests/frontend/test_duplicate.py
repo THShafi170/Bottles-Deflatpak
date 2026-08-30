@@ -7,7 +7,7 @@ from gi.repository import Gio
 bottles_resource = Gio.Resource.load(
     os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
 )
-bottles_resource._register()
+Gio.resources_register(bottles_resource)
 
 from bottles.backend.models.result import Result  # noqa: E402
 from bottles.frontend.windows.duplicate import DuplicateDialog  # noqa: E402

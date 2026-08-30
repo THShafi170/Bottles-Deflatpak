@@ -1,3 +1,12 @@
+bottles-deflatpak (66.10) unstable; urgency=medium
+
+  * Sync with upstream 66.10.
+  * Dedicated sandboxing support for UMU prefixes.
+  * Automatic local cover detection and library state improvements.
+  * Improved runner loading and offline mode handling.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Sun, 30 Aug 2026 22:45:00 +0600
+
 bottles-deflatpak (66.9) unstable; urgency=medium
 
   * Sync with upstream 66.9.

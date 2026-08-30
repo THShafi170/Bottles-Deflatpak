@@ -9,7 +9,7 @@ from gi.repository import Gio
 bottles_resource = Gio.Resource.load(
     os.environ.get("BOTTLES_TEST_RESOURCE", "build/bottles.gresource")
 )
-bottles_resource._register()
+Gio.resources_register(bottles_resource)
 
 from bottles.frontend.views import new_bottle_dialog
 from bottles.frontend.views.new_bottle_dialog import BottlesNewBottleDialog

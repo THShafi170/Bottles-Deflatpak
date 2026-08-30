@@ -815,9 +815,23 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 self.list_dlls.add(expander)
                 self.__registry.append(expander)
 
+    def __on_runner_expander_expanded(self, expander, _pspec, runner_struct):
+        if not expander.get_expanded() or runner_struct["expanded"]:
+            return
+        for runner_data in runner_struct["expander_queue"]:
+            _entry = ComponentEntry(
+                self.window, runner_data, runner_struct["runner_type"]
+            )
+            expander.add_row(_entry)
+            self.__registry.append(_entry)
+        runner_struct["expanded"] = True
+
     def __populate_runners_helper(
         self, runner_type, supported_runners_dict, identifiable_runners_struct
     ):
+        for identifiable_runner in identifiable_runners_struct:
+            identifiable_runner["runner_type"] = runner_type
+
         offline_runners_list = self.manager.get_offline_components(runner_type)
         if self.__display_unstable_candidate():
             for offline_runner_name in offline_runners_list:
@@ -841,7 +855,6 @@ class PreferencesWindow(Adw.PreferencesDialog):
             if not self.__display_unstable_candidate(supported_runner):
                 continue
 
-            _entry = ComponentEntry(self.window, supported_runner, runner_type)
             for identifiable_runner in identifiable_runners_struct:
                 if _runner_name.startswith(identifiable_runner["prefix"]):
                     while (
@@ -855,12 +868,9 @@ class PreferencesWindow(Adw.PreferencesDialog):
                         == identifiable_runner["offline_runners"][0][0]
                     ):
                         offline_runner = identifiable_runner["offline_runners"].pop(0)
-                        _offline_entry = ComponentEntry(
-                            self.window, offline_runner, runner_type
-                        )
-                        identifiable_runner["expander"].add_row(_offline_entry)
+                        identifiable_runner["expander_queue"].append(offline_runner)
                         identifiable_runner["count"] += 1
-                    identifiable_runner["expander"].add_row(_entry)
+                    identifiable_runner["expander_queue"].append(supported_runner)
                     identifiable_runner["count"] += 1
                     break
 
@@ -868,10 +878,7 @@ class PreferencesWindow(Adw.PreferencesDialog):
         for identifiable_runner in identifiable_runners_struct:
             while identifiable_runner["offline_runners"]:
                 offline_runner = identifiable_runner["offline_runners"].pop(0)
-                _offline_entry = ComponentEntry(
-                    self.window, offline_runner, runner_type
-                )
-                identifiable_runner["expander"].add_row(_offline_entry)
+                identifiable_runner["expander_queue"].append(offline_runner)
                 identifiable_runner["count"] += 1
 
     def populate_runners_list(self):
@@ -922,24 +929,37 @@ class PreferencesWindow(Adw.PreferencesDialog):
         exp_other_proton = ComponentExpander(_("Other Proton runners"))
 
         identifiable_wine_runners = [
-            {"prefix": "soda", "count": 0, "expander": exp_soda, "offline_runners": []},
+            {
+                "prefix": "soda",
+                "count": 0,
+                "expander": exp_soda,
+                "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
+            },
             {
                 "prefix": "caffe",
                 "count": 0,
                 "expander": exp_caffe,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
             {
                 "prefix": "vaniglia",
                 "count": 0,
                 "expander": exp_vaniglia,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
             {
                 "prefix": "kron4ek",
                 "count": 0,
                 "expander": exp_kron4ek,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
         ]
         deprecated_wine_runners = [
@@ -948,12 +968,16 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 "count": 0,
                 "expander": exp_wine_ge,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
             {
                 "prefix": "lutris",
                 "count": 0,
                 "expander": exp_lutris,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
         ]
         identifiable_proton_runners = [
@@ -962,18 +986,24 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 "count": 0,
                 "expander": exp_protosoda,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
             {
                 "prefix": "proton-cachyos",
                 "count": 0,
                 "expander": exp_proton_cachyos,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
             {
                 "prefix": "ge-proton",
                 "count": 0,
                 "expander": exp_proton_ge,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
         ]
         other_wine_runners = [
@@ -982,6 +1012,8 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 "count": 0,
                 "expander": exp_other_wine,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
         ]
         other_proton_runners = [
@@ -990,6 +1022,8 @@ class PreferencesWindow(Adw.PreferencesDialog):
                 "count": 0,
                 "expander": exp_other_proton,
                 "offline_runners": [],
+                "expander_queue": [],
+                "expanded": False,
             },
         ]
 
@@ -1016,6 +1050,11 @@ class PreferencesWindow(Adw.PreferencesDialog):
             if runner["count"] > 0:
                 self.list_runners.add(runner["expander"])
                 self.__registry.append(runner["expander"])
+                runner["expander"].connect(
+                    "notify::expanded",
+                    self.__on_runner_expander_expanded,
+                    runner,
+                )
 
         self.installers_stack.set_visible_child_name("installers_list")
 
