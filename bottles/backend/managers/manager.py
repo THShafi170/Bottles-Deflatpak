@@ -758,7 +758,7 @@ class Manager(metaclass=Singleton):
 
         xdg_open_wrapper = os.path.join(Paths.helpers, "xdg-open")
         wrapper_content = """#!/usr/bin/env sh
-# Clean Wine/Proton runner environment before handing over to host browser/portal
+# Clean Wine/Proton runner environment before handing over to host browser/applications
 
 # Restore host user identity to prevent Chromium/Brave/Firefox sandbox and IPC failures
 HOST_USER="$(id -un 2>/dev/null || whoami 2>/dev/null)"
@@ -768,7 +768,47 @@ if [ -n "$HOST_USER" ]; then
     export LOGNAME="$HOST_USER"
 fi
 
-# Unset all Wine, Proton, driver injection, and runner library overrides
+# Find the host's actual xdg-open binary (ignoring helper directories)
+SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+HOST_XDG_OPEN=""
+CLEAN_PATH=""
+IFS=':'
+for p in $PATH; do
+    if [ "$p" != "$SELF_DIR" ] && [ "$p" != "$HOME/.local/share/bottles/helpers" ] && [ -n "$p" ]; then
+        if [ -z "$CLEAN_PATH" ]; then
+            CLEAN_PATH="$p"
+        else
+            CLEAN_PATH="$CLEAN_PATH:$p"
+        fi
+        if [ -z "$HOST_XDG_OPEN" ] && [ -x "$p/xdg-open" ]; then
+            HOST_XDG_OPEN="$p/xdg-open"
+        fi
+    fi
+done
+unset IFS
+export PATH="$CLEAN_PATH"
+
+if [ -z "$HOST_XDG_OPEN" ]; then
+    for p in /usr/bin/xdg-open /bin/xdg-open /usr/local/bin/xdg-open; do
+        if [ -x "$p" ] && [ "$p" != "$SELF_DIR/xdg-open" ]; then
+            HOST_XDG_OPEN="$p"
+            break
+        fi
+    done
+fi
+
+# Strategy 1: systemd-run --user (Cleanest & most reliable on modern Linux)
+# Spawns a completely new top-level process in the user desktop session,
+# shedding all inherited Wine seccomp filters, NO_NEW_PRIVS flags, and LD_PRELOAD.
+if [ -n "$HOST_XDG_OPEN" ] && command -v systemd-run >/dev/null 2>&1; then
+    if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -e "/run/user/$(id -u)/bus" ]; then
+        if systemd-run --user --collect -q "$HOST_XDG_OPEN" "$@" >/dev/null 2>&1; then
+            exit 0
+        fi
+    fi
+fi
+
+# Unset all Wine, Proton, driver injection, and runner library overrides for fallback methods
 unset LD_LIBRARY_PATH
 unset LD_PRELOAD
 unset WINEDLLOVERRIDES
@@ -825,26 +865,9 @@ unset MANGOHUD_CONFIG
 unset ENABLE_VKBASALT
 unset OBS_VKCAPTURE
 
-# Strip helper directory from PATH to avoid recursion
-SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-CLEAN_PATH=""
-IFS=':'
-for p in $PATH; do
-    if [ "$p" != "$SELF_DIR" ] && [ -n "$p" ]; then
-        if [ -z "$CLEAN_PATH" ]; then
-            CLEAN_PATH="$p"
-        else
-            CLEAN_PATH="$CLEAN_PATH:$p"
-        fi
-    fi
-done
-unset IFS
-export PATH="$CLEAN_PATH"
-
 TARGET="$1"
 
-# 1. First priority: Use FreeDesktop OpenURI Portal via D-Bus if available.
-# This runs the browser in the host's desktop session completely detached from Wine.
+# Strategy 2: FreeDesktop OpenURI Portal via D-Bus
 if [ -n "$TARGET" ] && command -v gdbus >/dev/null 2>&1; then
     if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -e "/run/user/$(id -u)/bus" ]; then
         case "$TARGET" in
@@ -862,19 +885,33 @@ if [ -n "$TARGET" ] && command -v gdbus >/dev/null 2>&1; then
     fi
 fi
 
-# 2. Second priority: gio open
+# Strategy 3: Desktop environment launchers (KDE kstart, gio)
+if command -v kstart6 >/dev/null 2>&1 && [ -n "$HOST_XDG_OPEN" ]; then
+    if kstart6 "$HOST_XDG_OPEN" "$@" >/dev/null 2>&1; then
+        exit 0
+    fi
+elif command -v kstart5 >/dev/null 2>&1 && [ -n "$HOST_XDG_OPEN" ]; then
+    if kstart5 "$HOST_XDG_OPEN" "$@" >/dev/null 2>&1; then
+        exit 0
+    fi
+fi
+
 if command -v gio >/dev/null 2>&1; then
     if gio open "$@" >/dev/null 2>&1; then
         exit 0
     fi
 fi
 
-# 3. Third priority: host xdg-open
-for p in /usr/bin/xdg-open /bin/xdg-open /usr/local/bin/xdg-open; do
-    if [ -x "$p" ]; then
-        exec "$p" "$@"
+# Strategy 4: Detached background invocation of host xdg-open
+if [ -n "$HOST_XDG_OPEN" ]; then
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$HOST_XDG_OPEN" "$@" </dev/null >/dev/null 2>&1 &
+        exit 0
+    else
+        "$HOST_XDG_OPEN" "$@" </dev/null >/dev/null 2>&1 &
+        exit 0
     fi
-done
+fi
 
 exit 1
 """
