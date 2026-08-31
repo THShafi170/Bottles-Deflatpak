@@ -527,6 +527,10 @@ class WineCommand:
             env.add("PROTON_USE_SECCOMP", "1", override=True)
             env.add("USER", "steamuser", override=True)
             env.add("USERNAME", "steamuser", override=True)
+            env.add("UMU_ID", "0")
+            env.add("UMU_USE_STEAM", "0")
+            env.add("SteamAppId", "0")
+            env.add("SteamGameId", "0")
 
             if params.proton_log:
                 env.add("PROTON_LOG", "1", override=True)
