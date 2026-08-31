@@ -86,6 +86,30 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="67.0" date="2026-08-31">
+      <description translate="no">
+        <ul>
+          <li>Enabled Soda 11.0-7 with Adaptive Launch sessions and host OpenXR</li>
+          <li>Added ProtoSoda 11.0-2 with Adaptive Launch support through UMU</li>
+          <li>Added ARM64 Soda runner selection through the component catalog</li>
+          <li>Added a single action for adding or removing programs from the Library</li>
+          <li>Sorted Library entries by name</li>
+          <li>Fixed running programs restarting when opening unchanged synchronization settings</li>
+        </ul>
+      </description>
+    </release>
+    <release version="66.11" date="2026-08-31">
+      <description translate="no">
+        <ul>
+          <li>Added per-session Adaptive Launch learning for Soda runners</li>
+          <li>Added host OpenXR support for 64-bit Windows applications outside Steam</li>
+          <li>Added ARM64 Soda runners with bundled FEX support</li>
+          <li>Fixed platform-specific component selection and bundled FEX detection</li>
+          <li>Fixed UMU dedicated sandbox access to managed Proton runners</li>
+          <li>Fixed custom MangoHud configurations when system environment variables are limited</li>
+        </ul>
+      </description>
+    </release>
     <release version="66.10" date="2026-08-29">
       <description translate="no">
         <ul>

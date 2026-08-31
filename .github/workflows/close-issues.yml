@@ -47,9 +47,9 @@ jobs:
               await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: "closed", state_reason: "not_planned" })
             }
             if (!recognizedTemplate || titleLength < 10 || required.some((heading) => !hasValue(heading))) {
-              await close("Invalid issue, please follow the template.\n\nhttps://github.com/bottlesdevs/Bottles/issues/new/choose")
+              await close("Invalid issue, please follow the template.\n\nhttps://github.com/Tenshou170/Bottles-Deflatpak/issues/new/choose")
               return
             }
             if (/[Vv]ersion.*:.*202\d\.\d{1,2}\.\d{1,2}/.test(body)) {
-              await close("It seems like you're using an old version of Bottles. Please upgrade to the version from Flathub [here](https://flathub.org/apps/details/com.usebottles.bottles), and try to reproduce the bug.")
+              await close("It seems like you're using an older legacy version of Bottles. Please upgrade to the latest release of Bottles-Deflatpak and try to reproduce the bug.")
             }

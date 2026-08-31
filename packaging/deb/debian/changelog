@@ -1,3 +1,14 @@
+bottles-deflatpak (67.0) unstable; urgency=medium
+
+  * Sync with upstream 67.0.
+  * Enabled Soda 11.0-7 with Adaptive Launch sessions and host OpenXR.
+  * Added ProtoSoda 11.0-2 with Adaptive Launch support through UMU.
+  * Added ARM64 Soda runner selection through the component catalog.
+  * Added single action for adding/removing programs from Library.
+  * Sorted Library entries by name.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Mon, 31 Aug 2026 23:59:00 +0600
+
 bottles-deflatpak (66.10) unstable; urgency=medium
 
   * Sync with upstream 66.10.

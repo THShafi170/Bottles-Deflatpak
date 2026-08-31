@@ -27,7 +27,6 @@ _LEGACY_DEFAULT_INHERITED_ENVIRONMENT = [
     "WAYLAND_DISPLAY",
     "XAUTHORITY",
     "XDG_RUNTIME_DIR",
-    "XCURSOR_SIZE",
 ]
 _LEGACY_DEFAULT_INHERITED_ENVIRONMENTS = [
     [
@@ -36,6 +35,11 @@ _LEGACY_DEFAULT_INHERITED_ENVIRONMENTS = [
         if name != "MANGOHUD_CONFIG"
     ],
     _LEGACY_DEFAULT_INHERITED_ENVIRONMENT,
+]
+_LEGACY_DEFAULT_INHERITED_ENVIRONMENTS += [
+    [*environment, *extra]
+    for environment in tuple(_LEGACY_DEFAULT_INHERITED_ENVIRONMENTS)
+    for extra in (["XMODIFIERS"], ["XMODIFIERS", "XCURSOR_SIZE"])
 ]
 
 # class name prefix "Bottle" is a workaround for:
@@ -302,11 +306,20 @@ class BottleConfig(DictCompatMixIn):
             data.get("Limit_System_Environment")
             and inherited_environment in _LEGACY_DEFAULT_INHERITED_ENVIRONMENTS
         ):
-            logging.warning("Adding XMODIFIERS to inherited environment defaults")
-            data["Inherited_Environment_Variables"] = [
-                *inherited_environment,
-                "XMODIFIERS",
+            missing_defaults = [
+                name
+                for name in ("XMODIFIERS", "XDG_CONFIG_HOME")
+                if name not in inherited_environment
             ]
+            if missing_defaults:
+                logging.warning(
+                    "Adding inherited environment defaults: %s",
+                    ", ".join(missing_defaults),
+                )
+                data["Inherited_Environment_Variables"] = [
+                    *inherited_environment,
+                    *missing_defaults,
+                ]
 
         # migrate old fsr_level key to fsr_sharpening_strength
         if "fsr_level" in data["Parameters"]:

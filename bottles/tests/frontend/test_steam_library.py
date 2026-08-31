@@ -109,9 +109,17 @@ def test_cover_picker_opens_in_pictures(monkeypatch):
 class Button:
     def __init__(self):
         self.visible = True
+        self.sensitive = True
+        self.text = None
 
     def set_visible(self, visible):
         self.visible = visible
+
+    def set_sensitive(self, sensitive):
+        self.sensitive = sensitive
+
+    def set_property(self, name, value):
+        setattr(self, name, value)
 
 
 def desktop_program_entry():
@@ -366,6 +374,7 @@ def test_steam_program_can_be_added_to_library(monkeypatch):
         def add_to_library(self, data, config):
             captured["data"] = data
             captured["config"] = config
+            return "entry-id"
 
     def run_async(task, callback):
         callback(task(), False)
@@ -389,6 +398,9 @@ def test_steam_program_can_be_added_to_library(monkeypatch):
         btn_add_steam_library=steam_add_button,
         save_program=lambda: pytest.fail("Steam games must not be stored as programs"),
     )
+    entry._ProgramEntry__set_library_state = lambda exists: (
+        ProgramEntry._ProgramEntry__set_library_state(entry, exists)
+    )
 
     monkeypatch.setattr(program_module, "LibraryManager", LibraryManager)
     monkeypatch.setattr(program_module, "RunAsync", run_async)
@@ -408,7 +420,8 @@ def test_steam_program_can_be_added_to_library(monkeypatch):
     }
     assert captured["config"] is config
     assert captured["updated"] is True
-    assert add_button.visible is False
+    assert add_button.visible is True
+    assert add_button.text == "Remove from Library"
     assert steam_add_button.visible is False
 
 
@@ -419,6 +432,7 @@ def test_regular_program_library_entry_is_unchanged(monkeypatch):
         def add_to_library(self, data, config):
             captured["data"] = data
             captured["config"] = config
+            return "entry-id"
 
     def run_async(task, callback):
         callback(task(), False)
@@ -440,6 +454,9 @@ def test_regular_program_library_entry_is_unchanged(monkeypatch):
         btn_add_steam_library=Button(),
         save_program=lambda: captured.setdefault("saved", True),
     )
+    entry._ProgramEntry__set_library_state = lambda exists: (
+        ProgramEntry._ProgramEntry__set_library_state(entry, exists)
+    )
 
     monkeypatch.setattr(program_module, "LibraryManager", LibraryManager)
     monkeypatch.setattr(program_module, "RunAsync", run_async)
@@ -460,6 +477,7 @@ def test_regular_program_library_entry_is_unchanged(monkeypatch):
     assert captured["config"] is config
     assert captured["saved"] is True
     assert captured["updated"] is True
+    assert entry.btn_add_library.text == "Remove from Library"
 
 
 def test_library_waits_for_program_icon_extraction(monkeypatch, tmp_path):
@@ -469,6 +487,7 @@ def test_library_waits_for_program_icon_extraction(monkeypatch, tmp_path):
     class LibraryManager:
         def add_to_library(self, data, _config):
             captured["data"] = data
+            return "entry-id"
 
     class IconJob:
         @staticmethod
@@ -496,6 +515,9 @@ def test_library_waits_for_program_icon_extraction(monkeypatch, tmp_path):
         _ProgramEntry__program_icon_job=IconJob(),
         _ProgramEntry__program_icon_path=str(icon_path),
     )
+    entry._ProgramEntry__set_library_state = lambda exists: (
+        ProgramEntry._ProgramEntry__set_library_state(entry, exists)
+    )
 
     monkeypatch.setattr(program_module, "LibraryManager", LibraryManager)
     monkeypatch.setattr(program_module, "RunAsync", run_async)
@@ -508,6 +530,47 @@ def test_library_waits_for_program_icon_extraction(monkeypatch, tmp_path):
     ProgramEntry.add_to_library(entry, None)
 
     assert captured["data"]["icon"] == str(icon_path)
+
+
+def test_program_library_action_removes_entry(monkeypatch):
+    captured = {}
+
+    class LibraryManager:
+        def remove_from_library(self, entry_uuid, config):
+            captured["uuid"] = entry_uuid
+            captured["config"] = config
+
+    def run_async(task, callback):
+        callback(task(), False)
+
+    config = BottleConfig(Name="Games", Path="Games")
+    button = Button()
+    entry = SimpleNamespace(
+        window=SimpleNamespace(
+            update_library=lambda: captured.setdefault("updated", True),
+            show_toast=lambda message: captured.setdefault("toast", message),
+        ),
+        config=config,
+        program={"name": "Example Game"},
+        btn_add_library=button,
+        _ProgramEntry__library_entry_uuid="entry-id",
+        _ProgramEntry__set_library_state=lambda exists: (
+            ProgramEntry._ProgramEntry__set_library_state(entry, exists)
+        ),
+    )
+
+    monkeypatch.setattr(program_module, "LibraryManager", LibraryManager)
+    monkeypatch.setattr(program_module, "RunAsync", run_async)
+
+    ProgramEntry.manage_library(entry, None)
+
+    assert captured["uuid"] == "entry-id"
+    assert captured["config"] is config
+    assert captured["updated"] is True
+    assert captured["toast"] == '"Example Game" removed from your library'
+    assert entry._ProgramEntry__library_entry_uuid is None
+    assert button.text == "Add to Library"
+    assert button.sensitive is True
 
 
 def test_uninstall_program_refreshes_cached_programs(monkeypatch):
@@ -553,6 +616,7 @@ def test_steam_program_widget_exposes_library_action(monkeypatch):
         def add_to_library(self, data, config):
             captured["data"] = data
             captured["config"] = config
+            return "entry-id"
 
     def run_async(task, callback):
         callback(task(), False)
@@ -633,6 +697,8 @@ def test_program_widget_uses_library_icon(monkeypatch, tmp_path):
 
     assert entry.img_program.get_icon_name() is None
     assert entry.img_program.get_paintable() is not None
+    assert entry.btn_add_library.get_property("text") == "Remove from Library"
+    assert entry.btn_add_library.get_visible() is True
 
 
 def test_program_widget_extracts_its_own_icon(monkeypatch, tmp_path):

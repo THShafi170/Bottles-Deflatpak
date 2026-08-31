@@ -10,13 +10,13 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Extract version
         id: version
         run: |
           VERSION=$(grep -oP "version: '\K[^']+" meson.build | head -1)
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
       - name: Install system dependencies for pre-commit hooks
@@ -29,14 +29,16 @@ jobs:
             gir1.2-gtk-4.0 \
             libgtk-4-dev \
             pkg-config
-      - uses: pre-commit/action@v3.0.1
+          pip install pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files
 
   tarball:
     name: "Build Binary Tarball (.tar.gz)"
     needs: [validate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -75,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Install Build Dependencies & Setup Repos
         run: |
           # Enable multilib
@@ -137,7 +139,7 @@ jobs:
     needs: [validate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -183,7 +185,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Install Dependencies
         run: |
           dnf install -y \
@@ -228,7 +230,7 @@ jobs:
     needs: [validate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
@@ -251,7 +253,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 

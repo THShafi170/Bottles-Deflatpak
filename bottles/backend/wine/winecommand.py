@@ -22,7 +22,11 @@ from bottles.backend.managers.sandbox import SandboxManager
 from bottles.backend.models.config import BottleConfig
 from bottles.backend.models.result import Result
 from bottles.backend.utils.display import DisplayUtils
-from bottles.backend.utils.generic import detect_encoding, is_ntsync_available
+from bottles.backend.utils.generic import (
+    detect_encoding,
+    get_host_architecture,
+    is_ntsync_available,
+)
 from bottles.backend.utils.gpu import GPUUtils
 from bottles.backend.utils.hidraw import normalize_hidraw_id
 from bottles.backend.utils.lsfgvk import get_lsfg_vk_dll_path
@@ -267,6 +271,73 @@ def apply_hidraw_preferences(env: "WineEnv", params) -> None:
         env.add("PROTON_ENABLE_HIDRAW", ",".join(selected), override=True)
 
 
+def apply_openxr_preferences(
+    env: "WineEnv", runner_name: str, runner_path: str, bottle_path: str
+) -> None:
+    if not runner_name.lower().startswith("soda-"):
+        return
+
+    source = os.path.join(runner_path, "share/openxr/wineopenxr64.json")
+    if not os.path.isfile(source):
+        return
+
+    target_dir = os.path.join(bottle_path, "drive_c/openxr")
+    try:
+        bottle_root = os.path.realpath(bottle_path)
+        target_parent = os.path.realpath(os.path.dirname(target_dir))
+        if os.path.commonpath((bottle_root, target_parent)) != bottle_root:
+            raise OSError("OpenXR manifest path escapes the bottle")
+
+        os.makedirs(target_dir, exist_ok=True)
+        if (
+            os.path.commonpath((bottle_root, os.path.realpath(target_dir)))
+            != bottle_root
+        ):
+            raise OSError("OpenXR manifest path escapes the bottle")
+
+        with open(source, "rb") as manifest:
+            data = manifest.read(4097)
+        if len(data) > 4096 or b"wineopenxr.dll" not in data:
+            raise OSError("Invalid OpenXR manifest")
+
+        target = os.path.join(target_dir, "wineopenxr64.json")
+        if os.path.isfile(target):
+            with open(target, "rb") as current:
+                if current.read(4097) == data:
+                    env.add("SODA_OPENXR_RUNTIME", "host")
+                    return
+
+        fd, temporary = tempfile.mkstemp(prefix=".wineopenxr-", dir=target_dir)
+        try:
+            with os.fdopen(fd, "wb") as manifest:
+                manifest.write(data)
+                manifest.flush()
+                os.fsync(manifest.fileno())
+            os.chmod(temporary, 0o644)
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.remove(temporary)
+        env.add("SODA_OPENXR_RUNTIME", "host")
+    except OSError as error:
+        logging.warning(f"Could not prepare Soda OpenXR: {error}")
+
+
+def apply_fex_preferences(env: "WineEnv", runner_name: str, runner_path: str) -> None:
+    if get_host_architecture() != "aarch64" or not runner_name.lower().startswith(
+        "soda-"
+    ):
+        return
+
+    config = os.path.join(runner_path, "share/fex-emu/Config.json")
+    unixlib = os.path.join(runner_path, "lib/wine/aarch64-unix/libwow64fex.so")
+    if not os.path.isfile(config) or not os.path.isfile(unixlib):
+        return
+
+    env.add("FEX_APP_CONFIG", config)
+    env.add("FEX_APP_CONFIG_LOCATION", os.path.dirname(config))
+
+
 def _needs_steam_virtual_gamepad_workaround(runner_name: Optional[str]) -> bool:
     """Return True if the runner should force SteamVirtualGamepadInfo."""
 
@@ -477,6 +548,9 @@ class WineCommand:
         if os.path.isdir(Paths.helpers):
             env.add("PATH", f"{Paths.helpers}:{current_path}")
 
+        apply_openxr_preferences(env, config.Runner, runner_path, bottle)
+        apply_fex_preferences(env, config.Runner, runner_path)
+
         # Language
         if config.Language != "sys":
             # ensure an encoding is set (e.g. zh_CN -> zh_CN.UTF-8), otherwise
@@ -551,6 +625,9 @@ class WineCommand:
                 "lib64/wine/i386-unix",
             ]
             gst_libs = ["lib/gstreamer-1.0", "lib32/gstreamer-1.0"]
+
+        if get_host_architecture() == "aarch64":
+            runner_libs.insert(2, "lib/wine/aarch64-unix")
 
         if not config.Runner.startswith("sys-"):
             for lib in runner_libs:

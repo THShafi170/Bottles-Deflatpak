@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    66.10
+Version:    67.0
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}
@@ -136,6 +136,15 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
 %changelog
+* Mon Aug 31 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.0-1
+- Sync with upstream 67.0
+- Enabled Soda 11.0-7 with Adaptive Launch sessions and host OpenXR
+- Added ProtoSoda 11.0-2 with Adaptive Launch support through UMU
+- Added ARM64 Soda runner selection through the component catalog
+- Added single action for adding/removing programs from Library
+- Sorted Library entries by name
+- Pure native execution for Bottles on Linux & NixOS without Flatpak overhead
+
 * Mon Aug 31 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 66.10-1
 - Sync with upstream 66.10
 - Add Run dialogue command to Legacy Wine Tools
