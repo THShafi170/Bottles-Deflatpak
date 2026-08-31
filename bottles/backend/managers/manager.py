@@ -758,26 +758,125 @@ class Manager(metaclass=Singleton):
 
         xdg_open_wrapper = os.path.join(Paths.helpers, "xdg-open")
         wrapper_content = """#!/usr/bin/env sh
-# Clean Wine/Proton runner environment before handing over to host browser
+# Clean Wine/Proton runner environment before handing over to host browser/portal
+
+# Restore host user identity to prevent Chromium/Brave/Firefox sandbox and IPC failures
+HOST_USER="$(id -un 2>/dev/null || whoami 2>/dev/null)"
+if [ -n "$HOST_USER" ]; then
+    export USER="$HOST_USER"
+    export USERNAME="$HOST_USER"
+    export LOGNAME="$HOST_USER"
+fi
+
+# Unset all Wine, Proton, driver injection, and runner library overrides
 unset LD_LIBRARY_PATH
 unset LD_PRELOAD
 unset WINEDLLOVERRIDES
 unset WINEPREFIX
 unset WINEARCH
 unset WINEDEBUG
+unset WINELOADER
+unset WINESERVER
+unset WINEDLLPATH
+unset WINEESYNC
+unset WINEFSYNC
+unset WINE_USE_EGL
+unset WINE_MOVE_HACK
+unset WINE_DISABLE_FULLSCREEN_HACK
+unset WINE_LARGE_ADDRESS_AWARE
+unset STAGING_SHARED_MEMORY
+unset PROTON_USE_SECCOMP
+unset PROTON_NO_STEAMINPUT
+unset PROTON_USE_XALIA
+unset PROTON_LOG
+unset PROTON_LOG_DIR
 unset PROTON_EAC_RUNTIME
 unset PROTON_BATTLEYE_RUNTIME
+unset STEAM_COMPAT_DATA_PATH
+unset STEAM_COMPAT_CLIENT_INSTALL_PATH
+unset STEAM_COMPAT_INSTALL_PATH
+unset SteamVirtualGamepadInfo
 unset VK_ICD_FILENAMES
+unset DXVK_CONFIG
+unset DXVK_CONFIG_FILE
+unset DXVK_HDR
+unset VKD3D_FRAME_RATE
+unset DISABLE_LSFG
+unset DISABLE_LSFGVK
+unset LSFGVK_ENV
+unset LSFGVK_DLL_PATH
+unset LSFGVK_MULTIPLIER
+unset LSFGVK_FLOW_SCALE
+unset LSFGVK_PERFORMANCE_MODE
+unset LSFG_LEGACY
+unset LSFG_DLL_PATH
+unset LSFG_MULTIPLIER
+unset LSFG_FLOW_SCALE
+unset LSFG_PERFORMANCE_MODE
+unset SODA_OPENXR_RUNTIME
+unset FEX_APP_CONFIG
+unset FEX_APP_CONFIG_LOCATION
+unset GST_PLUGIN_PATH
+unset GST_PLUGIN_SYSTEM_PATH
+unset GAMEMODERUN
+unset GAMEMODEAUTO
+unset MANGOHUD
+unset MANGOHUD_CONFIG
+unset ENABLE_VKBASALT
+unset OBS_VKCAPTURE
 
+# Strip helper directory from PATH to avoid recursion
+SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+CLEAN_PATH=""
+IFS=':'
+for p in $PATH; do
+    if [ "$p" != "$SELF_DIR" ] && [ -n "$p" ]; then
+        if [ -z "$CLEAN_PATH" ]; then
+            CLEAN_PATH="$p"
+        else
+            CLEAN_PATH="$CLEAN_PATH:$p"
+        fi
+    fi
+done
+unset IFS
+export PATH="$CLEAN_PATH"
+
+TARGET="$1"
+
+# 1. First priority: Use FreeDesktop OpenURI Portal via D-Bus if available.
+# This runs the browser in the host's desktop session completely detached from Wine.
+if [ -n "$TARGET" ] && command -v gdbus >/dev/null 2>&1; then
+    if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -e "/run/user/$(id -u)/bus" ]; then
+        case "$TARGET" in
+            *://*|mailto:*|tel:*|steam:*|bottles:*)
+                if gdbus call --session \
+                    --dest org.freedesktop.portal.Desktop \
+                    --object-path /org/freedesktop/portal/desktop \
+                    --method org.freedesktop.portal.OpenURI.OpenURI \
+                    --timeout 5 \
+                    "" "$TARGET" "{}" >/dev/null 2>&1; then
+                    exit 0
+                fi
+                ;;
+        esac
+    fi
+fi
+
+# 2. Second priority: gio open
+if command -v gio >/dev/null 2>&1; then
+    if gio open "$@" >/dev/null 2>&1; then
+        exit 0
+    fi
+fi
+
+# 3. Third priority: host xdg-open
 for p in /usr/bin/xdg-open /bin/xdg-open /usr/local/bin/xdg-open; do
     if [ -x "$p" ]; then
         exec "$p" "$@"
     fi
 done
 
-if command -v gio >/dev/null 2>&1; then
-    exec gio open "$@"
-fi
+exit 1
 """
         try:
             with open(xdg_open_wrapper, "w", encoding="utf-8") as f:

@@ -865,7 +865,7 @@ class WineCommand:
 
             _proton_script = os.path.join(runner, "proton")
             if os.path.isfile(_proton_script) and config.Parameters.use_proton_scripts:
-                self.proton_script = _proton_script
+                self.proton_script = shlex.quote(_proton_script)
 
             runner = os.path.join(SteamUtils.get_dist_directory(runner), "bin/wine")
 
