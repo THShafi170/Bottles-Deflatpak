@@ -926,6 +926,19 @@ exit 1
                 with open(user_xdg_open, "w", encoding="utf-8") as f:
                     f.write(wrapper_content)
                 os.chmod(user_xdg_open, 0o755)
+
+            if os.path.isdir(Paths.runners):
+                for runner_dir in glob(f"{Paths.runners}/*/"):
+                    for sub in ["bin", "files/bin"]:
+                        target_dir = os.path.join(runner_dir, sub)
+                        if os.path.isdir(target_dir):
+                            r_xdg = os.path.join(target_dir, "xdg-open")
+                            try:
+                                if os.path.islink(r_xdg) or os.path.isfile(r_xdg):
+                                    os.remove(r_xdg)
+                                os.symlink(xdg_open_wrapper, r_xdg)
+                            except OSError:
+                                pass
         except OSError:
             pass
 
