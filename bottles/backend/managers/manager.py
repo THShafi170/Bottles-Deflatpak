@@ -882,6 +882,13 @@ exit 1
             with open(xdg_open_wrapper, "w", encoding="utf-8") as f:
                 f.write(wrapper_content)
             os.chmod(xdg_open_wrapper, 0o755)
+
+            user_bin = os.path.expanduser("~/.local/bin")
+            if os.path.isdir(user_bin):
+                user_xdg_open = os.path.join(user_bin, "xdg-open")
+                with open(user_xdg_open, "w", encoding="utf-8") as f:
+                    f.write(wrapper_content)
+                os.chmod(user_xdg_open, 0o755)
         except OSError:
             pass
 
