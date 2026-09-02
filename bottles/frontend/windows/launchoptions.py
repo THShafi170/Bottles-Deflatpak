@@ -143,7 +143,7 @@ class LaunchOptionsDialog(Adw.Window):
 
         arguments_enabled = program.get("arguments_enabled", True)
         self.switch_arguments.set_active(arguments_enabled)
-        self.entry_arguments.set_sensitive(arguments_enabled)
+        self.entry_arguments.set_editable(arguments_enabled)
         self.switch_hide_console.set_active(program.get("hide_console") is True)
         self.switch_autostart.set_active(program.get("autostart", False))
 
@@ -390,7 +390,7 @@ class LaunchOptionsDialog(Adw.Window):
         set_autostart_enabled(self.window, after, sync_finished)
 
     def __toggle_arguments(self, *_args):
-        self.entry_arguments.set_sensitive(self.switch_arguments.get_active())
+        self.entry_arguments.set_editable(self.switch_arguments.get_active())
 
     def __choose_pre_script(self, *_args):
         def set_path(dialog, result):

@@ -58,6 +58,14 @@ def test_bwrap_forwards_desktop_environment(monkeypatch):
     assert "--setenv XDG_DATA_DIRS /usr/share" in command
 
 
+def test_bwrap_shared_user_namespace_omits_user_flag(monkeypatch):
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    command = SandboxManager(share_user=True).get_cmd("true")
+
+    assert "--unshare-user" not in command
+
+
 def test_input_devices_are_opt_in():
     assert BottleConfig().Sandbox.share_input is False
 

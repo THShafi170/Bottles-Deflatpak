@@ -1,3 +1,9 @@
+* Wed Sep 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.1-1
+- Sync with upstream 67.1 (UMU runtime prep, opt-in network, add menu, argument toggle)
+
+* Mon Aug 31 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.0-1
+- Sync with upstream 67.0 (Soda 11.0-7, ProtoSoda 11.0-2, Library single action)
+
 * Tue Jun 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 64.1-1
 - Sync with upstream 64.1 (Eagle scanner, bulk update, NTsync, sandbox guard)
 

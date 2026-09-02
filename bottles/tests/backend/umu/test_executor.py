@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -16,7 +17,7 @@ from bottles.backend.umu import (
 from bottles.backend.umu import executor as executor_module
 
 
-def _game(repository, tmp_path, environment=None, sandbox=False):
+def _game(repository, tmp_path, environment=None, sandbox=False, share_net=False):
     return repository.new_game(
         "Example",
         tmp_path / "Game Files" / "game;name.exe",
@@ -27,6 +28,7 @@ def _game(repository, tmp_path, environment=None, sandbox=False):
         working_directory=tmp_path / "Game Files",
         environment=environment,
         sandbox=sandbox,
+        share_net=share_net,
     )
 
 
@@ -324,16 +326,20 @@ def test_run_uses_dedicated_sandbox_when_enabled(monkeypatch, tmp_path):
             return None
 
     calls = []
+    runtime_commands = []
 
     def popen(argv, **kwargs):
         calls.append((argv, kwargs))
         return Process()
 
+    monkeypatch.setattr(executor, "_ensure_sandbox_runtime", runtime_commands.append)
     monkeypatch.setattr(executor_module.subprocess, "Popen", popen)
 
     executor.run(game)
 
     argv, kwargs = calls[0]
+    assert len(runtime_commands) == 1
+    assert runtime_commands[0].env["PROTONPATH"] == "GE-Proton"
     prefix = repository.prefix_path(game)
     assert argv.startswith("bwrap ")
     assert "--clearenv" in argv
@@ -379,12 +385,213 @@ def test_dedicated_sandbox_exposes_managed_proton(monkeypatch, tmp_path):
         return Process()
 
     monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles")
+    monkeypatch.setattr(executor, "_ensure_sandbox_runtime", lambda _command: None)
     monkeypatch.setattr(executor_module.subprocess, "Popen", popen)
 
     executor.run(game)
 
     argv, _kwargs = calls[0]
     assert f"--ro-bind {proton} {proton}" in argv
+
+
+def test_dedicated_sandbox_uses_native_umu_path(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game_folder = tmp_path / "Game Files"
+    game_folder.mkdir()
+    game = _game(repository, tmp_path, sandbox=True)
+    home = tmp_path / "home"
+    executor = _executor(
+        repository,
+        tmp_path,
+        {
+            "HOME": str(home),
+            "XDG_DATA_HOME": str(tmp_path / "data"),
+        },
+    )
+
+    class Process:
+        pid = 123
+
+        @staticmethod
+        def poll():
+            return None
+
+    calls = []
+
+    def popen(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return Process()
+
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.setattr(executor, "_ensure_sandbox_runtime", lambda _command: None)
+    monkeypatch.setattr(executor_module.subprocess, "Popen", popen)
+
+    executor.run(game)
+
+    argv, _kwargs = calls[0]
+    runtime = tmp_path / "data" / "umu"
+    assert f"--bind {runtime} {runtime}" in argv
+    assert "--unshare-net" in argv
+
+
+def test_dedicated_sandbox_can_share_network(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game_folder = tmp_path / "Game Files"
+    game_folder.mkdir()
+    game = _game(repository, tmp_path, sandbox=True, share_net=True)
+    executor = _executor(
+        repository,
+        tmp_path,
+        {
+            "HOME": str(tmp_path / "home"),
+            "XDG_DATA_HOME": str(tmp_path / "data"),
+        },
+    )
+
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    command = executor.prepare(game)
+
+    assert "--share-net" in executor._sandbox_manager(game, command).get_cmd("true")
+
+
+def test_dedicated_sandbox_exposes_base_cache(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game_folder = tmp_path / "Game Files"
+    game_folder.mkdir()
+    cache_home = tmp_path / "cache"
+    game = _game(repository, tmp_path, sandbox=True)
+    executor = _executor(
+        repository,
+        tmp_path,
+        {"DISPLAY": ":1", "XDG_CACHE_HOME": str(cache_home)},
+    )
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    command = executor._sandbox_manager(game, executor.prepare(game)).get_cmd("true")
+
+    assert cache_home.is_dir()
+    assert f"--bind {cache_home} {cache_home}" in command
+
+
+def test_dedicated_sandbox_does_not_expose_game_cache_override(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game_folder = tmp_path / "Game Files"
+    game_folder.mkdir()
+    base_cache = tmp_path / "base-cache"
+    game_cache = tmp_path / "game-cache"
+    game = _game(
+        repository,
+        tmp_path,
+        environment={"XDG_CACHE_HOME": str(game_cache)},
+        sandbox=True,
+    )
+    executor = _executor(
+        repository,
+        tmp_path,
+        {"DISPLAY": ":1", "XDG_CACHE_HOME": str(base_cache)},
+    )
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    command = executor._sandbox_manager(game, executor.prepare(game)).get_cmd("true")
+
+    assert f"--bind {base_cache} {base_cache}" in command
+    assert f"--bind {game_cache} {game_cache}" not in command
+
+
+def test_dedicated_sandbox_does_not_expose_root_as_cache(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game_folder = tmp_path / "Game Files"
+    game_folder.mkdir()
+    game = _game(repository, tmp_path, sandbox=True)
+    executor = _executor(
+        repository,
+        tmp_path,
+        {"DISPLAY": ":1", "XDG_CACHE_HOME": "/"},
+    )
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    command = executor._sandbox_manager(game, executor.prepare(game)).get_cmd("true")
+
+    assert "--bind / /" not in command
+
+
+def test_runtime_root_uses_native_data_home(tmp_path):
+    data_home = tmp_path / "data"
+
+    runtime = UmuExecutor._runtime_root(
+        {
+            "HOME": str(tmp_path / "home"),
+            "XDG_DATA_HOME": str(data_home),
+        }
+    )
+
+    assert runtime == data_home / "umu"
+
+
+def test_dedicated_sandbox_prepares_runtime_outside_sandbox(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game = _game(repository, tmp_path, sandbox=True)
+    home = tmp_path / "home"
+    executor = _executor(
+        repository,
+        tmp_path,
+        {"HOME": str(home)},
+    )
+    calls = []
+
+    class Process:
+        stdout = iter(())
+
+        @staticmethod
+        def wait():
+            return 0
+
+    def popen(argv, **kwargs):
+        calls.append((argv, kwargs))
+        Path(argv[-1]).touch()
+        return Process()
+
+    monkeypatch.setattr(executor_module.subprocess, "Popen", popen)
+    command = executor.prepare(game)
+
+    executor._ensure_sandbox_runtime(command)
+    executor._ensure_sandbox_runtime(command)
+    other_command = replace(
+        command,
+        env={**command.env, "UMU_FOLDERS_PATH": str(tmp_path / "other-data")},
+    )
+    executor._ensure_sandbox_runtime(other_command)
+
+    assert len(calls) == 2
+    argv, kwargs = calls[0]
+    assert argv[:2] == [str(executor.installation.path), "/usr/bin/touch"]
+    assert Path(argv[-1]).parent == home / ".local" / "share" / "umu"
+    assert not Path(argv[-1]).exists()
+    assert kwargs["env"]["UMU_NO_PROTON"] == "1"
+    assert kwargs["shell"] is False
+    assert Path(calls[1][0][-1]).parent == tmp_path / "other-data" / "umu"
+
+
+def test_dedicated_sandbox_rejects_incomplete_runtime_setup(monkeypatch, tmp_path):
+    repository = UmuGameRepository(tmp_path / "umu")
+    game = _game(repository, tmp_path, sandbox=True)
+    executor = _executor(repository, tmp_path)
+
+    class Process:
+        stdout = iter(("ERROR: umu has not been setup for the user\n",))
+
+        @staticmethod
+        def wait():
+            return 0
+
+    monkeypatch.setattr(
+        executor_module.subprocess,
+        "Popen",
+        lambda _argv, **_kwargs: Process(),
+    )
+
+    with pytest.raises(UmuProcessError, match="UMU runtime setup failed"):
+        executor._ensure_sandbox_runtime(executor.prepare(game))
 
 
 def test_dedicated_sandbox_rejects_filesystem_root_as_prefix(monkeypatch, tmp_path):

@@ -1,3 +1,14 @@
+bottles-deflatpak (67.1) unstable; urgency=medium
+
+  * Sync with upstream 67.1.
+  * Fixed UMU runtime preparation inside dedicated sandbox.
+  * Added opt-in network permission for sandboxed UMU games.
+  * Restored add menu for bottle creation and UMU game install.
+  * Restored program launch options argument toggle.
+  * Pure native execution without Flatpak overhead.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Wed, 02 Sep 2026 11:15:00 +0600
+
 bottles-deflatpak (67.0) unstable; urgency=medium
 
   * Sync with upstream 67.0.

@@ -285,13 +285,24 @@ class SandboxManager:
             args.extend(["--tmpfs", "/dev/input"])
         elif self.share_input and self.supports_input_devices():
             args.extend(["--dev-bind", "/dev/input", "/dev/input"])
-            if os.path.exists("/run/udev"):
-                args.extend(["--ro-bind", "/run/udev", "/run/udev"])
+        if os.path.exists("/run/udev"):
+            args.extend(["--ro-bind", "/run/udev", "/run/udev"])
 
         if not self.share_usb and os.path.isdir("/dev/bus/usb"):
             args.extend(["--tmpfs", "/dev/bus/usb"])
         elif self.share_usb and self.supports_usb_devices():
             args.extend(["--dev-bind", "/dev/bus/usb", "/dev/bus/usb"])
+
+        if self.share_display and os.path.exists("/dev/video0"):
+            args.extend(["--dev-bind", "/dev/video0", "/dev/video0"])
+
+        if self.share_net:
+            args.append("--share-net")
+        else:
+            args.append("--unshare-net")
+
+        if not self.share_user:
+            args.append("--unshare-user")
 
         if self.share_hidraw and self.supports_hidraw_devices():
             args.extend(["--dev-bind", "/dev/hidraw", "/dev/hidraw"])

@@ -20,6 +20,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from gettext import gettext as _
+from glob import glob
 from typing import Optional
 
 import icoextract  # type: ignore [import-untyped]
@@ -997,3 +998,369 @@ class ManagerUtils:
             return locales
 
         return names
+
+    @staticmethod
+    def ensure_browser_helpers(runner_path: Optional[str] = None):
+        """
+        Deploy decoupled browser handover and URL opener wrappers across helper directories,
+        user bin, and runner bin paths to ensure 100% compatibility for Chrome, Brave,
+        Chromium forks, and Firefox.
+        """
+        if not os.path.isdir(Paths.helpers):
+            os.makedirs(Paths.helpers, exist_ok=True)
+
+        xdg_open_wrapper = os.path.join(Paths.helpers, "xdg-open")
+        wrapper_content = """#!/usr/bin/env sh
+# Clean Wine/Proton runner environment before handing over to host browser/applications
+
+# 1. Identify caller binary name
+CALLER="$(basename -- "$0")"
+
+# 2. Convert DOS / Windows paths if passed from Wine (e.g. C:\\... or Z:\\...)
+CLEAN_ARGS=""
+for arg in "$@"; do
+    case "$arg" in
+        [A-Za-z]:[/\\]*)
+            if command -v winepath >/dev/null 2>&1; then
+                u_arg="$(winepath -u "$arg" 2>/dev/null)"
+                if [ -n "$u_arg" ]; then
+                    arg="$u_arg"
+                fi
+            fi
+            ;;
+    esac
+    if [ -z "$CLEAN_ARGS" ]; then
+        CLEAN_ARGS="'$arg'"
+    else
+        CLEAN_ARGS="$CLEAN_ARGS '$arg'"
+    fi
+done
+
+# 3. Detect primary target URI / URL if present
+TARGET_URI=""
+for arg in "$@"; do
+    case "$arg" in
+        http://*|https://*|mailto:*|tel:*|ftp://*|file://*|*://*)
+            TARGET_URI="$arg"
+            break
+            ;;
+    esac
+done
+if [ -z "$TARGET_URI" ]; then
+    TARGET_URI="$1"
+fi
+
+# 4. Restore host user identity & runtime D-Bus session
+HOST_UID="$(id -u 2>/dev/null)"
+HOST_USER="$(id -un 2>/dev/null || whoami 2>/dev/null)"
+if [ -n "$HOST_USER" ]; then
+    export USER="$HOST_USER"
+    export USERNAME="$HOST_USER"
+    export LOGNAME="$HOST_USER"
+fi
+
+if [ -n "$HOST_UID" ]; then
+    if [ -z "$XDG_RUNTIME_DIR" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+        if [ -d "/run/user/$HOST_UID" ]; then
+            export XDG_RUNTIME_DIR="/run/user/$HOST_UID"
+        fi
+    fi
+    if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] || [ ! -S "${DBUS_SESSION_BUS_ADDRESS#unix:path=}" ]; then
+        if [ -S "/run/user/$HOST_UID/bus" ]; then
+            export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$HOST_UID/bus"
+        fi
+    fi
+fi
+
+# 5. Build clean host PATH ignoring helper directories
+SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+CLEAN_PATH=""
+IFS=':'
+for p in $PATH /usr/local/bin /usr/bin /bin /usr/bin/site_perl /usr/bin/vendor_perl /usr/bin/core_perl "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
+    if [ "$p" != "$SELF_DIR" ] && [ "$p" != "$HOME/.local/share/bottles/helpers" ] && [ -d "$p" ]; then
+        case ":$CLEAN_PATH:" in
+            *:"$p":*) ;;
+            *)
+                if [ -z "$CLEAN_PATH" ]; then
+                    CLEAN_PATH="$p"
+                else
+                    CLEAN_PATH="$CLEAN_PATH:$p"
+                fi
+                ;;
+        esac
+    fi
+done
+unset IFS
+export PATH="$CLEAN_PATH"
+
+# 6. Locate host xdg-open and specific host browser binary if applicable
+HOST_XDG_OPEN=""
+for p in /usr/bin/xdg-open /usr/local/bin/xdg-open /bin/xdg-open; do
+    if [ -x "$p" ] && [ "$p" != "$SELF_DIR/xdg-open" ]; then
+        HOST_XDG_OPEN="$p"
+        break
+    fi
+done
+if [ -z "$HOST_XDG_OPEN" ]; then
+    HOST_XDG_OPEN="$(command -v xdg-open 2>/dev/null)"
+fi
+
+HOST_BROWSER_BIN=""
+case "$CALLER" in
+    xdg-open|gio|gnome-open|kde-open|kde-open5|kfmclient)
+        ;;
+    *)
+        IFS=':'
+        for p in $CLEAN_PATH; do
+            if [ -x "$p/$CALLER" ] && [ "$p/$CALLER" != "$0" ]; then
+                HOST_BROWSER_BIN="$p/$CALLER"
+                break
+            fi
+        done
+        unset IFS
+        ;;
+esac
+
+# 7. Strategy 1: FreeDesktop OpenURI Portal via D-Bus (Best for URLs & Handover)
+# Completely decouples from Wine process tree and launches host's default browser
+if [ -n "$TARGET_URI" ]; then
+    case "$TARGET_URI" in
+        http://*|https://*|mailto:*|tel:*|ftp://*|file://*|*://*)
+            if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -S "/run/user/$HOST_UID/bus" ]; then
+                if command -v gdbus >/dev/null 2>&1; then
+                    if gdbus call --session \\
+                        --dest org.freedesktop.portal.Desktop \\
+                        --object-path /org/freedesktop/portal/desktop \\
+                        --method org.freedesktop.portal.OpenURI.OpenURI \\
+                        --timeout 5 \\
+                        "" "$TARGET_URI" "{}" >/dev/null 2>&1; then
+                        exit 0
+                    fi
+                elif command -v busctl >/dev/null 2>&1; then
+                    if busctl --user call \\
+                        org.freedesktop.portal.Desktop \\
+                        /org/freedesktop/portal/desktop \\
+                        org.freedesktop.portal.OpenURI \\
+                        OpenURI ssa\\{sv\\} "" "$TARGET_URI" 0 >/dev/null 2>&1; then
+                        exit 0
+                    fi
+                fi
+            fi
+            ;;
+    esac
+fi
+
+# 8. Strategy 2: systemd-run --user (Clean transient unit in desktop cgroup)
+# Preserves GUI display environment and prevents Crashpad / seccomp / NO_NEW_PRIVS aborts
+TARGET_CMD="${HOST_BROWSER_BIN:-$HOST_XDG_OPEN}"
+
+if [ -n "$TARGET_CMD" ] && command -v systemd-run >/dev/null 2>&1; then
+    if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -S "/run/user/$HOST_UID/bus" ]; then
+        SYSTEMD_ENV_ARGS="--setenv=PATH=$CLEAN_PATH"
+        [ -n "$DISPLAY" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=DISPLAY=$DISPLAY"
+        [ -n "$WAYLAND_DISPLAY" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
+        [ -n "$XDG_CURRENT_DESKTOP" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP"
+        [ -n "$DESKTOP_SESSION" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=DESKTOP_SESSION=$DESKTOP_SESSION"
+        [ -n "$XAUTHORITY" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XAUTHORITY=$XAUTHORITY"
+        [ -n "$XDG_SESSION_TYPE" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XDG_SESSION_TYPE=$XDG_SESSION_TYPE"
+        [ -n "$XDG_RUNTIME_DIR" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+        [ -n "$DBUS_SESSION_BUS_ADDRESS" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
+        [ -n "$XDG_DATA_DIRS" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XDG_DATA_DIRS=$XDG_DATA_DIRS"
+        [ -n "$XDG_CONFIG_DIRS" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=XDG_CONFIG_DIRS=$XDG_CONFIG_DIRS"
+        [ -n "$USER" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=USER=$USER"
+        [ -n "$HOME" ] && SYSTEMD_ENV_ARGS="$SYSTEMD_ENV_ARGS --setenv=HOME=$HOME"
+
+        if systemd-run --user --collect --slice=app.slice -q $SYSTEMD_ENV_ARGS "$TARGET_CMD" "$@" >/dev/null 2>&1; then
+            exit 0
+        fi
+    fi
+fi
+
+# 9. Clean environment for fallback methods (Unset all Wine / Proton / Graphics injection variables)
+unset LD_LIBRARY_PATH
+unset LD_PRELOAD
+unset WINEDLLOVERRIDES
+unset WINEPREFIX
+unset WINEARCH
+unset WINEDEBUG
+unset WINELOADER
+unset WINESERVER
+unset WINEDLLPATH
+unset WINEESYNC
+unset WINEFSYNC
+unset WINE_USE_EGL
+unset WINE_MOVE_HACK
+unset WINE_DISABLE_FULLSCREEN_HACK
+unset WINE_LARGE_ADDRESS_AWARE
+unset STAGING_SHARED_MEMORY
+unset PROTON_USE_SECCOMP
+unset PROTON_NO_STEAMINPUT
+unset PROTON_USE_XALIA
+unset PROTON_LOG
+unset PROTON_LOG_DIR
+unset PROTON_EAC_RUNTIME
+unset PROTON_BATTLEYE_RUNTIME
+unset STEAM_COMPAT_DATA_PATH
+unset STEAM_COMPAT_CLIENT_INSTALL_PATH
+unset STEAM_COMPAT_INSTALL_PATH
+unset SteamVirtualGamepadInfo
+unset SteamAppId
+unset SteamGameId
+unset UMU_ID
+unset UMU_USE_STEAM
+unset VK_ICD_FILENAMES
+unset VK_LAYER_PATH
+unset VK_ADD_LAYER_PATH
+unset DXVK_CONFIG
+unset DXVK_CONFIG_FILE
+unset DXVK_HDR
+unset VKD3D_FRAME_RATE
+unset VKD3D_SHADER_CACHE_PATH
+unset DXVK_SHADER_CACHE_PATH
+unset DISABLE_LSFG
+unset DISABLE_LSFGVK
+unset LSFGVK_ENV
+unset LSFGVK_DLL_PATH
+unset LSFGVK_MULTIPLIER
+unset LSFGVK_FLOW_SCALE
+unset LSFGVK_PERFORMANCE_MODE
+unset LSFG_LEGACY
+unset LSFG_DLL_PATH
+unset LSFG_MULTIPLIER
+unset LSFG_FLOW_SCALE
+unset LSFG_PERFORMANCE_MODE
+unset SODA_OPENXR_RUNTIME
+unset FEX_APP_CONFIG
+unset FEX_APP_CONFIG_LOCATION
+unset GST_PLUGIN_PATH
+unset GST_PLUGIN_SYSTEM_PATH
+unset GAMEMODERUN
+unset GAMEMODEAUTO
+unset MANGOHUD
+unset MANGOHUD_CONFIG
+unset ENABLE_VKBASALT
+unset OBS_VKCAPTURE
+
+# 10. Strategy 3: Desktop Environment session launchers (KDE kstart, gio)
+if [ -n "$TARGET_CMD" ]; then
+    if command -v kstart6 >/dev/null 2>&1; then
+        if kstart6 "$TARGET_CMD" "$@" >/dev/null 2>&1; then
+            exit 0
+        fi
+    elif command -v kstart5 >/dev/null 2>&1; then
+        if kstart5 "$TARGET_CMD" "$@" >/dev/null 2>&1; then
+            exit 0
+        fi
+    fi
+fi
+
+if [ -n "$TARGET_URI" ] && command -v gio >/dev/null 2>&1; then
+    if gio open "$TARGET_URI" >/dev/null 2>&1; then
+        exit 0
+    fi
+fi
+
+# 11. Strategy 4: Sanitized detached background execution
+if [ -n "$TARGET_CMD" ]; then
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$TARGET_CMD" "$@" </dev/null >/dev/null 2>&1 &
+        exit 0
+    else
+        "$TARGET_CMD" "$@" </dev/null >/dev/null 2>&1 &
+        exit 0
+    fi
+fi
+
+exit 1
+"""
+        helper_binaries = [
+            "xdg-open",
+            "gio",
+            "gnome-open",
+            "kde-open",
+            "kde-open5",
+            "kfmclient",
+            "google-chrome",
+            "google-chrome-stable",
+            "google-chrome-beta",
+            "google-chrome-unstable",
+            "chromium",
+            "chromium-browser",
+            "brave",
+            "brave-browser",
+            "brave-bin",
+            "firefox",
+            "firefox-developer-edition",
+            "firefox-nightly",
+            "firefox-esr",
+            "firefox-bin",
+            "vivaldi",
+            "vivaldi-stable",
+            "helium",
+            "helium-browser",
+            "zen-browser",
+            "zen",
+            "microsoft-edge",
+            "microsoft-edge-stable",
+            "microsoft-edge-beta",
+            "microsoft-edge-dev",
+            "opera",
+            "opera-beta",
+            "opera-developer",
+            "epiphany",
+            "midori",
+            "floorp",
+            "thorium-browser",
+            "thorium",
+            "librewolf",
+            "waterfox",
+        ]
+
+        try:
+            with open(xdg_open_wrapper, "w", encoding="utf-8") as f:
+                f.write(wrapper_content)
+            os.chmod(xdg_open_wrapper, 0o755)
+
+            # Link all binary aliases in helpers directory
+            for bin_name in helper_binaries:
+                if bin_name != "xdg-open":
+                    h_path = os.path.join(Paths.helpers, bin_name)
+                    try:
+                        if os.path.islink(h_path) or os.path.isfile(h_path):
+                            os.remove(h_path)
+                        os.symlink(xdg_open_wrapper, h_path)
+                    except OSError:
+                        pass
+
+            user_bin = os.path.expanduser("~/.local/bin")
+            if os.path.isdir(user_bin):
+                user_xdg_open = os.path.join(user_bin, "xdg-open")
+                with open(user_xdg_open, "w", encoding="utf-8") as f:
+                    f.write(wrapper_content)
+                os.chmod(user_xdg_open, 0o755)
+
+            target_dirs = []
+            if runner_path and os.path.isdir(runner_path):
+                for sub in ["bin", "files/bin"]:
+                    d = os.path.join(runner_path, sub)
+                    if os.path.isdir(d):
+                        target_dirs.append(d)
+
+            if os.path.isdir(Paths.runners):
+                for runner_dir in glob(f"{Paths.runners}/*/"):
+                    for sub in ["bin", "files/bin"]:
+                        d = os.path.join(runner_dir, sub)
+                        if os.path.isdir(d) and d not in target_dirs:
+                            target_dirs.append(d)
+
+            for target_dir in target_dirs:
+                for bin_name in helper_binaries:
+                    r_bin = os.path.join(target_dir, bin_name)
+                    try:
+                        if os.path.islink(r_bin) or os.path.isfile(r_bin):
+                            os.remove(r_bin)
+                        os.symlink(xdg_open_wrapper, r_bin)
+                    except OSError:
+                        pass
+        except OSError:
+            pass

@@ -548,6 +548,7 @@ class WineCommand:
             for e in environment:
                 env.add(e, environment[e], override=True)
 
+        ManagerUtils.ensure_browser_helpers(runner_path)
         current_path = os.environ.get("PATH", "/usr/bin:/bin")
         if os.path.isdir(Paths.helpers):
             env.add("PATH", f"{Paths.helpers}:{current_path}")

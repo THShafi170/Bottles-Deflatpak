@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    67.0
+Version:    67.1
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}
@@ -136,6 +136,14 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
 %changelog
+* Wed Sep 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.1-1
+- Sync with upstream 67.1
+- Fixed UMU runtime preparation inside dedicated sandbox
+- Added opt-in network permission for sandboxed UMU games
+- Restored add menu for bottle creation and UMU game install
+- Restored program launch options argument toggle
+- Pure native execution without Flatpak overhead
+
 * Mon Aug 31 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.0-1
 - Sync with upstream 67.0
 - Enabled Soda 11.0-7 with Adaptive Launch sessions and host OpenXR

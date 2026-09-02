@@ -25,6 +25,7 @@ Gio.resources_register(Gio.Resource.load(str(resource_path)))
 from bottles.frontend.views.list import BottleView
 from bottles.frontend.widgets.umu import UmuPrefixRow
 from bottles.frontend.windows import umu as umu_module
+from bottles.frontend.windows import window as window_module
 from bottles.frontend.windows.umu import (
     UmuAddGameDialog,
     UmuDependencyDialog,
@@ -115,6 +116,46 @@ def test_detected_prefix_opens_database_search():
     )
 
     assert calls == [{"detected_prefix": "/home/user/Games/umu/game"}]
+
+
+def test_create_bottle_action_is_independent_from_active_page(monkeypatch):
+    calls = []
+
+    class Dialog:
+        def present(self, parent):
+            calls.append(parent)
+
+    monkeypatch.setattr(window_module, "BottlesNewBottleDialog", Dialog)
+    window = SimpleNamespace(
+        pop_add=SimpleNamespace(popdown=lambda: calls.append("closed")),
+        stack_main=SimpleNamespace(get_visible_child_name=lambda: "page_library"),
+        show_umu_search=lambda: calls.append("umu"),
+    )
+
+    BottlesWindow.show_add_view(window)
+
+    assert calls == ["closed", window]
+
+
+def test_install_umu_action_opens_database_search(monkeypatch):
+    calls = []
+
+    class Dialog:
+        def __init__(self, parent, detected_prefix=None):
+            calls.append((parent, detected_prefix))
+
+        def present(self, parent):
+            calls.append(parent)
+
+    monkeypatch.setattr(window_module, "UmuSearchDialog", Dialog)
+    window = SimpleNamespace(
+        manager=SimpleNamespace(get_umu_installation=lambda: object()),
+        pop_add=SimpleNamespace(popdown=lambda: calls.append("closed")),
+    )
+
+    BottlesWindow.show_umu_search(window)
+
+    assert calls == ["closed", (window, None), window]
 
 
 def test_database_selection_preserves_identity_and_detected_prefix(monkeypatch):
@@ -277,11 +318,13 @@ def test_add_game_passes_dedicated_sandbox_to_repository(monkeypatch):
     dialog.entry_game_id.set_text("umu-default")
     dialog.executable = "/games/setup.exe"
     dialog.switch_sandbox.set_active(True)
+    dialog.switch_network.set_active(True)
     dialog.btn_add.set_sensitive(True)
 
     dialog._UmuAddGameDialog__add()
 
     assert calls[0][2]["sandbox"] is True
+    assert calls[0][2]["share_net"] is True
     assert ("launch", game) in calls
 
 
@@ -311,12 +354,14 @@ def test_install_wizard_passes_dedicated_sandbox_to_repository():
         proton="GE-Proton",
         database_entry=SimpleNamespace(umu_id="umu-default", store="none"),
         switch_sandbox=SimpleNamespace(get_active=lambda: True),
+        switch_network=SimpleNamespace(get_active=lambda: True),
         _UmuInstallDialog__portable=False,
     )
 
     UmuInstallDialog._UmuInstallDialog__new_game(dialog, "installing")
 
     assert calls[0][2]["sandbox"] is True
+    assert calls[0][2]["share_net"] is True
 
 
 def test_umu_dependency_dialog_installs_without_a_second_step(monkeypatch):
