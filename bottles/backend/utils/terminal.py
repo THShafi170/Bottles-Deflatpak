@@ -36,49 +36,162 @@ class TerminalUtils:
         "debug": "#ff9800 #2e2c2b",
         "easter": "#0bff00 #2b2e2c",
     }
-    gpu_environment = (
-        "DRI_PRIME",
-        "__NV_PRIME_RENDER_OFFLOAD",
-        "__GLX_VENDOR_LIBRARY_NAME",
-        "__VK_LAYER_NV_optimus",
-        "VK_ICD_FILENAMES",
-    )
 
     terminals = [
-        # Third party
-        ["foot", "%s"],
-        ["kitty", "%s"],
-        ["ghostty", "-e %s"],
-        ["alacritty", "-e %s"],
-        ["tilix", "-- %s"],
-        ["st", "-e %s"],
-        ["wezterm", "-e -- %s"],
-        # Desktop environments
-        ["ptyxis", "-- %s"],
+        # Desktop environments / Freedesktop standard
+        ["xdg-terminal-exec", "sh -c %s"],
+        ["konsole", "--noclose -e sh -c %s"],
+        ["ptyxis", "-- sh -c %s"],
+        ["gnome-terminal", "-- sh -c %s"],
+        ["kgx", "-e sh -c %s"],
         ["cosmic-term", "-e sh -c %s"],
-        ["xfce4-terminal", "-e %s"],
-        ["konsole", "--noclose -e %s"],
-        ["gnome-terminal", "-- %s"],
-        ["kgx", "-e %s"],
-        ["mate-terminal", "--command %s"],
-        ["qterminal", "--execute %s"],
-        ["lxterminal", "-e %s"],
+        ["xfce4-terminal", "--hold -x sh -c %s"],
+        ["mate-terminal", "-x sh -c %s"],
+        ["qterminal", "-e sh -c %s"],
+        ["lxterminal", "-e sh -c %s"],
+        # Distro alternative
+        ["x-terminal-emulator", "-e sh -c %s"],
+        # Third party
+        ["ghostty", "-e sh -c %s"],
+        ["alacritty", "--hold -e sh -c %s"],
+        ["kitty", "--hold sh -c %s"],
+        ["foot", "--hold sh -c %s"],
+        ["wezterm", "start -- sh -c %s"],
+        ["tilix", "-- sh -c %s"],
+        ["st", "-e sh -c %s"],
         # Fallback
-        ["xterm", "-e %s"],
+        ["xterm", "-hold -e sh -c %s"],
     ]
 
     def __init__(self):
         self.terminal = None
 
-    def check_support(self):
+    def get_preferred_terminals(self) -> list[list[str]]:
         import shutil
 
-        for terminal in self.terminals:
+        de = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+        session = os.environ.get("DESKTOP_SESSION", "").lower()
+
+        # 1. Standard freedesktop terminal executor (if available)
+        primary_names: list[str] = ["xdg-terminal-exec"]
+
+        # 2. Desktop environment native terminals
+        if "kde" in de or "plasma" in session:
+            primary_names.extend(["konsole", "qterminal"])
+        elif "gnome" in de or "gnome" in session:
+            primary_names.extend(["ptyxis", "gnome-terminal", "kgx"])
+        elif "cosmic" in de or "cosmic" in session:
+            primary_names.append("cosmic-term")
+        elif "xfce" in de or "xfce" in session:
+            primary_names.append("xfce4-terminal")
+        elif "mate" in de or "mate" in session:
+            primary_names.append("mate-terminal")
+        elif "lxqt" in de or "lxqt" in session:
+            primary_names.append("qterminal")
+        elif "cinnamon" in de or "cinnamon" in session:
+            primary_names.append("gnome-terminal")
+
+        # 3. System alternatives (Debian/Ubuntu/etc.)
+        primary_names.append("x-terminal-emulator")
+
+        # 4. User-defined TERMINAL environment variable (if set and binary exists)
+        terminal_env = os.environ.get("TERMINAL", "").strip()
+        env_term_entry: list[str] | None = None
+        if terminal_env:
+            parts = shlex.split(terminal_env)
+            if parts and shutil.which(parts[0]):
+                env_bin = parts[0]
+                matched = next((t for t in self.terminals if t[0] == env_bin), None)
+                if matched:
+                    env_term_entry = matched
+                else:
+                    env_term_entry = [env_bin, "-e sh -c %s"]
+
+        ordered: list[list[str]] = []
+
+        # Add DE/standard primary candidates if known in self.terminals
+        for name in primary_names:
+            for term in self.terminals:
+                if term[0] == name and term not in ordered:
+                    ordered.append(term)
+
+        # In standalone window managers (e.g. Sway, Hyprland, MangoWM, i3),
+        # prioritize $TERMINAL if configured.
+        is_full_de = any(
+            env_name in de or env_name in session
+            for env_name in [
+                "kde",
+                "plasma",
+                "gnome",
+                "cosmic",
+                "xfce",
+                "mate",
+                "lxqt",
+                "cinnamon",
+            ]
+        )
+        if env_term_entry:
+            if not is_full_de:
+                if env_term_entry in ordered:
+                    ordered.remove(env_term_entry)
+                ordered.insert(0, env_term_entry)
+            elif env_term_entry not in ordered:
+                ordered.append(env_term_entry)
+
+        # Append remaining supported terminals
+        for term in self.terminals:
+            if term not in ordered:
+                ordered.append(term)
+
+        return ordered
+
+    def check_support(self) -> bool:
+        import shutil
+
+        for terminal in self.get_preferred_terminals():
             if shutil.which(terminal[0]):
                 self.terminal = terminal
                 return True
 
         return False
+
+    @staticmethod
+    def build_argv(
+        terminal_entry: list[str] | tuple[str, ...], command: str
+    ) -> list[str]:
+        parts = list(terminal_entry)
+        flat_parts: list[str] = []
+        has_placeholder = False
+
+        for p in parts:
+            if "%s" in p:
+                has_placeholder = True
+                sub = shlex.split(p.replace("%s", "PLACEHOLDER"))
+                for s in sub:
+                    if "PLACEHOLDER" in s:
+                        flat_parts.append("%s")
+                    else:
+                        flat_parts.append(s)
+            else:
+                flat_parts.extend(shlex.split(p))
+
+        has_sh = "sh" in flat_parts and "-c" in flat_parts
+
+        if has_placeholder:
+            argv: list[str] = []
+            for p in flat_parts:
+                if p == "%s":
+                    if not has_sh:
+                        argv.extend(["sh", "-c", command])
+                    else:
+                        argv.append(command)
+                else:
+                    argv.append(p)
+            return argv
+        else:
+            if not has_sh:
+                return flat_parts + ["sh", "-c", command]
+            return flat_parts + [command]
 
     def execute(self, command, env=None, colors="default", cwd=None):
         if env is None:
@@ -94,59 +207,21 @@ class TerminalUtils:
             logging.warning("No terminal available.")
             return False
 
-        if colors not in self.colors:
-            colors = "default"
-
         command = str(command)
-        # We don't quote 'command' here because it's quoted inside the shell wrapper
-        # to ensure it behaves correctly across all terminal emulators and wrappers.
+        argv = self.build_argv(self.terminal, command)
 
-        terminal = self.terminal
-        template = " ".join(terminal)
-        term_bin = os.path.basename(terminal[0])
-
-        if term_bin == "cosmic-term":
-            # cosmic-term template already includes 'sh -c'
-            cmd_for_shell = shlex.quote(command)
-            try:
-                full_cmd = template % cmd_for_shell
-            except Exception:
-                full_cmd = f"{template} {cmd_for_shell}"
-
-        elif term_bin in [
-            "xfce4-terminal",
-            "kitty",
-            "foot",
-            "konsole",
-            "gnome-terminal",
-            "wezterm",
-        ]:
-            cmd_for_shell = shlex.quote(f"sh -c {shlex.quote(command)}")
-            try:
-                full_cmd = template % cmd_for_shell
-            except Exception:
-                full_cmd = f"{template} {cmd_for_shell}"
-
-        else:
-            cmd_for_shell = shlex.quote(f"sh -c {shlex.quote(command)}")
-            try:
-                full_cmd = template % cmd_for_shell
-            except Exception:
-                full_cmd = f"{template} {cmd_for_shell}"
-
-        logging.info(f"Command: {full_cmd}")
+        logging.info(f"Command: {shlex.join(argv)}")
 
         try:
-            proc_out = subprocess.Popen(
-                full_cmd, shell=True, env=env, stdout=subprocess.PIPE, cwd=cwd
-            ).communicate()[0]
-            if proc_out:
-                try:
-                    proc_out.decode("utf-8")
-                except Exception:
-                    pass
-        except Exception:
-            logging.warning("Failed to launch terminal command.")
+            proc = subprocess.Popen(
+                argv,
+                shell=False,
+                env=env,
+                cwd=cwd,
+            )
+            proc.communicate()
+        except Exception as e:
+            logging.warning(f"Failed to launch terminal command: {e}")
             return False
 
         return True
@@ -154,4 +229,4 @@ class TerminalUtils:
     def launch_snake(self):
         snake_path = os.path.dirname(os.path.realpath(__file__))
         snake_path = os.path.join(snake_path, "snake.py")
-        self.execute(command="python %s" % snake_path, colors="easter")
+        self.execute(command=f"python {shlex.quote(snake_path)}", colors="easter")

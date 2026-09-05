@@ -345,6 +345,7 @@ def test_run_uses_dedicated_sandbox_when_enabled(monkeypatch, tmp_path):
     assert "--clearenv" in argv
     assert f"--bind {prefix} {prefix}" in argv
     assert f"--bind {tmp_path / 'data' / 'umu'} {tmp_path / 'data' / 'umu'}" in argv
+    assert "--ro-bind / /" not in argv
     assert "--share-net" not in argv
     assert "'$(touch ignored)'" in argv
     assert kwargs["shell"] is True
@@ -384,7 +385,6 @@ def test_dedicated_sandbox_exposes_managed_proton(monkeypatch, tmp_path):
         calls.append((argv, kwargs))
         return Process()
 
-    monkeypatch.setenv("FLATPAK_ID", "com.usebottles.bottles")
     monkeypatch.setattr(executor, "_ensure_sandbox_runtime", lambda _command: None)
     monkeypatch.setattr(executor_module.subprocess, "Popen", popen)
 
@@ -392,6 +392,7 @@ def test_dedicated_sandbox_exposes_managed_proton(monkeypatch, tmp_path):
 
     argv, _kwargs = calls[0]
     assert f"--ro-bind {proton} {proton}" in argv
+    assert "--ro-bind / /" not in argv
 
 
 def test_dedicated_sandbox_uses_native_umu_path(monkeypatch, tmp_path):

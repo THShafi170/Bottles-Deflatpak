@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    67.1
+Version:    67.2
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}
@@ -136,6 +136,13 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
 %changelog
+* Sat Sep 05 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.2-1
+- Sync with upstream 67.2
+- Fixed Proton font links after runner updates
+- Fixed UMU dedicated sandbox host filesystem isolation
+- Fixed installer icons failing to load from hosts that reject anonymous requests
+- Pure native execution without Flatpak overhead
+
 * Wed Sep 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.1-1
 - Sync with upstream 67.1
 - Fixed UMU runtime preparation inside dedicated sandbox

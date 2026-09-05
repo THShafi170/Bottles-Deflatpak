@@ -52,3 +52,102 @@ def test_supported_terminals_contain_modern_terminals():
     assert "ghostty" in bins
     assert "alacritty" in bins
     assert "foot" in bins
+    assert "konsole" in bins
+    assert "kitty" in bins
+
+
+def test_kde_desktop_prioritizes_konsole(monkeypatch):
+    import shutil as _shutil
+
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    monkeypatch.setenv("DESKTOP_SESSION", "plasma")
+    monkeypatch.delenv("TERMINAL", raising=False)
+    # Simulate both konsole and kitty being installed
+    monkeypatch.setattr(
+        _shutil,
+        "which",
+        lambda cmd: f"/usr/bin/{cmd}" if cmd in ["konsole", "kitty"] else None,
+    )
+    terminal = TerminalUtils()
+    assert terminal.check_support() is True
+    assert terminal.terminal[0] == "konsole"
+
+
+def test_execute_formats_command_with_spaces(mocker):
+    terminal = TerminalUtils()
+    terminal.terminal = ["konsole", "--noclose -e sh -c %s"]
+    mocker.patch.object(terminal, "check_support", return_value=True)
+    popen = mocker.patch("bottles.backend.utils.terminal.subprocess.Popen")
+    popen.return_value.communicate.return_value = (b"", None)
+
+    cmd = "/usr/bin/gamemoderun '/home/user/Custom Runner/files/bin/wine' start /wait game.exe"
+    result = terminal.execute(cmd)
+
+    assert result is True
+    call_args = popen.call_args[0][0]
+    assert call_args == ["konsole", "--noclose", "-e", "sh", "-c", cmd]
+    assert popen.call_args.kwargs.get("shell") is False
+
+
+def test_xdg_terminal_exec_prioritized(monkeypatch):
+    import shutil as _shutil
+
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    monkeypatch.setenv("DESKTOP_SESSION", "plasma")
+    monkeypatch.delenv("TERMINAL", raising=False)
+    monkeypatch.setattr(
+        _shutil,
+        "which",
+        lambda cmd: (
+            f"/usr/bin/{cmd}"
+            if cmd in ["xdg-terminal-exec", "konsole", "kitty"]
+            else None
+        ),
+    )
+    terminal = TerminalUtils()
+    assert terminal.check_support() is True
+    assert terminal.terminal[0] == "xdg-terminal-exec"
+
+
+def test_wm_session_prioritizes_terminal_env(monkeypatch):
+    import shutil as _shutil
+
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "Hyprland")
+    monkeypatch.setenv("DESKTOP_SESSION", "hyprland")
+    monkeypatch.setenv("TERMINAL", "foot")
+    monkeypatch.setattr(
+        _shutil,
+        "which",
+        lambda cmd: f"/usr/bin/{cmd}" if cmd in ["foot", "kitty", "konsole"] else None,
+    )
+    terminal = TerminalUtils()
+    assert terminal.check_support() is True
+    assert terminal.terminal[0] == "foot"
+
+
+def test_build_argv_supports_various_templates():
+    cmd = "wine '/games/My Game/game.exe'"
+    assert TerminalUtils.build_argv(["foot", "%s"], cmd) == [
+        "foot",
+        "sh",
+        "-c",
+        cmd,
+    ]
+    assert TerminalUtils.build_argv(["alacritty", "-e %s"], cmd) == [
+        "alacritty",
+        "-e",
+        "sh",
+        "-c",
+        cmd,
+    ]
+    assert TerminalUtils.build_argv(["konsole", "--noclose -e sh -c %s"], cmd) == [
+        "konsole",
+        "--noclose",
+        "-e",
+        "sh",
+        "-c",
+        cmd,
+    ]
+    assert TerminalUtils.build_argv(
+        ["konsole", "--noclose", "-e", "sh", "-c"], cmd
+    ) == ["konsole", "--noclose", "-e", "sh", "-c", cmd]

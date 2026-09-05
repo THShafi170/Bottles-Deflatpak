@@ -1,3 +1,6 @@
+* Sat Sep 05 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.2-1
+- Sync with upstream 67.2 (Proton font links, UMU dedicated sandbox isolation, installer icon fix)
+
 * Wed Sep 02 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.1-1
 - Sync with upstream 67.1 (UMU runtime prep, opt-in network, add menu, argument toggle)
 

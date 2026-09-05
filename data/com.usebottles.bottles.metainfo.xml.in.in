@@ -86,6 +86,15 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="67.2" date="2026-09-03">
+      <description translate="no">
+        <ul>
+          <li>Fixed Proton font links not being refreshed after runner updates</li>
+          <li>Fixed the UMU dedicated sandbox exposing the host filesystem read-only</li>
+          <li>Fixed installer icons failing to load from hosts that reject anonymous requests</li>
+        </ul>
+      </description>
+    </release>
     <release version="67.1" date="2026-09-02">
       <description translate="no">
         <ul>
@@ -131,7 +140,6 @@
           <li>Fixed component selectors after bottle creation and program refresh after executable discovery</li>
           <li>Hidden the offline warning when offline mode is enabled explicitly</li>
           <li>Replaced the retired connectivity endpoint and added IPv4 fallback</li>
-          <li>Updated the official cpak package to manifest v3 with bundled UMU</li>
         </ul>
       </description>
     </release>
@@ -141,7 +149,6 @@
           <li>Fixed the Stop action for games launched from the Library</li>
           <li>Fixed opening custom bottle folders</li>
           <li>Fixed steamuser profile aliases when the home directory is a symbolic link</li>
-          <li>Added dconf and xz to the cpak runtime</li>
         </ul>
       </description>
     </release>
@@ -225,7 +232,6 @@
           <li>Integrated UMU with Library-managed games, prefixes, per-game Proton settings, dependencies and command line support</li>
           <li>Added ProtoSoda as the default UMU runner with the Soda compatibility work in a Proton environment</li>
           <li>Added Adaptive Launch profiling for bottles using Soda 11.0-5 or newer</li>
-          <li>Added an experimental official cpak package built from the Bottles source tree and release tags</li>
           <li>Added official runner logos and bundled the symbolic icons required by the interface</li>
           <li>Improved runner and graphics component updates with a shared bulk update flow</li>
           <li>Added Steam Linux Runtime 4 support for Proton 11 and synchronized its VKD3D utilities</li>
