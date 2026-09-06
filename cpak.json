@@ -4,7 +4,7 @@
   "name": "Bottles",
   "description": "Run and manage your Windows applications on Linux with Wine and Proton.",
   "version": "67.2",
-  "image": "ghcr.io/bottlesdevs/bottles@sha256:334265cee99fcec69f74a3974883c4e42aeecfd87bf1d5261ad2bf3d5d0937f1",
+  "image": "ghcr.io/bottlesdevs/bottles@sha256:8602ab7f181aca1a09e11399d60717fab1effabe70b5a56c61c6a539e2efb7b4",
   "binaries": [
     "/usr/bin/bottles",
     "/usr/bin/bottles-cli"
