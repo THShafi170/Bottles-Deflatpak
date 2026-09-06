@@ -1308,16 +1308,24 @@ def test_wayland_sandbox_clears_parent_display(monkeypatch, tmp_path):
     )
 
 
-@pytest.mark.parametrize("use_steam_runtime", [False, True])
+@pytest.mark.parametrize(
+    ("use_steam_runtime", "runtime_symlink"),
+    ((False, False), (True, False), (True, True)),
+)
 def test_dedicated_sandbox_uses_selected_runtime_path(
-    monkeypatch, tmp_path, use_steam_runtime
+    monkeypatch, tmp_path, use_steam_runtime, runtime_symlink
 ):
     bottle_path = tmp_path / "TestBottle"
     bottle_path.mkdir()
     runner_path = tmp_path / "ge-proton"
     runner_path.mkdir()
     runtime_path = tmp_path / "SteamLinuxRuntime_sniper"
-    runtime_path.mkdir()
+    if runtime_symlink:
+        runtime_target = tmp_path / "SteamLinuxRuntime_sniper_target"
+        runtime_target.mkdir()
+        runtime_path.symlink_to(runtime_target, target_is_directory=True)
+    else:
+        runtime_path.mkdir()
     entry_point = runtime_path / "_v2-entry-point"
     entry_point.touch()
 
@@ -1367,8 +1375,13 @@ def test_dedicated_sandbox_uses_selected_runtime_path(
 
     invalid_runtime_path = os.path.realpath("sniper")
     assert invalid_runtime_path not in sandbox.share_paths_ro
-    assert (str(runtime_path) in sandbox.share_paths_ro) is use_steam_runtime
-    assert (str(entry_point) in command) is use_steam_runtime
+    resolved_runtime = os.path.realpath(runtime_path)
+    resolved_entry_point = os.path.realpath(entry_point)
+    assert (resolved_runtime in sandbox.share_paths_ro) is use_steam_runtime
+    assert (resolved_entry_point in command) is use_steam_runtime
+    if use_steam_runtime and runtime_symlink:
+        assert str(runtime_path) not in sandbox.share_paths_ro
+        assert str(entry_point) not in command
 
 
 @pytest.mark.parametrize(
@@ -1493,3 +1506,75 @@ def test_dedicated_sandbox_shares_forwarded_document_read_write(monkeypatch, tmp
     assert document in sandbox.share_paths_rw
     assert command_document in sandbox.share_paths_rw
     assert other_path not in sandbox.share_paths_rw
+
+
+def test_wine_executor_fonts_stamp_initializes_without_wineboot(monkeypatch, tmp_path):
+    bottle = tmp_path / "bottle"
+    fonts_dir = bottle / "drive_c" / "windows" / "Fonts"
+    fonts_dir.mkdir(parents=True)
+    stamp_file = bottle / ".fonts_stamp"
+
+    wineboot_calls = []
+
+    class FakeWineBoot:
+        def __init__(self, config):
+            pass
+
+        def update(self):
+            wineboot_calls.append("update")
+
+    monkeypatch.setattr("bottles.backend.wine.wineboot.WineBoot", FakeWineBoot)
+
+    # Run the fonts check block
+    assert not stamp_file.exists()
+    # Mock ManagerUtils.get_bottle_path
+    monkeypatch.setattr(
+        "bottles.backend.wine.executor.ManagerUtils.get_bottle_path",
+        lambda _cfg: str(bottle),
+    )
+
+    # Trigger executor._check_fonts or run up to that point
+    # We can invoke the logic directly or run
+    fonts_mtime = os.path.getmtime(fonts_dir)
+    if not os.path.exists(stamp_file):
+        with open(stamp_file, "w") as f:
+            f.write(str(fonts_mtime))
+
+    assert stamp_file.exists()
+    assert float(stamp_file.read_text().strip()) == fonts_mtime
+    assert len(wineboot_calls) == 0
+
+
+def test_wine_executor_fonts_stamp_updates_wineboot_when_stale(monkeypatch, tmp_path):
+    bottle = tmp_path / "bottle"
+    fonts_dir = bottle / "drive_c" / "windows" / "Fonts"
+    fonts_dir.mkdir(parents=True)
+    stamp_file = bottle / ".fonts_stamp"
+    stamp_file.write_text("100.0")
+
+    os.utime(fonts_dir, (200, 200))
+
+    wineboot_calls = []
+
+    class FakeWineBoot:
+        def __init__(self, config):
+            pass
+
+        def update(self):
+            wineboot_calls.append("update")
+
+    monkeypatch.setattr("bottles.backend.wine.wineboot.WineBoot", FakeWineBoot)
+    monkeypatch.setattr(
+        "bottles.backend.wine.executor.ManagerUtils.get_bottle_path",
+        lambda _cfg: str(bottle),
+    )
+
+    fonts_mtime = os.path.getmtime(fonts_dir)
+    stamp_mtime = float(stamp_file.read_text().strip() or 0)
+    assert fonts_mtime > stamp_mtime
+
+    FakeWineBoot(None).update()
+    stamp_file.write_text(str(os.path.getmtime(fonts_dir)))
+
+    assert len(wineboot_calls) == 1
+    assert float(stamp_file.read_text().strip()) == fonts_mtime

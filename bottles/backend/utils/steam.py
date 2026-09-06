@@ -184,6 +184,10 @@ class SteamUtils:
                     if os.path.lexists(destination):
                         if not os.path.islink(destination):
                             continue
+                        if os.readlink(destination) == source or os.path.realpath(
+                            destination
+                        ) == os.path.realpath(source):
+                            continue
                         os.unlink(destination)
                     os.makedirs(destination_dir, exist_ok=True)
                     os.symlink(source, destination)

@@ -212,3 +212,23 @@ def test_run_dialog_launches_rundll32_shell32(monkeypatch):
     BottleView.run_dialog(view, None)
 
     assert calls == ["run_dialog"]
+
+
+def test_populate_updates_hides_empty_group():
+    visibility = []
+    view = SimpleNamespace(
+        config=BottleConfig(Name="Test"),
+        manager=SimpleNamespace(
+            settings=SimpleNamespace(get_boolean=lambda _key: True),
+            get_component_updates=lambda _config: [],
+        ),
+        group_updates=SimpleNamespace(
+            remove=lambda _row: None,
+            set_visible=visibility.append,
+        ),
+        _BottleView__update_rows=[],
+    )
+
+    BottleView.populate_updates(view)
+
+    assert visibility == [False]

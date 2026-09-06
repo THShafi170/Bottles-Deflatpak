@@ -114,6 +114,29 @@ def test_sync_proton_fonts_replaces_only_existing_symlinks(tmp_path: Path) -> No
     assert (prefix_fonts / "arial.ttf").read_bytes() == b"custom"
 
 
+def test_sync_proton_fonts_is_idempotent_and_preserves_symlinks(
+    tmp_path: Path,
+) -> None:
+    proton_path = tmp_path / "Proton"
+    prefix_fonts = tmp_path / "prefix/drive_c/windows/Fonts"
+    source_fonts = proton_path / "files/share/wine/fonts"
+    source_fonts.mkdir(parents=True)
+    prefix_fonts.mkdir(parents=True)
+    (source_fonts / "tahoma.ttf").write_bytes(b"tahoma")
+
+    SteamUtils.sync_proton_fonts(str(proton_path), str(prefix_fonts.parents[2]))
+    tahoma = prefix_fonts / "tahoma.ttf"
+    assert tahoma.is_symlink()
+    initial_lstat = tahoma.lstat()
+
+    # Second sync must be a no-op, preserving existing symlink inode and timestamp
+    SteamUtils.sync_proton_fonts(str(proton_path), str(prefix_fonts.parents[2]))
+    second_lstat = tahoma.lstat()
+
+    assert initial_lstat.st_mtime_ns == second_lstat.st_mtime_ns
+    assert initial_lstat.st_ino == second_lstat.st_ino
+
+
 def _write_protonfixes(path: Path, replacement: str) -> None:
     package = path / "protonfixes"
     package.mkdir(parents=True)

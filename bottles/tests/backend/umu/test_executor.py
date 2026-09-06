@@ -344,7 +344,7 @@ def test_run_uses_dedicated_sandbox_when_enabled(monkeypatch, tmp_path):
     assert argv.startswith("bwrap ")
     assert "--clearenv" in argv
     assert f"--bind {prefix} {prefix}" in argv
-    assert f"--bind {tmp_path / 'data' / 'umu'} {tmp_path / 'data' / 'umu'}" in argv
+    assert f"--ro-bind {tmp_path / 'data' / 'umu'} {tmp_path / 'data' / 'umu'}" in argv
     assert "--ro-bind / /" not in argv
     assert "--share-net" not in argv
     assert "'$(touch ignored)'" in argv
@@ -431,7 +431,8 @@ def test_dedicated_sandbox_uses_native_umu_path(monkeypatch, tmp_path):
 
     argv, _kwargs = calls[0]
     runtime = tmp_path / "data" / "umu"
-    assert f"--bind {runtime} {runtime}" in argv
+    assert f"--ro-bind {runtime} {runtime}" in argv
+    assert f"--bind {runtime} {runtime}" not in argv
     assert "--unshare-net" in argv
 
 
