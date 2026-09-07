@@ -1,3 +1,11 @@
+bottles-deflatpak (67.3) unstable; urgency=medium
+
+  * Sync with upstream 67.3 release.
+  * UMU and Gamescope improvements for native environment.
+  * Wine launch speedup and idempotency optimizations.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Mon, 07 Sep 2026 17:50:00 +0600
+
 bottles-deflatpak (67.2) unstable; urgency=medium
 
   * Sync with upstream 67.2.

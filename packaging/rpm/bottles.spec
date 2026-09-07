@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    67.2
+Version:    67.3
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}
@@ -136,6 +136,11 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
 %changelog
+* Mon Sep 07 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.3-1
+- Sync with upstream 67.3
+- UMU and Gamescope improvements for native environment
+- Wine launch speedup and idempotency optimizations
+
 * Sat Sep 05 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.2-1
 - Sync with upstream 67.2
 - Fixed Proton font links after runner updates

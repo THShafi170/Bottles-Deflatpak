@@ -1122,9 +1122,6 @@ class CLI:
         winecommand = WineCommand(config=bottle, command='"$@"')
         env = winecommand.get_env(return_clean_env=True)
         cmd = winecommand.get_cmd('"$@"', return_clean_cmd=True)
-        winecommand.command.replace(
-            "/usr/lib/extensions/vulkan/MangoHud/bin/mangohud", ""
-        )
 
         if os.path.isfile(standalone_path):
             os.remove(standalone_path)

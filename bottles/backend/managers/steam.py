@@ -44,8 +44,9 @@ from bottles.backend.wine.winecommand import WineCommand
 logging = Logger()
 
 STEAM_COMPATIBILITY_TOOL_PATHS = (
-    "/app/share/steam/compatibilitytools.d",
     "/usr/share/steam/compatibilitytools.d",
+    "/usr/local/share/steam/compatibilitytools.d",
+    "/run/current-system/sw/share/steam/compatibilitytools.d",
 )
 
 

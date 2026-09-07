@@ -27,7 +27,7 @@ class UmuProvider:
     def __init__(
         self,
         explicit_path: str | Path | None = None,
-        bundled_path: str | Path | None = "/app/bin/umu-run",
+        bundled_path: str | Path | None = None,
         fallback_path: str | Path | None = None,
         timeout: float = 5,
     ):

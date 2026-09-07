@@ -203,12 +203,7 @@ class BottlesWindow(Adw.ApplicationWindow):
             try:
                 portal = Xdp.Portal()
                 parent = XdpGtk4.parent_new_gtk(self)
-                if uri.startswith("file:"):
-                    portal.open_directory(
-                        parent, uri, Xdp.OpenUriFlags.NONE, None, None
-                    )
-                else:
-                    portal.open_uri(parent, uri, Xdp.OpenUriFlags.NONE, None, None)
+                portal.open_uri(parent, uri, Xdp.OpenUriFlags.NONE, None, None)
                 return
             except Exception:
                 pass

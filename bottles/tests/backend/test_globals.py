@@ -1,11 +1,8 @@
 from bottles.backend.globals import Paths
 
 
-def test_lsfg_vk_detects_layer_in_extension_path(monkeypatch):
-    expected = (
-        "/usr/lib/extensions/vulkan/lsfgvk/share/vulkan/implicit_layer.d/"
-        "VkLayer_LS_frame_generation.json"
-    )
+def test_lsfg_vk_detects_layer_in_system_path(monkeypatch):
+    expected = "/usr/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json"
     monkeypatch.setattr(
         "bottles.backend.globals.os.path.isfile",
         lambda path: path == expected,

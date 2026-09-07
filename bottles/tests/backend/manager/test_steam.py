@@ -226,7 +226,7 @@ def test_list_compatibility_tools_keeps_only_valid_proton(tmp_path, monkeypatch)
 
 
 def test_list_compatibility_tools_without_steam(tmp_path, monkeypatch):
-    tools = tmp_path / "flatpak-extension"
+    tools = tmp_path / "system-tools"
     proton = tools / "GE-Proton10-4"
     proton.mkdir(parents=True)
     (proton / "toolmanifest.vdf").write_text(

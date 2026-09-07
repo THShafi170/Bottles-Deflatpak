@@ -56,10 +56,12 @@ class Paths:
     @staticmethod
     def is_vkbasalt_available():
         vkbasalt_paths = [
-            "/usr/lib/extensions/vulkan/vkBasalt/etc/vkBasalt",
-            "/usr/local",
+            "/etc/vkBasalt",
+            "/etc/vkBasalt/vkBasalt.conf",
             "/usr/share/vkBasalt",
+            "/usr/local/share/vkBasalt",
             "/run/current-system/sw/share/vkBasalt",
+            f"{Paths.xdg_data_home}/vkBasalt",
         ]
         for path in vkbasalt_paths:
             if os.path.exists(path):
@@ -74,11 +76,11 @@ class Paths:
             if path
         ]
         layer_dirs += [
-            "/usr/lib/extensions/vulkan/lsfgvk/share/vulkan/implicit_layer.d",
             f"{Paths.xdg_data_home}/vulkan/implicit_layer.d",
-            "/usr/local/share/vulkan/implicit_layer.d",
             "/usr/share/vulkan/implicit_layer.d",
+            "/usr/local/share/vulkan/implicit_layer.d",
             "/etc/vulkan/implicit_layer.d",
+            "/run/current-system/sw/share/vulkan/implicit_layer.d",
         ]
         for version, manifest in (
             (2, "VkLayer_LSFGVK_frame_generation.json"),

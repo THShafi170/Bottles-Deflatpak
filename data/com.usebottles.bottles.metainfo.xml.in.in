@@ -86,6 +86,17 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="67.3" date="2026-09-07">
+      <description translate="no">
+        <ul>
+          <li>Fixed Steam runtime launches when the runtime path uses a symbolic link</li>
+          <li>Improved desktop integration and URI handling for native environments</li>
+          <li>Reaped Gamescope child processes properly on exit</li>
+          <li>Protected shared UMU data and kept UMU details visible</li>
+          <li>Hidden the component update section when no updates are available</li>
+        </ul>
+      </description>
+    </release>
     <release version="67.2" date="2026-09-03">
       <description translate="no">
         <ul>

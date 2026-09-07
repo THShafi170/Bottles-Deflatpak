@@ -27,7 +27,7 @@ def test_vulkan_detects_nouveau_icds(monkeypatch, tmp_path):
     }
 
 
-def test_nouveau_detection_uses_sysfs_inside_flatpak(monkeypatch):
+def test_nouveau_detection_uses_sysfs(monkeypatch):
     monkeypatch.setattr(
         gpu_module.os.path,
         "isdir",

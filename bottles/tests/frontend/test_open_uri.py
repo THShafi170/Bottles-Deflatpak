@@ -52,9 +52,9 @@ def test_portal_used_for_file_uri_when_xdp_available(monkeypatch):
 
     _handler(uri, XdpStub, XdpGtk4Stub, lambda *a: gtk_calls.append(a), monkeypatch)
 
-    assert len(PortalStub.directory_calls) == 1
-    assert PortalStub.directory_calls[0][1] == uri
-    assert not PortalStub.uri_calls
+    assert len(PortalStub.uri_calls) == 1
+    assert PortalStub.uri_calls[0][1] == uri
+    assert not PortalStub.directory_calls
     assert not gtk_calls
 
 
