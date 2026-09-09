@@ -1,3 +1,11 @@
+bottles-deflatpak (67.4) unstable; urgency=medium
+
+  * Sync with upstream 67.4 release.
+  * Update Soda 11.0-10 references.
+  * Fix Battle.net crashes and KiriKiri first-run video freezing.
+
+ -- Tenshou Zmeyev <tenshou170@gmail.com>  Wed, 09 Sep 2026 10:00:00 +0600
+
 bottles-deflatpak (67.3) unstable; urgency=medium
 
   * Sync with upstream 67.3 release.

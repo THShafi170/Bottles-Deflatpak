@@ -1,3 +1,6 @@
+* Wed Sep 09 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.4-1
+- Sync with upstream 67.4 (Soda 11.0-10 references, Battle.net and KiriKiri fixes)
+
 * Mon Sep 07 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.3-1
 - Sync with upstream 67.3 (UMU and Gamescope native improvements, Wine launch speedup)
 

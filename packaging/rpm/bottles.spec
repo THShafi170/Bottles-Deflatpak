@@ -1,5 +1,5 @@
 Name:       bottles-deflatpak
-Version:    67.3
+Version:    67.4
 Release:    1
 Summary:    Run Windows in a Bottle (native fork, no Flatpak)
 Provides:   bottles = %{version}-%{release}
@@ -136,6 +136,11 @@ desktop-file-validate %buildroot%_datadir/applications/*.desktop
 
 
 %changelog
+* Wed Sep 09 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.4-1
+- Sync with upstream 67.4
+- Update Soda 11.0-10 references
+- Fix Battle.net crashes and KiriKiri first-run video freezing
+
 * Mon Sep 07 2026 Tenshou Zmeyev <tenshou170@gmail.com> - 67.3-1
 - Sync with upstream 67.3
 - UMU and Gamescope improvements for native environment
